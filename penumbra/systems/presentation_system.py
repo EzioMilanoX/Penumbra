@@ -1,0 +1,375 @@
+"""
+Traducao do estado para pixels: uma entidade visual por celula da grade.
+
+Paleta deliberadamente minima -- preto, branco e um terceiro tom dourado. O
+dourado nao decora: ele aparece SO no que exige os dois seres ao mesmo tempo
+(zonas de polaridade, a porta que elas destrancam, os dois portais). Quando
+a tela mostra dourado, o jogador esta olhando para o unico tipo de problema
+que nenhum dos dois resolve sozinho.
+
+As celulas nao sao redesenhadas por um laco Python: as 880 entidades de
+celula existem do primeiro ao ultimo frame do processo (nenhuma e criada ou
+destruida nem quando a fase troca), suas linhas densas sao resolvidas uma
+vez na composicao, e este sistema so reescreve colunas inteiras de tint/
+escala com ufuncs NumPy.
+"""
+from __future__ import annotations
+
+import math
+
+import numpy as np
+
+from ouroboros.core.systems.base_system import ISystem
+from ouroboros.core.world import World
+from ouroboros.interfaces.renderer import SHAPE_CIRCLE, SHAPE_RECT, SHAPE_RING
+
+from penumbra.state import DualityState, LUMEN, UMBRA
+from penumbra.terrain import (
+    ROLE_DOOR,
+    ROLE_EMPTY,
+    ROLE_ETHER,
+    ROLE_LAMP,
+    ROLE_LUMEN_GOAL,
+    ROLE_ROCK,
+    ROLE_UMBRA_GOAL,
+    ROLE_ZONE_LIGHT,
+    ROLE_ZONE_SHADOW,
+    Terrain,
+)
+from penumbra.tuning import DualityTuning
+
+# --- terceiro tom: dourado, reservado ao que e cooperativo ---
+GOLD_DIM = (96, 76, 38)
+GOLD = (196, 158, 82)
+GOLD_BRIGHT = (247, 214, 138)
+
+# --- rocha: o chao neutro, cinza-azulado ---
+ROCK_UNLIT = (25, 25, 33)
+ROCK_LIT = (152, 156, 172)
+
+# --- eter: a materia potencial, o unico terreno que troca de dono ---
+ETHER_SHADOW_DEEP = (42, 40, 56)
+ETHER_SHADOW_EDGE = (88, 84, 112)
+ETHER_LIT_EDGE = (156, 162, 198)
+ETHER_LIT_FULL = (242, 246, 255)
+
+# --- luz no ar: branco frio, translucido ---
+AIR_GLOW = (206, 218, 255)
+AIR_GLOW_MAX_ALPHA = 118.0
+
+LAMP_ON = (255, 250, 232)
+LAMP_SNUFFED = (74, 70, 86)
+
+LUMEN_BODY = (250, 250, 255)
+LUMEN_FADING = (104, 104, 134)
+UMBRA_BODY = (32, 30, 44)
+UMBRA_DISSOLVING = (164, 154, 196)
+UMBRA_RIM = (138, 136, 162)
+
+_ROLE_COUNT = 9
+_CELL_SPRITE_UNIT = 8.0
+"""`PygameRenderer.draw_batch` converte `transform.scale` em pixels
+multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
+de `cell_size` px pede, portanto, `scale = cell_size / 8`."""
+
+_PULSE_HZ = 1.15
+
+
+class PresentationSystem(ISystem):
+    """
+    Reescreve `sprite`/`transform` das entidades puramente visuais.
+
+    Nao le input, nao move ninguem, nao decide nada: se este sistema fosse
+    removido, o jogo continuaria funcionando exatamente igual e ficaria
+    invisivel. E por isso que ele e o ultimo da lista.
+    """
+
+    def __init__(
+        self,
+        terrain: Terrain,
+        state: DualityState,
+        tuning: DualityTuning,
+        cell_entity_indices: np.ndarray,
+        aura_entity_indices: np.ndarray,
+    ) -> None:
+        self._terrain = terrain
+        self._state = state
+        self._tuning = tuning
+        self._cell_entity_indices = cell_entity_indices
+        self._aura_entity_indices = aura_entity_indices
+        self._sprite_pool = None
+        self._transform_pool = None
+        self._cell_sprite_rows = None
+        self._cell_transform_rows = None
+        self._elapsed = 0.0
+
+        cell_count = terrain.rows * terrain.cols
+        self._red = np.zeros(cell_count, dtype=np.float32)
+        self._green = np.zeros(cell_count, dtype=np.float32)
+        self._blue = np.zeros(cell_count, dtype=np.float32)
+        self._alpha = np.zeros(cell_count, dtype=np.float32)
+        self._ramp = np.zeros(cell_count, dtype=np.float32)
+        self._channel = np.zeros(cell_count, dtype=np.float32)
+        self._mask = np.zeros(cell_count, dtype=bool)
+        self._mask_alt = np.zeros(cell_count, dtype=bool)
+
+        # role -> forma primitiva / fracao de uma celula ocupada. Escritos
+        # a cada frame por `np.take` (a fase pode trocar sem que este
+        # sistema saiba: nao existe gancho de "fase carregada" aqui).
+        self._shape_by_role = np.full(_ROLE_COUNT, SHAPE_RECT, dtype=np.uint32)
+        self._shape_by_role[ROLE_LAMP] = SHAPE_CIRCLE
+        self._shape_by_role[ROLE_LUMEN_GOAL] = SHAPE_RING
+        self._shape_by_role[ROLE_UMBRA_GOAL] = SHAPE_RING
+        self._size_by_role = np.ones(_ROLE_COUNT, dtype=np.float32)
+        self._size_by_role[ROLE_LAMP] = 0.44
+        self._size_by_role[ROLE_LUMEN_GOAL] = 0.92
+        self._size_by_role[ROLE_UMBRA_GOAL] = 0.92
+        self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
+
+    def update(self, world: World, delta_time: float) -> None:
+        if self._sprite_pool is None:
+            self._resolve_pools(world)
+        self._elapsed += delta_time
+        self._paint_cells()
+        self._paint_characters()
+        self._paint_auras()
+
+    # ------------------------------------------------------------------
+    # composicao tardia
+    # ------------------------------------------------------------------
+
+    def _resolve_pools(self, world: World) -> None:
+        """As linhas densas das celulas sao resolvidas UMA vez e guardadas.
+
+        Isso e seguro -- e nao um cache que pode envelhecer -- porque
+        nenhuma entidade de Penumbra e destruida em nenhum momento: sem
+        `detach`, o swap-remove que invalidaria estas linhas nunca
+        acontece. Trocar de fase recarrega mascaras, nao entidades."""
+        self._sprite_pool = world.get_pool("sprite")
+        self._transform_pool = world.get_pool("transform")
+        self._cell_sprite_rows = self._sprite_pool.dense_rows_of(self._cell_entity_indices)
+        self._cell_transform_rows = self._transform_pool.dense_rows_of(self._cell_entity_indices)
+
+    # ------------------------------------------------------------------
+    # celulas
+    # ------------------------------------------------------------------
+
+    def _paint_cells(self) -> None:
+        state, terrain = self._state, self._terrain
+        light = state.display_light.reshape(-1)
+        role = terrain.role.reshape(-1)
+        threshold = self._tuning.light.solid_threshold
+        pulse = 0.5 + 0.5 * math.sin(self._elapsed * _PULSE_HZ * math.tau)
+
+        self._red[:] = 0.0
+        self._green[:] = 0.0
+        self._blue[:] = 0.0
+        self._alpha[:] = 0.0
+
+        # ar: a luz em si, translucida sobre o fundo
+        np.equal(role, ROLE_EMPTY, out=self._mask)
+        np.clip(light, 0.0, 1.0, out=self._ramp)
+        self._fill(self._mask, AIR_GLOW, AIR_GLOW)
+        np.multiply(self._ramp, AIR_GLOW_MAX_ALPHA, out=self._channel)
+        np.copyto(self._alpha, self._channel, where=self._mask)
+
+        # rocha: opaca, revelada pela luz que a banha
+        np.equal(role, ROLE_ROCK, out=self._mask)
+        np.clip(light, 0.0, 1.0, out=self._ramp)
+        self._fill(self._mask, ROCK_UNLIT, ROCK_LIT)
+        np.copyto(self._alpha, 255.0, where=self._mask)
+
+        # eter aceso: chao da Lumen
+        np.equal(role, ROLE_ETHER, out=self._mask)
+        np.logical_and(self._mask, state.lit.reshape(-1), out=self._mask_alt)
+        self._ramp_between(light, threshold, 1.0)
+        self._fill(self._mask_alt, ETHER_LIT_EDGE, ETHER_LIT_FULL)
+        np.copyto(self._alpha, 255.0, where=self._mask_alt)
+
+        # eter apagado: chao da Umbra
+        np.logical_and(self._mask, np.logical_not(state.lit.reshape(-1)), out=self._mask_alt)
+        self._ramp_between(light, 0.0, threshold)
+        self._fill(self._mask_alt, ETHER_SHADOW_DEEP, ETHER_SHADOW_EDGE)
+        np.copyto(self._alpha, 255.0, where=self._mask_alt)
+
+        # lampadas: acesas, ou engolidas pelo bolsao de escuridao da Umbra
+        np.equal(role, ROLE_LAMP, out=self._mask)
+        np.logical_and(self._mask, np.logical_not(state.absorbed.reshape(-1)), out=self._mask_alt)
+        self._fill(self._mask_alt, LAMP_ON, LAMP_ON)
+        np.copyto(self._alpha, 255.0, where=self._mask_alt)
+        np.logical_and(self._mask, state.absorbed.reshape(-1), out=self._mask_alt)
+        self._fill(self._mask_alt, LAMP_SNUFFED, LAMP_SNUFFED)
+        np.copyto(self._alpha, 190.0, where=self._mask_alt)
+
+        # porta: parede dourada enquanto trancada, contorno tenue depois
+        np.equal(role, ROLE_DOOR, out=self._mask)
+        if state.door_open:
+            self._fill(self._mask, GOLD_DIM, GOLD_DIM)
+            np.copyto(self._alpha, 52.0, where=self._mask)
+        else:
+            np.clip(light, 0.0, 1.0, out=self._ramp)
+            self._fill(self._mask, GOLD_DIM, GOLD_BRIGHT)
+            np.copyto(self._alpha, 255.0, where=self._mask)
+
+        # zonas de polaridade: acendem quando a condicao delas e cumprida
+        self._paint_zone(role, ROLE_ZONE_LIGHT, state.lit.reshape(-1), satisfied_when_lit=True)
+        self._paint_zone(role, ROLE_ZONE_SHADOW, state.lit.reshape(-1), satisfied_when_lit=False)
+
+        # portais: os dois pulsam, e ficam solidos quando ocupados
+        self._paint_goal(role, ROLE_LUMEN_GOAL, LUMEN, pulse)
+        self._paint_goal(role, ROLE_UMBRA_GOAL, UMBRA, pulse)
+
+        self._flush_cells(role, pulse)
+
+    def _paint_zone(
+        self, role: np.ndarray, role_id: int, lit_flat: np.ndarray, satisfied_when_lit: bool
+    ) -> None:
+        np.equal(role, role_id, out=self._mask)
+        if satisfied_when_lit:
+            np.logical_and(self._mask, lit_flat, out=self._mask_alt)
+        else:
+            np.logical_and(self._mask, np.logical_not(lit_flat), out=self._mask_alt)
+        self._fill(self._mask, GOLD_DIM, GOLD_DIM)
+        np.copyto(self._alpha, 44.0, where=self._mask)
+        self._fill(self._mask_alt, GOLD, GOLD)
+        np.copyto(self._alpha, 132.0, where=self._mask_alt)
+
+    def _paint_goal(self, role: np.ndarray, role_id: int, side: int, pulse: float) -> None:
+        np.equal(role, role_id, out=self._mask)
+        occupied = bool(self._state.reached_goal[side])
+        color = GOLD_BRIGHT if occupied else GOLD
+        self._fill(self._mask, color, color)
+        np.copyto(self._alpha, 255.0 if occupied else (150.0 + 70.0 * pulse), where=self._mask)
+
+    def _flush_cells(self, role: np.ndarray, pulse: float) -> None:
+        sprite_view = self._sprite_pool.active_view()
+        rows = self._cell_sprite_rows
+        sprite_view["tint_r"][rows] = self._red
+        sprite_view["tint_g"][rows] = self._green
+        sprite_view["tint_b"][rows] = self._blue
+        sprite_view["tint_a"][rows] = self._alpha
+        sprite_view["texture_id"][rows] = np.take(self._shape_by_role, role)
+
+        # Escala: fracao da celula por papel, com os portais respirando.
+        np.take(self._size_by_role, role, out=self._channel)
+        np.multiply(self._channel, self._cell_scale, out=self._channel)
+        np.equal(role, ROLE_LUMEN_GOAL, out=self._mask)
+        np.logical_or(self._mask, np.equal(role, ROLE_UMBRA_GOAL), out=self._mask)
+        np.multiply(self._channel, 0.88 + 0.16 * pulse, out=self._ramp)
+        np.copyto(self._channel, self._ramp, where=self._mask)
+
+        transform_view = self._transform_pool.active_view()
+        transform_rows = self._cell_transform_rows
+        transform_view["scale_x"][transform_rows] = self._channel
+        transform_view["scale_y"][transform_rows] = self._channel
+
+    # ------------------------------------------------------------------
+    # seres e auras
+    # ------------------------------------------------------------------
+
+    def _paint_characters(self) -> None:
+        """Cada ser escurece (Lumen) ou clareia (Umbra) conforme o medidor
+        de perigo sobe -- a morte por polaridade errada e telegrafada no
+        corpo, nao so na barra do HUD."""
+        state = self._state
+        sprite_view = self._sprite_pool.active_view()
+        for side, dark, bright in (
+            (LUMEN, LUMEN_FADING, LUMEN_BODY),
+            (UMBRA, UMBRA_BODY, UMBRA_DISSOLVING),
+        ):
+            row = self._sprite_pool.dense_row_of(int(state.entity_index[side]))
+            peril = float(state.peril[side])
+            ratio = peril if side == UMBRA else 1.0 - peril
+            sprite_view["tint_r"][row] = _mix(dark[0], bright[0], ratio)
+            sprite_view["tint_g"][row] = _mix(dark[1], bright[1], ratio)
+            sprite_view["tint_b"][row] = _mix(dark[2], bright[2], ratio)
+
+    def _paint_auras(self) -> None:
+        """Tres entidades de acompanhamento: o halo da Lumen, a orla da
+        Umbra (sem ela, um corpo quase preto no fundo quase preto seria
+        invisivel) e o anel dourado que marca quem o jogador comanda."""
+        state, tuning = self._state, self._tuning
+        cell_size = self._terrain.cell_size
+        transform_view = self._transform_pool.active_view()
+        sprite_view = self._sprite_pool.active_view()
+
+        lumen_x, lumen_y = self._character_position(LUMEN)
+        umbra_x, umbra_y = self._character_position(UMBRA)
+        pulse = 0.5 + 0.5 * math.sin(self._elapsed * _PULSE_HZ * math.tau)
+
+        beam_reach = (
+            tuning.light.beam_intensity - tuning.light.solid_threshold
+        ) * tuning.light.falloff_radius_cells
+        absorb_reach = tuning.light.absorb_radius_cells
+
+        halo_cells = beam_reach if state.ability_on[LUMEN] else 0.85
+        rim_cells = absorb_reach if state.ability_on[UMBRA] else 0.85
+
+        self._place_aura(0, lumen_x, lumen_y, halo_cells * 2.0 * cell_size, SHAPE_CIRCLE,
+                         AIR_GLOW, 30.0 if state.ability_on[LUMEN] else 66.0,
+                         transform_view, sprite_view)
+        self._place_aura(1, umbra_x, umbra_y, rim_cells * 2.0 * cell_size, SHAPE_RING,
+                         UMBRA_RIM, 150.0 if state.ability_on[UMBRA] else 105.0,
+                         transform_view, sprite_view)
+
+        active_x, active_y = (lumen_x, lumen_y) if state.active == LUMEN else (umbra_x, umbra_y)
+        self._place_aura(2, active_x, active_y, (1.55 + 0.18 * pulse) * cell_size, SHAPE_RING,
+                         GOLD_BRIGHT, 205.0, transform_view, sprite_view)
+
+    def _place_aura(
+        self, slot: int, x: float, y: float, diameter: float, shape: int,
+        color, alpha: float, transform_view, sprite_view,
+    ) -> None:
+        entity_index = int(self._aura_entity_indices[slot])
+        transform_row = self._transform_pool.dense_row_of(entity_index)
+        transform_view["position_x"][transform_row] = x
+        transform_view["position_y"][transform_row] = y
+        transform_view["scale_x"][transform_row] = diameter / _CELL_SPRITE_UNIT
+        transform_view["scale_y"][transform_row] = diameter / _CELL_SPRITE_UNIT
+
+        sprite_row = self._sprite_pool.dense_row_of(entity_index)
+        sprite_view["texture_id"][sprite_row] = shape
+        sprite_view["tint_r"][sprite_row] = color[0]
+        sprite_view["tint_g"][sprite_row] = color[1]
+        sprite_view["tint_b"][sprite_row] = color[2]
+        sprite_view["tint_a"][sprite_row] = int(alpha)
+
+    def _character_position(self, side: int):
+        pool = self._transform_pool
+        row = pool.dense_row_of(int(self._state.entity_index[side]))
+        view = pool.active_view()
+        return float(view["position_x"][row]), float(view["position_y"][row])
+
+    # ------------------------------------------------------------------
+    # utilitarios de cor
+    # ------------------------------------------------------------------
+
+    def _fill(self, mask: np.ndarray, color_low, color_high) -> None:
+        """Escreve `color_low + ramp * (color_high - color_low)` nas celulas
+        de `mask`, usando o `self._ramp` corrente. Passar a mesma cor duas
+        vezes e o caso "cor fixa" (o ramp e ignorado)."""
+        for channel, low, high in (
+            (self._red, color_low[0], color_high[0]),
+            (self._green, color_low[1], color_high[1]),
+            (self._blue, color_low[2], color_high[2]),
+        ):
+            if low == high:
+                np.copyto(channel, float(low), where=mask)
+                continue
+            np.multiply(self._ramp, float(high - low), out=self._channel)
+            np.add(self._channel, float(low), out=self._channel)
+            np.copyto(channel, self._channel, where=mask)
+
+    def _ramp_between(self, values: np.ndarray, low: float, high: float) -> None:
+        """Normaliza `values` para 0..1 dentro da faixa `[low, high]`, no
+        `self._ramp` -- e assim que os dois lados do eter ganham gradiente
+        proprio em vez de uma cor chapada."""
+        span = high - low
+        np.subtract(values, low, out=self._ramp)
+        np.multiply(self._ramp, 1.0 / span if span else 0.0, out=self._ramp)
+        np.clip(self._ramp, 0.0, 1.0, out=self._ramp)
+
+
+def _mix(low: int, high: int, ratio: float) -> int:
+    ratio = 0.0 if ratio < 0.0 else (1.0 if ratio > 1.0 else ratio)
+    return int(low + (high - low) * ratio)

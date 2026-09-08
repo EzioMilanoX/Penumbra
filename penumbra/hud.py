@@ -1,0 +1,145 @@
+"""
+HUD e avisos de fim de fase.
+
+Vive fora de qualquer `ISystem` de proposito: `IRenderer.draw_text`/
+`draw_ui_rect` alocam (cache de fontes e superficies dentro do adapter), o
+que a Regra 1 da Constituicao proibe dentro de `World.step()`. A engine
+oferece exatamente um lugar legitimo pra isso -- o callback global de
+`GameLoop.set_on_draw_ui`, chamado depois do `render()` da cena e antes do
+`end_frame()` -- e e ele que este modulo implementa.
+"""
+from __future__ import annotations
+
+from ouroboros.interfaces.renderer import IRenderer
+
+from penumbra.state import (
+    DualityState,
+    LevelRuntime,
+    LUMEN,
+    OUTCOME_COMPLETE,
+    OUTCOME_PLAYING,
+    UMBRA,
+)
+from penumbra.tuning import DualityTuning
+
+_PANEL = (12, 12, 18, 236)
+_RULE = (58, 56, 72, 255)
+_TEXT = (206, 208, 224, 255)
+_TEXT_DIM = (128, 130, 148, 255)
+_GOLD = (247, 214, 138, 255)
+_LUMEN_TONE = (250, 250, 255, 255)
+_UMBRA_TONE = (150, 146, 178, 255)
+_PERIL = (206, 88, 88, 255)
+"""Unico tom fora da paleta preto/branco/dourado do jogo, e so aqui: o
+medidor de perigo precisa ser lido antes de ser pensado. O dourado nao
+podia servir -- ele significa cooperacao, o oposto do que este medidor
+avisa."""
+
+_BAR_WIDTH = 30.0
+_BAR_HEIGHT = 3.0
+_BAR_GAP = 2.0
+
+
+class PenumbraHud:
+    """Callable registrado em `GameLoop.set_on_draw_ui`.
+
+    Desenha tres coisas, nessa ordem: os medidores flutuantes sobre cada
+    ser, a faixa de rodape com a fase corrente, e -- quando a fase acabou
+    -- o painel central. Coordenadas de mundo e de tela coincidem aqui (o
+    jogo cabe numa tela, nao ha camera), entao os medidores podem ser
+    posicionados direto pela posicao do ser.
+    """
+
+    def __init__(
+        self,
+        state: DualityState,
+        runtime: LevelRuntime,
+        tuning: DualityTuning,
+        transform_pool,
+        viewport_size,
+    ) -> None:
+        self._state = state
+        self._runtime = runtime
+        self._tuning = tuning
+        self._transform_pool = transform_pool
+        self._width, self._height = viewport_size
+        self._playfield_height = tuning.world.grid_rows * tuning.world.cell_size
+        self._sides = (tuning.lumen, tuning.umbra)
+
+    def __call__(self, renderer: IRenderer) -> None:
+        self._draw_character_meters(renderer)
+        self._draw_footer(renderer)
+        if self._state.outcome != OUTCOME_PLAYING:
+            self._draw_outcome_panel(renderer)
+
+    # ------------------------------------------------------------------
+
+    def _draw_character_meters(self, renderer: IRenderer) -> None:
+        state = self._state
+        view = self._transform_pool.active_view()
+        for side, tone in ((LUMEN, _LUMEN_TONE), (UMBRA, _UMBRA_TONE)):
+            row = self._transform_pool.dense_row_of(int(state.entity_index[side]))
+            x = float(view["position_x"][row])
+            y = float(view["position_y"][row]) - self._sides[side].half_height - 14.0
+            left = x - _BAR_WIDTH / 2.0
+
+            self._bar(renderer, left, y, float(state.charge[side]), tone)
+            if state.ability_on[side]:
+                renderer.draw_ui_rect(left - 7.0, y, 4.0, _BAR_HEIGHT, _GOLD)
+            peril = float(state.peril[side])
+            if peril > 0.02:
+                self._bar(renderer, left, y + _BAR_HEIGHT + _BAR_GAP, peril, _PERIL)
+
+    def _bar(self, renderer: IRenderer, x: float, y: float, ratio: float, rgba) -> None:
+        renderer.draw_ui_rect(x - 1.0, y - 1.0, _BAR_WIDTH + 2.0, _BAR_HEIGHT + 2.0, (10, 10, 16, 190))
+        filled = max(0.0, min(1.0, ratio)) * _BAR_WIDTH
+        if filled >= 1.0:
+            renderer.draw_ui_rect(x, y, filled, _BAR_HEIGHT, rgba)
+
+    # ------------------------------------------------------------------
+
+    def _draw_footer(self, renderer: IRenderer) -> None:
+        state, level = self._state, self._runtime.current
+        top = self._playfield_height
+        renderer.draw_ui_rect(0.0, top, self._width, self._height - top, _PANEL)
+        renderer.draw_ui_rect(0.0, top, self._width, 1.0, _RULE)
+
+        renderer.draw_text(
+            14.0, top + 8.0,
+            f"{state.level_index + 1}/{self._runtime.count}  {level.name}",
+            14, _TEXT,
+        )
+        renderer.draw_text(14.0, top + 27.0, level.hint, 12, _TEXT_DIM)
+
+        active = state.active_name.upper()
+        renderer.draw_text(self._width - 14.0, top + 8.0, f"comando: {active}", 14, _GOLD, anchor="topright")
+        renderer.draw_text(
+            self._width - 14.0, top + 27.0,
+            "A/D mover   ESPACO pular   J habilidade   TAB trocar   R reiniciar   ESC sair",
+            11, _TEXT_DIM, anchor="topright",
+        )
+
+    # ------------------------------------------------------------------
+
+    def _draw_outcome_panel(self, renderer: IRenderer) -> None:
+        state = self._state
+        won = state.outcome == OUTCOME_COMPLETE
+        panel_width, panel_height = 520.0, 116.0
+        x = (self._width - panel_width) / 2.0
+        y = (self._playfield_height - panel_height) / 2.0
+
+        renderer.draw_ui_rect(x, y, panel_width, panel_height, _PANEL)
+        renderer.draw_ui_rect(x, y, panel_width, 2.0, _GOLD if won else _RULE)
+
+        center_x = self._width / 2.0
+        renderer.draw_text(
+            center_x, y + 26.0,
+            "ECLIPSE" if won else "DISSONANCIA",
+            20, _GOLD if won else _PERIL, anchor="center",
+        )
+        renderer.draw_text(center_x, y + 58.0, state.message, 13, _TEXT, anchor="center")
+        renderer.draw_text(
+            center_x, y + 86.0,
+            "ESPACO para continuar" if won else "ESPACO para tentar de novo",
+            11, _TEXT_DIM, anchor="center",
+        )

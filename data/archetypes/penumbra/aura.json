@@ -1,0 +1,5 @@
+{
+  "id": "aura",
+  "pools": ["transform", "sprite"],
+  "_nota": "Halo da Lumen, orla da Umbra e o anel de 'quem esta sob comando'. Puramente cosmeticas, reposicionadas todo frame pelo PresentationSystem."
+}

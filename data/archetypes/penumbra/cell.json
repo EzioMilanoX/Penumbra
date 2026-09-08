@@ -1,0 +1,5 @@
+{
+  "id": "cell",
+  "pools": ["transform", "sprite"],
+  "_nota": "Uma por celula da grade, so visual: sem hitbox e sem velocity, entao nem TileCollisionSystem nem GravitySystem a enxergam. A colisao de verdade e contra as duas Grid2D."
+}

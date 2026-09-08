@@ -1,0 +1,50 @@
+{
+  "name": "basic",
+  "_nota": "Todo numero de balanceamento de Penumbra vive AQUI, nunca hardcoded em Python (Regra 3 da Constituicao da OuroborosEngine). penumbra/tuning.py e o unico leitor deste arquivo, via EngineConfig.difficulty_path.",
+
+  "world": {
+    "cell_size": 24.0,
+    "grid_cols": 40,
+    "grid_rows": 22,
+    "gravity_y": 1100.0
+  },
+
+  "lumen": {
+    "move_speed": 200.0,
+    "jump_velocity_y": -430.0,
+    "half_width": 8.0,
+    "half_height": 10.0,
+    "ability_charge_seconds": 3.2,
+    "ability_refill_per_second": 0.42,
+    "peril_seconds": 1.3,
+    "peril_recovery_per_second": 0.8
+  },
+
+  "umbra": {
+    "move_speed": 108.0,
+    "jump_velocity_y": -330.0,
+    "half_width": 10.0,
+    "half_height": 11.0,
+    "ability_charge_seconds": 3.2,
+    "ability_refill_per_second": 0.42,
+    "peril_seconds": 1.6,
+    "peril_recovery_per_second": 0.8
+  },
+
+  "light": {
+    "_nota": "decay_per_cell = 1/falloff_radius_cells. Uma semente de intensidade I acende (>= solid_threshold) tudo num raio geodesico de (I - solid_threshold) * falloff_radius_cells celulas, contornando rocha. relaxation_passes precisa ser >= falloff_radius_cells: cada passe empurra a luz exatamente uma celula, entao menos passes truncariam o alcance.",
+    "falloff_radius_cells": 9.0,
+    "solid_threshold": 0.35,
+    "lamp_intensity": 1.0,
+    "beam_intensity": 1.0,
+    "absorb_radius_cells": 5.0,
+    "extinguish_below": 0.12,
+    "dissolve_above": 0.6,
+    "relaxation_passes": 14
+  },
+
+  "flow": {
+    "overlay_seconds": 2.0,
+    "overlay_min_seconds": 0.45
+  }
+}

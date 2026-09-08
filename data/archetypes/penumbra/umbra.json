@@ -1,0 +1,5 @@
+{
+  "id": "umbra",
+  "pools": ["transform", "velocity", "hitbox_shadow", "sprite"],
+  "_nota": "Usa 'hitbox_shadow', uma segunda pool com o mesmo HITBOX_DTYPE criada por penumbra/composition.py -- o segundo TileCollisionSystem observa ESSA pool contra a GRADE DA SOMBRA. E o que faz os dois seres terem chaos diferentes na mesma simulacao sem nenhum ramo condicional dentro de um sistema generico."
+}

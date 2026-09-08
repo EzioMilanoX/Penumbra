@@ -1,0 +1,5 @@
+{
+  "id": "lumen",
+  "pools": ["transform", "velocity", "hitbox", "sprite"],
+  "_nota": "Usa a pool generica 'hitbox', que e a que o TileCollisionSystem montado por CompositionRoot.build(tile_grid=...) observa -- por isso Lumen colide contra a GRADE DA LUZ. Ver penumbra/composition.py."
+}

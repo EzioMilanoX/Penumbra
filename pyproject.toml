@@ -1,0 +1,14 @@
+[project]
+name = "penumbra"
+version = "0.1.0"
+description = "Luz e Sombra: Dualidade -- puzzle-platformer cooperativo de um jogador so, sobre a OuroborosEngine"
+requires-python = ">=3.11"
+dependencies = [
+    "ouroboros-engine>=0.2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
