@@ -94,6 +94,17 @@ class DualityState:
         """0..1. Nao vive no `Terrain` porque nao e terreno: e o esforco em
         curso de UM ser sobre uma celula, e reinicia ao trocar de alvo."""
 
+        # --- relogio do mundo (ver WorldClockSystem) ---
+        self.beacon_phase = 0.0
+        self.beacon_on = True
+        self.beacon_seconds_left = 0.0
+        """Quanto falta pra o farol virar. O HUD mostra isso -- e a
+        informacao com que o jogador planeja a travessia."""
+        self.eclipse_touched = False
+        self.eclipse_seconds_left = 0.0
+        """Prazo da zona de eclipse, iniciado pelo PRIMEIRO toque de
+        qualquer um dos dois (nao pelo inicio da fase)."""
+
         # --- porta de polaridade ---
         self.door_open = False
         """Trava por fase: uma vez que os dois seres cumpriram as duas
@@ -167,6 +178,13 @@ class LevelRuntime:
         return self._catalog.count
 
     @property
+    def terrain(self) -> Terrain:
+        """O `Terrain` que esta carregado agora. Exposto porque o HUD precisa
+        saber se a fase TEM farol ou eclipse pra decidir se mostra o relogio
+        deles -- e nao ha outro caminho do HUD ate o terreno."""
+        return self._terrain
+
+    @property
     def is_last(self) -> bool:
         return self._state.level_index >= self._catalog.count - 1
 
@@ -213,6 +231,11 @@ class LevelRuntime:
         state.crust_target_col = -1
         state.crust_target_row = -1
         state.crust_progress = 0.0
+        state.beacon_phase = 0.0
+        state.beacon_on = True
+        state.beacon_seconds_left = 0.0
+        state.eclipse_touched = False
+        state.eclipse_seconds_left = 0.0
         state.light[:] = 0.0
         state.display_light[:] = 0.0
         state.lit[:] = False

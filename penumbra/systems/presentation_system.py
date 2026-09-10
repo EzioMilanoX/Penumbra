@@ -31,7 +31,9 @@ from penumbra.terrain import (
     ROLE_LAMP,
     ROLE_LUMEN_GOAL,
     ROLE_ROCK,
+    ROLE_BEACON,
     ROLE_CRUST,
+    ROLE_ECLIPSE,
     ROLE_UMBRA_GOAL,
     ROLE_ZONE_LIGHT,
     ROLE_ZONE_SHADOW,
@@ -79,6 +81,15 @@ cinza-azulado da rocha se le mesmo com pouca luz."""
 
 LAMP_ON = (255, 250, 232)
 LAMP_SNUFFED = (74, 70, 86)
+BEACON_OFF = (92, 88, 104)
+
+ECLIPSE_CALM = (168, 136, 72)
+ECLIPSE_URGENT = (250, 222, 150)
+"""A zona de eclipse e a unica celula que aceita os DOIS -- e por isso o
+unico terreno em dourado, o tom que o jogo reserva ao que exige os dois ao
+mesmo tempo. Ela clareia e pulsa mais rapido conforme o prazo se esgota: o
+aviso tem de estar no proprio chao, nao so numa barra do HUD, porque e no
+chao que o jogador esta olhando."""
 
 LUMEN_BODY = (250, 250, 255)
 LUMEN_FADING = (104, 104, 134)
@@ -86,7 +97,7 @@ UMBRA_BODY = (32, 30, 44)
 UMBRA_DISSOLVING = (164, 154, 196)
 UMBRA_RIM = (138, 136, 162)
 
-_ROLE_COUNT = 10
+_ROLE_COUNT = 12
 _CELL_SPRITE_UNIT = 8.0
 """`PygameRenderer.draw_batch` converte `transform.scale` em pixels
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
@@ -156,7 +167,10 @@ class PresentationSystem(ISystem):
         # blocos soltos; a rocha, uma massa continua.
         self._size_by_role[ROLE_ETHER] = 0.82
         self._size_by_role[ROLE_CRUST] = 0.9
+        self._size_by_role[ROLE_BEACON] = 0.62
+        self._shape_by_role[ROLE_BEACON] = SHAPE_CIRCLE
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
+        self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
 
     def update(self, world: World, delta_time: float) -> None:
         if self._sprite_pool is None:
@@ -239,6 +253,22 @@ class PresentationSystem(ISystem):
         self._fill(self._mask, CRUST_UNLIT, CRUST_LIT)
         np.copyto(self._alpha, 255.0, where=self._mask)
 
+        # farol: aceso como lampada, apagado como brasa
+        np.equal(role, ROLE_BEACON, out=self._mask)
+        if state.beacon_on:
+            self._fill(self._mask, LAMP_ON, LAMP_ON)
+            np.copyto(self._alpha, 255.0, where=self._mask)
+        else:
+            self._fill(self._mask, BEACON_OFF, BEACON_OFF)
+            np.copyto(self._alpha, 190.0, where=self._mask)
+
+        # zona de eclipse: dourada, clareando conforme o prazo se esgota
+        np.equal(role, ROLE_ECLIPSE, out=self._mask)
+        urgency = self._eclipse_urgency(pulse)
+        self._ramp[:] = urgency
+        self._fill(self._mask, ECLIPSE_CALM, ECLIPSE_URGENT)
+        np.copyto(self._alpha, 255.0, where=self._mask)
+
         # porta: parede dourada enquanto trancada, contorno tenue depois
         np.equal(role, ROLE_DOOR, out=self._mask)
         if state.door_open:
@@ -258,6 +288,17 @@ class PresentationSystem(ISystem):
         self._paint_goal(role, ROLE_UMBRA_GOAL, UMBRA, pulse)
 
         self._flush_cells(role, pulse)
+
+    def _eclipse_urgency(self, pulse: float) -> float:
+        """0 antes de alguem pisar, subindo ate 1 no fim do prazo -- com um
+        pulso que fica mais forte junto. Antes do primeiro toque a zona fica
+        no tom calmo: o relogio dela ainda nao anda, e mostrar urgencia seria
+        mentir."""
+        state = self._state
+        if not state.eclipse_touched or self._eclipse_seconds <= 0.0:
+            return 0.0
+        spent = 1.0 - max(0.0, state.eclipse_seconds_left) / self._eclipse_seconds
+        return min(1.0, spent * (0.65 + 0.35 * pulse) + 0.2 * spent)
 
     def _paint_zone(
         self, role: np.ndarray, role_id: int, lit_flat: np.ndarray, satisfied_when_lit: bool

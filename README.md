@@ -1,7 +1,8 @@
 # Penumbra — Luz e Sombra: Dualidade
 
 Puzzle-platformer de um jogador só sobre dois seres que não podem se tocar e
-não conseguem avançar separados. Vertical slice de 4 fases construído sobre a
+não conseguem avançar separados. Oito fases, com menu e seleção, construído
+sobre a
 [OuroborosEngine](https://github.com/EzioMilanoX/OuroborosEngine) — a engine
 vive no repositório dela, não é vendorizada aqui.
 
@@ -17,8 +18,12 @@ cd Penumbra && python -m penumbra.main  # rodar SEMPRE da raiz, como módulo
 (`from penumbra...`) e os caminhos de `config.json` são relativos à raiz do
 projeto, então rodar `python penumbra/main.py` falha.
 
-Controles: **A/D** mover · **ESPAÇO** pular · **J** habilidade · **TAB** trocar
-de ser · **R** reiniciar a fase · **ESC** sair.
+No menu: **W/S** escolher a fase · **ESPAÇO** jogar · **ESC** sair.
+Na fase: **A/D** mover · **ESPAÇO** pular · **J** habilidade · **TAB** trocar de
+ser · **R** reiniciar · **ESC** voltar ao menu.
+
+Nenhuma fase é trancada. Com oito fases curtas, poder repetir a que ensinou
+uma mecânica vale mais que a cerimônia de desbloquear.
 
 ---
 
@@ -52,6 +57,18 @@ o ser está de pé. A Umbra alcança 2,06 células de altura mas só desloca 0,4
 lá em cima: na prática ela sobe **um** degrau. `penumbra/reachability.py`
 modela isso, e é o que impede uma fase de pedir dela o que ela não faz.
 
+## Os quatro terrenos
+
+| | de quem é o chão | notas |
+|---|---|---|
+| **rocha** `#` | dos dois, sempre | o chão neutro, e é ele que torna as fases solúveis: alguém precisa ter onde esperar |
+| **éter** `~` | de exatamente um, decidido pela luz **agora** | o conflito central |
+| **crosta** `%` | dos dois — até a Umbra rompê-la | opaca. Romper é irreversível, e abre caminho para a luz que ela barrava |
+| **eclipse** `=` | **dos dois ao mesmo tempo** — a única célula assim | mas com prazo: o primeiro passo de qualquer um inicia o colapso da zona inteira |
+
+E duas fontes de luz: a **lâmpada** `*`, fixa, e o **farol** `o`, que acende e
+apaga sozinho.
+
 ## O conflito, concretamente
 
 Entre os dois limiares de morte existe uma **penumbra** onde os dois
@@ -79,6 +96,15 @@ Disso saem as situações que as fases exploram:
 - **O ser inativo não está protegido.** Ele fica parado, mas continua sujeito
   à gravidade e ao próprio chão. Se você mudar a polaridade sob ele enquanto
   comanda o outro, ele cai.
+- **O farol inverte o conflito sem você pedir.** Aceso, a ponte de éter é chão
+  da Lumen; apagado, é da Umbra. Até ele existir, os dois sentidos do conflito
+  exigiam duas habilidades e duas decisões — aqui vêm de graça, e contra os
+  dois. É a única coisa no jogo em que ninguém escolhe a hora.
+- **O eclipse troca a pergunta.** Todo o resto do terreno responde "de quem é
+  este chão?". O eclipse responde outra: **"dá tempo pros dois?"** É a única
+  mecânica que os obriga a ocupar o *mesmo* espaço, em vez de pistas ou
+  momentos separados — e o prazo só começa no primeiro passo, para não punir
+  quem está pensando.
 - **A crosta não volta.** Todo o resto do terreno é interruptor — acender,
   apagar, acender de novo. A crosta, não: rompida, rompida para a fase
   inteira. É a única decisão do jogo que não dá para desfazer. E como ela é
@@ -94,6 +120,10 @@ Disso saem as situações que as fases exploram:
 | 2 | **A Crosta** | Os **dois** verbos da Umbra, com um passo sem volta no meio. Ela rompe a crosta para passar — e o buraco deixa a lâmpada acender o éter do outro lado, que era o chão *dela*. Rompeu e se trancou fora da própria ponte: agora precisa absorver para devolvê-la ao escuro, atravessar, e desligar depois, para que a Lumen a encontre acesa. |
 | 3 | **O Mesmo Chão** | As duas habilidades em disputa. A lâmpada sobre a ponte faz dela chão da Lumen; a Umbra só a toma absorvendo — e absorver apaga a lâmpada, então os dois nunca podem estar na ponte ao mesmo tempo. |
 | 4 | **Eclipse** | A porta de polaridade, e a **sombra projetada pela rocha**: a zona de luz fica em cima de uma laje e a de sombra exatamente embaixo, então é a própria laje que impede o facho da Lumen de vazar até a zona da Umbra e cancelar a condição. |
+| 5 | **Eclipse Partilhado** | A ponte que aceita os **dois** — e colapsa depois do primeiro passo. A Umbra atravessa primeiro por ser a lenta; o prazo tem de cobrir as duas travessias. |
+| 6 | **Farol** | A mesma ponte serve aos dois, em turnos que não são deles. Aceso, é chão da Lumen; apagado, da Umbra. Ninguém escolhe quando. |
+| 7 | **Contratempo** | Farol e crosta juntos: romper abre o caminho, o farol decide a hora. Uma coisa irreversível e uma periódica na mesma fase. |
+| 8 | **Fusão** | A porta de polaridade destranca a ponte de eclipse. No fim, os dois atravessam o mesmo chão — o único que aceita os dois, e por tempo contado. |
 
 Três princípios de desenho, todos aprendidos errando:
 
@@ -112,8 +142,10 @@ Três princípios de desenho, todos aprendidos errando:
 #  rocha (sólida para os dois, bloqueia luz)     A  spawn da Lumen
 ~  éter (sólido para um por vez)                 B  spawn da Umbra
 %  crosta (sólida, opaca, só a Umbra rompe)      X  portal da Lumen
-*  lâmpada                                       Y  portal da Umbra
-D  porta de polaridade                           .  vazio
+=  eclipse (sólida para os dois, com prazo)      Y  portal da Umbra
+*  lâmpada fixa                                  .  vazio
+o  farol pulsante
+D  porta de polaridade
 L  zona de luz (gatilho da Lumen)
 S  zona de sombra (gatilho da Umbra)
 ```
@@ -157,19 +189,20 @@ penumbra/
   levels.py          catálogo de data/levels/*.json
   reachability.py    modelo de salto + grafo de alcance (auditoria de geometria)
   state.py           estado compartilhado + troca de fase
-  scenes.py          quando o mundo anda e quando congela
+  scenes.py          menu, seleção de fase, e quando o mundo congela
   hud.py             HUD e avisos de fim de fase
   systems/
     duality_control_system.py   input -> velocity dos dois seres
     light_field_system.py       a luz, e as duas grades de colisão
     crust_break_system.py       o verbo da Umbra; muta o terreno
+    world_clock_system.py       farol e eclipse; o que muda sozinho
     polarity_door_system.py     a porta que exige os dois ao mesmo tempo
     outcome_system.py           as quatro mortes e a única vitória
     presentation_system.py      estado -> pixels
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/               72 testes headless
+tests/               87 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -202,12 +235,16 @@ faz a ação de um ser desfazer o terreno do outro.
 5. GravitySystem          (Penumbra) fecha o contrato Physics -> Tile* -> Gravity
 6. DualityControlSystem              escreve `velocity` depois de tudo acima
 7. LightFieldSystem                  recalcula a luz e as duas grades
-8. CrustBreakSystem                  o verbo da Umbra; muta o terreno
-9. PolarityDoorSystem                lê a luz deste frame
-10. OutcomeSystem                    lê posições já resolvidas
-11. PresentationSystem               só pixels
-12. QuitOnActionSystem
+8. WorldClockSystem                  farol e eclipse; o que muda sozinho
+9. CrustBreakSystem                  o verbo da Umbra; muta o terreno
+10. PolarityDoorSystem               lê a luz deste frame
+11. OutcomeSystem                    lê posições já resolvidas
+12. PresentationSystem               só pixels
 ```
+
+Não há sistema de "sair": **ESC é tratado nas cenas** (volta ao menu durante
+a fase, encerra no menu), porque um `ISystem` só roda dentro de `world.step()`
+— e o menu existe justamente enquanto o mundo está parado.
 
 `CompositionRoot.build()` registra 1–3 e sempre nessa ordem; `gravity_y` é
 deliberadamente **omitido** na chamada para que o `GravitySystem` possa entrar
@@ -221,8 +258,8 @@ engine exigem.
   alocado na composição; `update()` só faz ufuncs NumPy com `out=`. As 880
   entidades de célula e os dois seres existem do primeiro ao último frame do
   processo — **trocar de fase não cria nem destrói nenhuma entidade**, só
-  reescreve as máscaras do `Terrain` no lugar. Custo medido: **1,8 ms/frame**
-  (teto de ~570 fps).
+  reescreve as máscaras do `Terrain` no lugar. Custo medido: **1,7 ms/frame**
+  (teto de ~600 fps).
 - **Logic vs Presentation.** Nenhum módulo de `penumbra` importa `pygame`. O
   HUD usa `draw_text`/`draw_ui_rect`, que alocam, e por isso vive no callback
   de `GameLoop.set_on_draw_ui` — nunca dentro de um `ISystem`.
@@ -235,7 +272,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 72 testes, ~15 s, headless
+pytest -q                      # 87 testes, ~6 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -270,7 +307,6 @@ e não tinha como voltar à zona de luz —, corrigido com dois degraus de rocha
 Este é o vertical slice das mecânicas centrais. Ficaram **fora**, do documento
 de design original:
 
-- **Zona de eclipse** (área que os dois pisam por tempo limitado)
 - **Sacrifício de forma** (a Umbra cobrindo a Lumen para protegê-la)
 - **Controle simultâneo** dos dois seres (um em cada analógico)
 - **Boss fight** e a narrativa com a escolha da fusão

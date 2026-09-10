@@ -133,7 +133,7 @@ class TestTerrain:
 
 
 class TestLevelCatalog:
-    def test_as_quatro_fases_do_jogo_carregam_e_sao_validas(self):
+    def test_todas_as_fases_do_jogo_carregam_e_sao_validas(self):
         """`validate_all` parseia TODAS as fases contra o `Terrain` real na
         composicao, nao na transicao: descobrir que a fase 4 esta quebrada
         depois de o jogador resolver as tres primeiras seria a pior hora
@@ -141,7 +141,7 @@ class TestLevelCatalog:
         from penumbra.composition import LEVELS_DIR
 
         catalog = LevelCatalog.load_from_directory(LEVELS_DIR)
-        assert catalog.count == 4
+        assert catalog.count >= 4, "o slice precisa de fases suficientes pra ensinar as mecanicas"
         catalog.validate_all(Terrain(cols=GRID_COLS, rows=GRID_ROWS, cell_size=32.0))
         for index in range(catalog.count):
             level = catalog.at(index)

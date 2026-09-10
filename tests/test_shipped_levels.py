@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from penumbra.scenes import PenumbraScene
+from penumbra.scenes import MenuScene, PenumbraFlow
 from penumbra.state import (
     LUMEN,
     OUTCOME_COMPLETE,
@@ -363,18 +363,163 @@ class TestPlaythrough:
         )
 
 
+class _FakeGameLoop:
+    """Duplo minimo do `GameLoop` para testar o fluxo de cenas.
+
+    O `PenumbraFlow` usa exatamente tres coisas do `GameLoop` --
+    `reset_scenes`, `stop` e `current_scene` -- e nenhuma delas precisa de
+    janela. Um duplo aqui deixa o fluxo (menu -> fase -> menu) ser testado
+    headless, que e o unico jeito de testa-lo: `CompositionRoot.build_world`
+    nao constroi `GameLoop` nenhum."""
+
+    def __init__(self) -> None:
+        self.current_scene = None
+        self.stopped = False
+
+    def reset_scenes(self, scene) -> None:
+        self.current_scene = scene
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
 class TestLevelFlow:
-    def test_completar_a_ultima_fase_volta_a_primeira(self, simulation):
-        """O slice nao tem tela de fim de jogo; o ciclo volta ao inicio."""
+    """Menu -> fase -> menu, e o congelamento entre elas."""
+
+    @pytest.fixture
+    def flow(self, simulation, input_provider):
+        loop = _FakeGameLoop()
+        flow = PenumbraFlow(
+            loop, simulation.runtime, simulation.state,
+            simulation.catalog, simulation.tuning, input_provider,
+        )
+        flow.show_menu()
+        return flow
+
+    def _drive(self, flow, simulation, input_provider, frames):
+        for _ in range(frames):
+            input_provider.poll()
+            flow._game_loop.current_scene.update(simulation.world, FRAME)
+
+    # ---------------- menu ----------------
+
+    def test_o_jogo_abre_no_menu(self, flow):
+        assert isinstance(flow._game_loop.current_scene, MenuScene)
+
+    def test_o_menu_lista_todas_as_fases_e_nenhuma_esta_trancada(self, flow, simulation):
+        """Com oito fases curtas, poder repetir a que ensinou uma mecanica
+        vale mais que a cerimonia de desbloquear."""
+        assert len(flow.completed) == simulation.catalog.count
+        assert not any(flow.completed)
+        for index in range(simulation.catalog.count):
+            flow.start_level(index)
+            assert simulation.state.level_index == index
+
+    def test_escolher_no_menu_e_confirmar_comeca_a_fase(self, flow, simulation, input_provider):
+        input_provider.set_action_held("menu_down", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        input_provider.set_action_held("menu_down", False)
+        input_provider.set_action_held("jump", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+
+        assert flow._game_loop.current_scene is flow.gameplay
+        assert simulation.state.level_index == 1, "W/S move a selecao, ESPACO entra"
+
+    def test_esc_no_menu_encerra_o_jogo(self, flow, simulation, input_provider):
+        input_provider.set_action_held("quit", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert flow._game_loop.stopped
+
+    def test_o_hud_cala_a_boca_no_menu(self, flow):
+        """O HUD e um callback GLOBAL de `set_on_draw_ui` -- roda independente
+        da cena no topo. Sem consultar o fluxo ele desenharia a faixa de
+        rodape e os medidores dos seres por cima do menu."""
+        assert not flow.hud_visible
+        flow.start_level(0)
+        assert flow.hud_visible
+
+    # ---------------- fase ----------------
+
+    def test_esc_na_fase_volta_ao_menu_em_vez_de_sair(self, flow, simulation, input_provider):
+        flow.start_level(2)
+        input_provider.set_action_held("quit", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+
+        assert isinstance(flow._game_loop.current_scene, MenuScene)
+        assert not flow._game_loop.stopped
+
+    def test_a_cena_congela_o_mundo_enquanto_o_aviso_esta_na_tela(
+        self, flow, simulation, input_provider
+    ):
+        """O congelamento e proposital: o jogador precisa ver a causa da
+        morte parada na tela, nao um corte pra um menu."""
+        flow.start_level(1)
+        state = simulation.state
+        state.fail("teste")
+        place(simulation, LUMEN, 20, 5)  # no ar: cairia se o mundo andasse
+        pool = simulation.world.get_pool("transform")
+        dense_row = pool.dense_row_of(int(state.entity_index[LUMEN]))
+        frozen_y = float(pool.active_view()["position_y"][dense_row])
+
+        self._drive(flow, simulation, input_provider, frames=6)
+
+        assert float(pool.active_view()["position_y"][dense_row]) == frozen_y
+
+    def test_falhar_recarrega_a_mesma_fase(self, flow, simulation, input_provider):
+        flow.start_level(1)
+        state = simulation.state
+        state.fail("teste")
+
+        frames = int(simulation.tuning.flow.overlay_seconds * 60) + 4
+        self._drive(flow, simulation, input_provider, frames=frames)
+
+        assert state.outcome == OUTCOME_PLAYING
+        assert state.level_index == 1
+        assert flow._game_loop.current_scene is flow.gameplay
+
+    def test_vencer_avanca_e_marca_a_fase(self, flow, simulation, input_provider):
+        flow.start_level(1)
+        state = simulation.state
+        state.complete("teste")
+
+        frames = int(simulation.tuning.flow.overlay_seconds * 60) + 4
+        self._drive(flow, simulation, input_provider, frames=frames)
+
+        assert flow.completed[1], "a fase vencida fica marcada no menu"
+        assert state.level_index == 2
+
+    def test_vencer_a_ultima_fase_volta_ao_menu(self, flow, simulation, input_provider):
+        """Antes o ciclo reiniciava da fase 1 em silencio, o que parecia um
+        bug. Agora o jogo diz que acabou."""
         last = simulation.catalog.count - 1
-        simulation.runtime.load(last)
-        simulation.runtime.advance()
-        assert simulation.state.level_index == 0
+        flow.start_level(last)
+        simulation.state.complete("teste")
+
+        frames = int(simulation.tuning.flow.overlay_seconds * 60) + 4
+        self._drive(flow, simulation, input_provider, frames=frames)
+
+        assert isinstance(flow._game_loop.current_scene, MenuScene)
+        assert flow.completed[last]
+        assert flow.menu.message, "o menu deveria dizer que o jogo acabou"
+
+    def test_o_aviso_ignora_a_tecla_ainda_pressionada_no_frame_da_morte(
+        self, flow, simulation, input_provider
+    ):
+        """`overlay_min_seconds` existe pra que o pulo que o jogador estava
+        segurando quando morreu nao dispense o aviso antes de ele ser lido."""
+        flow.start_level(1)
+        state = simulation.state
+        state.fail("teste")
+        input_provider.set_action_held("jump", True)
+
+        self._drive(flow, simulation, input_provider, frames=2)
+
+        assert state.outcome == OUTCOME_FAILED, "o aviso nao pode sumir no primeiro frame"
 
     def test_recomecar_devolve_a_fase_ao_estado_inicial(self, simulation, input_provider):
         simulation.runtime.load(0)
         state = simulation.state
-        place(simulation, LUMEN, 30, 5)
+        place(simulation, LUMEN, 20, 5)
         state.ability_on[LUMEN] = True
         state.charge[LUMEN] = 0.1
         state.peril[LUMEN] = 0.5
@@ -388,66 +533,3 @@ class TestLevelFlow:
         assert float(state.peril[LUMEN]) == 0.0
         assert state.active == LUMEN
         assert tuple(state.cell[LUMEN]) == simulation.terrain.lumen_spawn_cell
-
-    @pytest.fixture
-    def scene(self, simulation, input_provider):
-        return PenumbraScene(simulation.runtime, simulation.state, simulation.tuning, input_provider)
-
-    def _drive_scene(self, scene, simulation, input_provider, frames):
-        for _ in range(frames):
-            input_provider.poll()
-            scene.update(simulation.world, FRAME)
-
-    def test_a_cena_congela_o_mundo_enquanto_o_aviso_esta_na_tela(
-        self, scene, simulation, input_provider
-    ):
-        """O congelamento e proposital: o jogador precisa ver a causa da
-        morte parada na tela, nao um corte pra um menu."""
-        simulation.runtime.load(1)
-        state = simulation.state
-        state.fail("teste")
-        place(simulation, LUMEN, 20, 5)  # no ar: cairia se o mundo andasse
-        pool = simulation.world.get_pool("transform")
-        dense_row = pool.dense_row_of(int(state.entity_index[LUMEN]))
-        frozen_y = float(pool.active_view()["position_y"][dense_row])
-
-        self._drive_scene(scene, simulation, input_provider, frames=6)
-
-        assert float(pool.active_view()["position_y"][dense_row]) == frozen_y
-
-    def test_a_cena_recarrega_a_fase_depois_de_uma_falha(self, scene, simulation, input_provider):
-        simulation.runtime.load(1)
-        state = simulation.state
-        state.fail("teste")
-
-        frames = int(simulation.tuning.flow.overlay_seconds * 60) + 4
-        self._drive_scene(scene, simulation, input_provider, frames=frames)
-
-        assert state.outcome == OUTCOME_PLAYING
-        assert state.level_index == 1, "falhar recarrega a MESMA fase"
-
-    def test_a_cena_avanca_de_fase_depois_de_uma_vitoria(self, scene, simulation, input_provider):
-        simulation.runtime.load(1)
-        state = simulation.state
-        state.complete("teste")
-
-        frames = int(simulation.tuning.flow.overlay_seconds * 60) + 4
-        self._drive_scene(scene, simulation, input_provider, frames=frames)
-
-        assert state.outcome == OUTCOME_PLAYING
-        assert state.level_index == 2
-
-    def test_o_aviso_ignora_a_tecla_ainda_pressionada_no_frame_da_morte(
-        self, scene, simulation, input_provider
-    ):
-        """`overlay_min_seconds` existe pra que o pulo que o jogador estava
-        segurando quando morreu nao dispense o aviso antes de ele ser
-        lido."""
-        simulation.runtime.load(1)
-        state = simulation.state
-        state.fail("teste")
-        input_provider.set_action_held("jump", True)
-
-        self._drive_scene(scene, simulation, input_provider, frames=2)
-
-        assert state.outcome == OUTCOME_FAILED, "o aviso nao pode sumir no primeiro frame"

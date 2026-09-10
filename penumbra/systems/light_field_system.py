@@ -78,6 +78,8 @@ class LightFieldSystem(ISystem):
         self._blocked = np.zeros(shape, dtype=bool)
         self._mask_a = np.zeros(shape, dtype=bool)
         self._mask_b = np.zeros(shape, dtype=bool)
+        self._shared_solid = np.zeros(shape, dtype=bool)
+        self._mask_b_float = np.zeros(shape, dtype=np.float32)
         self._dist_x = np.zeros(shape, dtype=np.float32)
         self._dist_y = np.zeros(shape, dtype=np.float32)
 
@@ -125,6 +127,9 @@ class LightFieldSystem(ISystem):
         np.multiply(self._open_solid, self._mask_a, out=self._open_light)
 
         np.multiply(terrain.lamp, light_tuning.lamp_intensity, out=self._seed)
+        if state.beacon_on:
+            np.multiply(terrain.beacon, light_tuning.lamp_intensity, out=self._mask_b_float)
+            np.maximum(self._seed, self._mask_b_float, out=self._seed)
         if state.ability_on[LUMEN]:
             col, row = int(state.cell[LUMEN, 0]), int(state.cell[LUMEN, 1])
             self._seed[row, col] = max(float(self._seed[row, col]), light_tuning.beam_intensity)
@@ -207,18 +212,22 @@ class LightFieldSystem(ISystem):
     def _compose_collision_grids(self) -> None:
         """Escreve as duas `Grid2D` lidas pelos dois `TileCollisionSystem`.
 
-        Rocha, crosta e porta trancada sao solidas pros DOIS -- e o chao
-        neutro que torna as fases solveis. O eter e solido so pra um: pra Lumen onde
+        Rocha, crosta, porta trancada e zona de eclipse sao solidas pros
+        DOIS -- e o chao neutro que torna as fases solveis. O eclipse e o
+        unico deles com prazo: quando o `WorldClockSystem` o colapsa, as
+        celulas somem das duas grades no mesmo frame. O eter e solido so pra um: pra Lumen onde
         esta aceso, pra Umbra onde esta apagado. Nenhuma celula e chao dos
         dois ao mesmo tempo, o que e exatamente o ponto."""
         terrain, state = self._terrain, self._state
+        np.logical_or(self._blocked, terrain.eclipse, out=self._shared_solid)
+
         np.logical_and(terrain.ether, state.lit, out=self._mask_a)
-        np.logical_or(self._blocked, self._mask_a, out=self._mask_b)
+        np.logical_or(self._shared_solid, self._mask_a, out=self._mask_b)
         self._lumen_grid.cells[:] = self._mask_b
 
         np.logical_not(state.lit, out=self._mask_a)
         np.logical_and(terrain.ether, self._mask_a, out=self._mask_a)
-        np.logical_or(self._blocked, self._mask_a, out=self._mask_b)
+        np.logical_or(self._shared_solid, self._mask_a, out=self._mask_b)
         self._umbra_grid.cells[:] = self._mask_b
 
     def _compose_display_light(self) -> None:

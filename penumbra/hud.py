@@ -66,6 +66,7 @@ class PenumbraHud:
         tuning: DualityTuning,
         transform_pool,
         viewport_size,
+        visible=None,
     ) -> None:
         self._state = state
         self._runtime = runtime
@@ -74,8 +75,11 @@ class PenumbraHud:
         self._width, self._height = viewport_size
         self._playfield_height = tuning.world.grid_rows * tuning.world.cell_size
         self._sides = (tuning.lumen, tuning.umbra)
+        self._visible = visible if visible is not None else (lambda: True)
 
     def __call__(self, renderer: IRenderer) -> None:
+        if not self._visible():
+            return
         self._draw_character_meters(renderer)
         self._draw_footer(renderer)
         if self._state.outcome != OUTCOME_PLAYING:
@@ -132,11 +136,33 @@ class PenumbraHud:
             f"comando: {state.active_name.upper()}", 14, _GOLD, anchor="topright",
         )
         renderer.draw_text(14.0, top + _LINE_2, level.hint, 12, _TEXT_DIM)
+        self._draw_world_clock(renderer, top)
         renderer.draw_text(
             14.0, top + _LINE_3,
             "A/D mover   ESPACO pular   J habilidade   TAB trocar   R reiniciar   ESC sair",
             11, _TEXT_FAINT,
         )
+
+    def _draw_world_clock(self, renderer: IRenderer, top: float) -> None:
+        """Os dois relogios do mundo, quando a fase tem um deles. O farol e o
+        eclipse mudam o chao sem o jogador pedir, entao "quanto falta" e
+        informacao de planejamento, nao enfeite -- sem isso o jogador so
+        descobre a virada quando ela acontece embaixo dele."""
+        state = self._state
+        terrain = self._runtime.terrain
+        if terrain.has_beacon:
+            label = "farol ACESO" if state.beacon_on else "farol apagado"
+            tone = _GOLD if state.beacon_on else _TEXT_DIM
+            renderer.draw_text(
+                self._width - 14.0, top + _LINE_2,
+                f"{label}  {state.beacon_seconds_left:.1f}s", 12, tone, anchor="topright",
+            )
+        if terrain.has_eclipse and state.eclipse_touched:
+            renderer.draw_text(
+                self._width - 14.0, top + _LINE_3,
+                f"eclipse colapsa em {state.eclipse_seconds_left:.1f}s",
+                12, _PERIL, anchor="topright",
+            )
 
     # ------------------------------------------------------------------
 

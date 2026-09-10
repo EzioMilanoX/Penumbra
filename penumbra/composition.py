@@ -47,7 +47,7 @@ from ouroboros.roguelite.entities.archetype_loader import ArchetypeLoader
 
 from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
-from penumbra.scenes import PenumbraScene
+from penumbra.scenes import PenumbraFlow
 from penumbra.state import DualityState, LevelRuntime, LUMEN, UMBRA
 from penumbra.systems.crust_break_system import CrustBreakSystem
 from penumbra.systems.duality_control_system import DualityControlSystem
@@ -55,7 +55,7 @@ from penumbra.systems.light_field_system import LightFieldSystem
 from penumbra.systems.outcome_system import OutcomeSystem
 from penumbra.systems.polarity_door_system import PolarityDoorSystem
 from penumbra.systems.presentation_system import PresentationSystem
-from penumbra.systems.quit_on_action_system import QuitOnActionSystem
+from penumbra.systems.world_clock_system import WorldClockSystem
 from penumbra.terrain import Terrain
 from penumbra.tuning import DualityTuning
 
@@ -142,16 +142,21 @@ def build_game(config: EngineConfig) -> GameLoop:
     )
 
     world = simulation.world
-    world.register_system(QuitOnActionSystem(game_loop.input_provider, game_loop))
+    flow = PenumbraFlow(
+        game_loop, simulation.runtime, simulation.state,
+        simulation.catalog, tuning, game_loop.input_provider,
+    )
+    # O HUD e um callback GLOBAL (roda independente da cena no topo), entao
+    # ele consulta `flow.hud_visible` -- senao desenha o rodape e os
+    # medidores dos seres por cima do menu.
     game_loop.set_on_draw_ui(
         PenumbraHud(
             simulation.state, simulation.runtime, tuning,
             world.get_pool("transform"), game_loop.renderer.get_viewport_size(),
+            visible=lambda: flow.hud_visible,
         )
     )
-    game_loop.reset_scenes(
-        PenumbraScene(simulation.runtime, simulation.state, tuning, game_loop.input_provider)
-    )
+    flow.show_menu()
     return game_loop
 
 
@@ -205,10 +210,16 @@ def _assemble(
        a unica posicao valida pra um sistema de input (o mesmo contrato do
        vertical slice do Platformer)
     7. `LightFieldSystem`     -- recalcula a luz e as duas grades
-    8. `CrustBreakSystem`     -- o verbo da Umbra; muta o terreno
-    9. `PolarityDoorSystem`   -- le a luz deste frame
-    10. `OutcomeSystem`       -- le posicoes ja resolvidas
-    11. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
+    8. `WorldClockSystem`     -- farol e eclipse; o que muda sozinho
+    9. `CrustBreakSystem`     -- o verbo da Umbra; muta o terreno
+    10. `PolarityDoorSystem`  -- le a luz deste frame
+    11. `OutcomeSystem`       -- le posicoes ja resolvidas
+    12. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
+
+    Nao ha sistema de "sair": ESC e tratado nas CENAS (volta ao menu durante
+    a fase, encerra no menu), porque um `ISystem` so roda dentro de
+    `world.step()` -- e o menu existe justamente enquanto o mundo esta
+    parado.
     """
     world.create_pool(SHADOW_HITBOX_POOL, HITBOX_DTYPE)
     ArchetypeLoader(ARCHETYPES_DIR).load_and_register_all(world)
@@ -238,6 +249,7 @@ def _assemble(
     # entao a mudanca so aparece nas grades no frame seguinte -- um frame de
     # atraso invisivel, e a alternativa (mutar antes da luz ser calculada)
     # usaria a posicao do frame anterior, que e pior.
+    world.register_system(WorldClockSystem(terrain, state, tuning))
     world.register_system(
         CrustBreakSystem(
             input_provider, terrain, state, umbra_tile_collision,

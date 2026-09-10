@@ -46,6 +46,11 @@
 
   "flow": {
     "overlay_seconds": 2.0,
-    "overlay_min_seconds": 0.45
+    "overlay_min_seconds": 0.45,
+    "_nota_farol": "Ciclo do farol pulsante. Aceso um pouco mais que apagado: apagado e quando a Lumen perde o chao, e ela e a fragil.",
+    "beacon_on_seconds": 2.6,
+    "beacon_off_seconds": 2.0,
+    "_nota_eclipse": "Prazo da zona de eclipse, contado do PRIMEIRO toque. Precisa caber duas travessias -- a da Umbra, mais lenta, e a da Lumen.",
+    "eclipse_collapse_seconds": 6.5
   }
 }

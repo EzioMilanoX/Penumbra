@@ -93,10 +93,14 @@ class LightTuning:
 
 @dataclass(frozen=True)
 class FlowTuning:
-    """Duracao dos avisos de fase completa/falha."""
+    """Duracao dos avisos de fim de fase, e os dois relogios do mundo
+    (ver `penumbra.systems.world_clock_system`)."""
 
     overlay_seconds: float
     overlay_min_seconds: float
+    beacon_on_seconds: float = 2.6
+    beacon_off_seconds: float = 2.0
+    eclipse_collapse_seconds: float = 6.5
 
 
 @dataclass(frozen=True)
@@ -172,6 +176,11 @@ def _validate(tuning: DualityTuning, path: str) -> None:
             f"(recebido {light.extinguish_below} / {light.solid_threshold} / {light.dissolve_above}) -- "
             f"sem essa penumbra intermediaria nenhuma fase e solvel"
         )
+    flow = tuning.flow
+    if flow.beacon_on_seconds <= 0.0 or flow.beacon_off_seconds <= 0.0:
+        raise TuningDefinitionError(f"{path}: 'flow' precisa de um ciclo de farol com as duas metades positivas")
+    if flow.eclipse_collapse_seconds <= 0.0:
+        raise TuningDefinitionError(f"{path}: 'flow.eclipse_collapse_seconds' precisa ser positivo")
     for who, character in (("lumen", tuning.lumen), ("umbra", tuning.umbra)):
         if character.half_width > world.half_cell or character.half_height > world.half_cell:
             raise TuningDefinitionError(

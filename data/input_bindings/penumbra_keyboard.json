@@ -5,5 +5,7 @@
   "ability": "KEY_J",
   "switch": "KEY_TAB",
   "restart": "KEY_R",
+  "menu_up": "KEY_W",
+  "menu_down": "KEY_S",
   "quit": "KEY_ESCAPE"
 }

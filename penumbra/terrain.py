@@ -22,6 +22,8 @@ ROCK_CHAR = "#"
 EMPTY_CHAR = "."
 ETHER_CHAR = "~"
 CRUST_CHAR = "%"
+ECLIPSE_CHAR = "="
+BEACON_CHAR = "o"
 LAMP_CHAR = "*"
 DOOR_CHAR = "D"
 ZONE_LIGHT_CHAR = "L"
@@ -45,6 +47,8 @@ ROLE_ZONE_SHADOW = 6
 ROLE_LUMEN_GOAL = 7
 ROLE_UMBRA_GOAL = 8
 ROLE_CRUST = 9
+ROLE_ECLIPSE = 10
+ROLE_BEACON = 11
 
 _MARKER_CHARS = frozenset(
     {LUMEN_SPAWN_CHAR, UMBRA_SPAWN_CHAR, LUMEN_GOAL_CHAR, UMBRA_GOAL_CHAR}
@@ -62,6 +66,18 @@ class Terrain:
     """
     Mascaras de uma fase, todas com shape `(rows, cols)` e alocadas uma
     unica vez.
+
+    `eclipse` e a zona de eclipse: solida para os DOIS -- a unica celula do
+    jogo que aceita os dois seres -- mas com prazo. Ao primeiro toque de
+    qualquer um deles a zona inteira comeca a colapsar, e quando o prazo
+    termina ela desaparece de vez. E a unica mecanica que os obriga a ocupar o
+    MESMO espaco, em vez de pistas ou momentos separados.
+
+    `beacon` e o farol pulsante: uma lampada que acende e apaga em ciclo. Nao
+    e so temporizacao -- e a unica coisa no jogo que inverte o conflito sem o
+    jogador pedir. Quando ele apaga, o eter sob a Lumen deixa de ser chao;
+    quando acende, o da Umbra deixa de ser. Os dois sentidos do conflito num
+    unico objeto.
 
     `crust` e a crosta: solida para os dois e opaca como a rocha, mas a
     Umbra a rompe empurrando-a. Romper e IRREVERSIVEL dentro da fase, e a
@@ -90,11 +106,13 @@ class Terrain:
 
         self.rock = np.zeros(shape, dtype=bool)
         self.crust = np.zeros(shape, dtype=bool)
+        self.eclipse = np.zeros(shape, dtype=bool)
         self.ether = np.zeros(shape, dtype=bool)
         self.door = np.zeros(shape, dtype=bool)
         self.zone_light = np.zeros(shape, dtype=bool)
         self.zone_shadow = np.zeros(shape, dtype=bool)
         self.lamp = np.zeros(shape, dtype=np.float32)
+        self.beacon = np.zeros(shape, dtype=np.float32)
         self.role = np.zeros(shape, dtype=np.int8)
 
         # Centro de mundo de cada celula, pre-computado uma vez: o disco de
@@ -110,6 +128,8 @@ class Terrain:
         self.lumen_goal_cell = (0, 0)
         self.umbra_goal_cell = (0, 0)
         self.has_door = False
+        self.has_eclipse = False
+        self.has_beacon = False
 
     @property
     def cols(self) -> int:
@@ -146,11 +166,13 @@ class Terrain:
 
         self.rock[:] = False
         self.crust[:] = False
+        self.eclipse[:] = False
         self.ether[:] = False
         self.door[:] = False
         self.zone_light[:] = False
         self.zone_shadow[:] = False
         self.lamp[:] = 0.0
+        self.beacon[:] = 0.0
         self.role[:] = ROLE_EMPTY
 
         markers: dict = {}
@@ -164,6 +186,12 @@ class Terrain:
                 elif char == CRUST_CHAR:
                     self.crust[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_CRUST
+                elif char == ECLIPSE_CHAR:
+                    self.eclipse[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_ECLIPSE
+                elif char == BEACON_CHAR:
+                    self.beacon[row_index, col_index] = 1.0
+                    self.role[row_index, col_index] = ROLE_BEACON
                 elif char == ETHER_CHAR:
                     self.ether[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_ETHER
@@ -201,6 +229,8 @@ class Terrain:
         self.lumen_goal_cell = markers[LUMEN_GOAL_CHAR]
         self.umbra_goal_cell = markers[UMBRA_GOAL_CHAR]
         self.has_door = bool(self.door.any())
+        self.has_eclipse = bool(self.eclipse.any())
+        self.has_beacon = bool(self.beacon.any())
 
         if self.has_door and not (self.zone_light.any() and self.zone_shadow.any()):
             raise TerrainDefinitionError(
@@ -209,6 +239,18 @@ class Terrain:
             )
         if (self.zone_light.any() or self.zone_shadow.any()) and not self.has_door:
             raise TerrainDefinitionError("fase com zona 'L'/'S' mas sem nenhuma celula de porta ('D')")
+
+    def collapse_eclipse(self) -> int:
+        """Faz TODAS as celulas de eclipse desaparecerem de uma vez, e devolve
+        quantas eram. A zona colapsa junta, nao celula por celula: e uma
+        passagem unica com prazo, e o drama e "da tempo pros dois?" -- se cada
+        celula tivesse seu proprio relogio, a ponte se desfaria em pedacos
+        atras de quem passou e o prazo deixaria de ser compartilhado."""
+        count = int(self.eclipse.sum())
+        if count:
+            self.role[self.eclipse] = ROLE_EMPTY
+            self.eclipse[:] = False
+        return count
 
     def break_crust(self, col: int, row: int) -> bool:
         """Rompe a crosta em `(col, row)`. Devolve `False` se nao havia
