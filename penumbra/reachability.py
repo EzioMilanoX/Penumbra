@@ -200,9 +200,18 @@ class TraversalGraph:
         return seen
 
 
-def solid_mask(terrain, door_open: bool) -> np.ndarray:
-    """Mascara otimista de solidos: rocha + eter + porta, se trancada."""
+def solid_mask(terrain, door_open: bool, crust_broken: bool = False) -> np.ndarray:
+    """
+    Mascara otimista de solidos: rocha + eter + crosta + porta, se trancada.
+
+    `crust_broken=True` responde a pergunta do outro lado -- "e depois de a
+    Umbra romper tudo que ela consegue romper?". As duas respostas importam:
+    com a crosta intacta se mede se a fase e atravessavel SEM gastar o
+    irreversivel; com ela rompida, se romper de fato abre o caminho.
+    """
     mask = terrain.rock | terrain.ether
+    if not crust_broken:
+        mask = mask | terrain.crust
     if not door_open:
         mask = mask | terrain.door
     return mask

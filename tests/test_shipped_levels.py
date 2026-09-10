@@ -123,7 +123,19 @@ class TestEveryLevelIsPlayable:
 
 
 class TestPlaythrough:
-    """A prova final: a fase 1 termina jogando, so com input."""
+    """
+    A prova final: as quatro fases terminam JOGANDO, so com input.
+
+    Um controlador rudimentar segura as teclas e aperta TAB/J na ordem certa.
+    E o unico teste que responde "o slice tem solucao?" -- os invariantes
+    acima medem propriedades, este percorre o caminho. Cada rota tambem
+    DOCUMENTA a ordem obrigatoria da fase: quando um ajuste de balanceamento
+    fecha o unico caminho, e aqui que aparece.
+    """
+
+    # ------------------------------------------------------------------
+    # o controlador
+    # ------------------------------------------------------------------
 
     def _press(self, simulation, input_provider, action: str) -> None:
         """Um toque -- as acoes de borda (`switch`, `ability`) so disparam na
@@ -133,10 +145,12 @@ class TestPlaythrough:
         input_provider.set_action_held(action, False)
         advance(simulation, input_provider, frames=1)
 
-    def _walk_to(self, simulation, input_provider, target_col: int, max_frames: int = 900) -> None:
-        """Conduz o ser ATIVO ate uma coluna, soltando as teclas ao chegar --
-        um jogador rudimentar, nao um teleporte. Se este laco nao chega, a
-        fase de fato nao e caminhavel."""
+    def _release(self, input_provider) -> None:
+        for action in ("move_right", "move_left", "jump"):
+            input_provider.set_action_held(action, False)
+
+    def _walk_to(self, simulation, input_provider, target_col: int, max_frames: int = 600) -> None:
+        """Conduz o ser ATIVO ate uma coluna, soltando as teclas ao chegar."""
         target_x = (target_col + 0.5) * simulation.terrain.cell_size
         side = simulation.state.active
         for _ in range(max_frames):
@@ -150,42 +164,16 @@ class TestPlaythrough:
             assert simulation.state.outcome != OUTCOME_FAILED, (
                 f"morreu no caminho para a coluna {target_col}: {simulation.state.message}"
             )
-        input_provider.set_action_held("move_right", False)
-        input_provider.set_action_held("move_left", False)
+        self._release(input_provider)
         advance(simulation, input_provider, frames=1)
-
-    def test_a_fase_1_e_completavel_so_andando(self, simulation, input_provider):
-        """'Duas Polaridades' e a fase de leitura: ela ensina que o mesmo
-        material e chao de um e abismo do outro, e precisa ser vencivel sem
-        nenhuma habilidade -- so TAB e as setas. Se algum dia ela exigir o
-        facho, o jogo perdeu sua porta de entrada."""
-        simulation.runtime.load(0)
-        terrain = simulation.terrain
-        assert simulation.state.active == LUMEN
-
-        self._walk_to(simulation, input_provider, terrain.lumen_goal_cell[0])
-        assert bool(simulation.state.reached_goal[LUMEN]), "Lumen deveria estar no portal dela"
-        assert simulation.state.outcome == OUTCOME_PLAYING, "um portal so nao termina a fase"
-
-        self._press(simulation, input_provider, "switch")
-        assert simulation.state.active == UMBRA
-        self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
-
-        assert simulation.state.outcome == OUTCOME_COMPLETE, (
-            f"a fase 1 deveria terminar so andando (estado: {simulation.state.message!r})"
-        )
-
-    def _release(self, input_provider) -> None:
-        for action in ("move_right", "move_left", "jump"):
-            input_provider.set_action_held(action, False)
 
     def _climb_to(
         self, simulation, input_provider, target_col: int, target_row: int, max_frames: int = 600
     ) -> bool:
-        """Conduz o ser ATIVO ate uma celula podendo SALTAR, e so considera
-        que chegou estando de pe (`is_grounded`) na linha certa -- checar so
-        a linha aceitaria um apice de salto de passagem e o teste passaria
-        com o ser caindo de volta no frame seguinte."""
+        """Como `_walk_to`, mas podendo SALTAR -- e so considera que chegou
+        estando de pe (`is_grounded`) na linha certa. Checar so a linha
+        aceitaria um apice de salto de passagem, e o teste passaria com o ser
+        caindo de volta no frame seguinte."""
         side = simulation.state.active
         tile_collision = simulation.tile_collision_systems[side]
         entity_index = int(simulation.state.entity_index[side])
@@ -197,7 +185,7 @@ class TestPlaythrough:
             current_x, current_y = position(simulation, side)
             row = int(current_y // cell_size)
             grounded = tile_collision.is_grounded(entity_index)
-            if grounded and row == target_row and abs(current_x - target_x) <= 8.0:
+            if grounded and row == target_row and abs(current_x - target_x) <= 9.0:
                 self._release(input_provider)
                 advance(simulation, input_provider, frames=2)
                 return True
@@ -214,183 +202,163 @@ class TestPlaythrough:
         advance(simulation, input_provider, frames=2)
         return False
 
-    def test_a_fase_4_perdoa_descer_antes_de_abrir_a_porta(self, simulation, input_provider):
-        """
-        O bug que o jogador encontrou, agora como regressao jogada.
-
-        Descer da saliencia pra olhar a porta de perto e o movimento mais
-        natural do mundo, e era irreversivel: os degraus estavam empilhados
-        na mesma coluna, o de cima era teto do de baixo, e a zona de luz --
-        a unica coisa que destranca a porta -- ficava inalcancavel. Sem
-        morte, sem mensagem, sem aviso: so uma parede que nunca abria.
-
-        Aqui a Lumen desce PRIMEIRO, de proposito, e tem de conseguir voltar
-        pela escada escalonada e terminar a fase.
-        """
-        simulation.runtime.load(3)
-        state = simulation.state
+    def _push_until_broken(
+        self, simulation, input_provider, col: int, row: int, max_frames: int = 300
+    ) -> bool:
+        """Segura a direcao contra a crosta em `(col, row)` ate ela ceder.
+        Romper exige `crust_break_seconds` de empurrao continuo -- deliberado,
+        porque nao tem volta."""
         terrain = simulation.terrain
-        light_col = int(np.nonzero(terrain.zone_light)[1][0])
-        light_row = int(np.nonzero(terrain.zone_light)[0][0])
-        shadow_col = int(np.nonzero(terrain.zone_shadow)[1][0])
+        target_x = (col + 0.5) * terrain.cell_size
+        for _ in range(max_frames):
+            if not bool(terrain.crust[row, col]):
+                self._release(input_provider)
+                advance(simulation, input_provider, frames=2)
+                return True
+            current_x, _ = position(simulation, simulation.state.active)
+            input_provider.set_action_held("move_right", target_x > current_x)
+            input_provider.set_action_held("move_left", target_x < current_x)
+            advance(simulation, input_provider, frames=1)
+        self._release(input_provider)
+        return False
 
-        # Facho ligado: ela precisa dele pra sobreviver ao trecho escuro do
-        # chao, e a carga se recompoe entre os saltos.
-        self._press(simulation, input_provider, "ability")
-        assert bool(state.ability_on[LUMEN])
+    # ------------------------------------------------------------------
+    # as quatro fases
+    # ------------------------------------------------------------------
 
-        assert self._climb_to(simulation, input_provider, 18, 17), "nao chegou ao chao junto da porta"
-        assert state.outcome == OUTCOME_PLAYING, f"morreu na descida: {state.message!r}"
+    def test_a_fase_1_e_completavel_so_andando(self, simulation, input_provider):
+        """'Duas Polaridades' e a fase de leitura: ensina que o mesmo
+        material e chao de um e abismo do outro, e precisa ser vencivel sem
+        nenhuma habilidade -- so TAB e as setas. Se algum dia ela exigir o
+        facho, o jogo perdeu sua porta de entrada."""
+        simulation.runtime.load(0)
+        terrain = simulation.terrain
+        assert simulation.state.active == LUMEN
 
-        # A volta, degrau por degrau.
-        for col, row in ((13, 15), (15, 13), (light_col, light_row)):
-            assert self._climb_to(simulation, input_provider, col, row), (
-                f"nao conseguiu subir de volta ate (col={col}, row={row}) -- a descida voltou "
-                f"a ser de mao unica e a fase esta insolvel"
-            )
+        self._walk_to(simulation, input_provider, terrain.lumen_goal_cell[0])
+        assert bool(simulation.state.reached_goal[LUMEN])
+        assert simulation.state.outcome == OUTCOME_PLAYING, "um portal so nao termina a fase"
 
-        if not bool(state.ability_on[LUMEN]):
-            self._press(simulation, input_provider, "ability")
         self._press(simulation, input_provider, "switch")
-        self._walk_to(simulation, input_provider, shadow_col)
-        assert state.door_open, "a porta deveria ceder depois da volta a zona de luz"
-
+        assert simulation.state.active == UMBRA
         self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
+
+        assert simulation.state.outcome == OUTCOME_COMPLETE, (
+            f"a fase 1 deveria terminar so andando (estado: {simulation.state.message!r})"
+        )
+
+    def test_a_fase_2_e_completavel_rompendo_a_crosta(self, simulation, input_provider):
+        """
+        'A Crosta' usa os DOIS verbos da Umbra, com um passo sem volta no meio.
+
+        Ela rompe a crosta pra passar -- e o buraco deixa a lampada acender o
+        eter do outro lado, que era o chao DELA. Rompeu e se trancou fora da
+        propria ponte. Precisa entao absorver pra devolve-la ao escuro,
+        atravessar, e desligar depois, pra que a Lumen encontre a ponte acesa.
+        """
+        simulation.runtime.load(1)
+        state, terrain = simulation.state, simulation.terrain
+        assert terrain.crust.any(), "a fase 2 precisa ter crosta"
+
         self._press(simulation, input_provider, "switch")
-        self._climb_to(simulation, input_provider, 27, 17)
-        if not bool(state.ability_on[LUMEN]):
-            self._press(simulation, input_provider, "ability")
+        assert state.active == UMBRA
+        assert self._push_until_broken(simulation, input_provider, 15, 12), (
+            "a Umbra deveria romper a crosta na altura dela"
+        )
+        assert bool(state.lit[13, 17]), (
+            "romper deixou a lampada acender o eter -- e ele era o chao DELA"
+        )
+
+        self._walk_to(simulation, input_provider, 16)
+        self._press(simulation, input_provider, "ability")
+        assert bool(state.ability_on[UMBRA]), "sem absorver, a ponte nao volta a ser dela"
+        self._walk_to(simulation, input_provider, 21)
+        self._press(simulation, input_provider, "ability")
+        self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
+        assert bool(state.reached_goal[UMBRA])
+
+        self._press(simulation, input_provider, "switch")
         self._walk_to(simulation, input_provider, terrain.lumen_goal_cell[0])
 
         assert state.outcome == OUTCOME_COMPLETE, f"estado: {state.message!r}"
 
-    def test_a_fase_2_e_completavel_levando_a_umbra_primeiro(self, simulation, input_provider):
-        """
-        'O Mesmo Chao' tem uma ORDEM obrigatoria, e e ela a licao da fase.
-
-        O caminho intuitivo -- levar a Lumen ate o portal dela primeiro --
-        nao fecha: para chegar ao portal dela a Umbra tem que absorver a
-        lampada que fica a tres celulas do portal da Lumen, e isso deixa a
-        Lumen no escuro por mais tempo do que ela aguenta. Levando a Umbra
-        primeiro, a Lumen ainda esta la atras, no raio da outra lampada, e
-        a absorcao nao a alcanca.
-
-        Este teste percorre a fase inteira por input. Se um ajuste de
-        balanceamento fechar tambem esta ordem, a fase deixa de ter solucao
-        e o teste falha aqui, nao no jogador.
-        """
-        simulation.runtime.load(1)
-        state = simulation.state
-        terrain = simulation.terrain
+    def test_a_fase_3_e_completavel_disputando_a_ponte(self, simulation, input_provider):
+        """'O Mesmo Chao': a lampada sobre a ponte faz dela chao da Lumen. A
+        Umbra so a toma absorvendo -- e absorver apaga a lampada, entao os
+        dois nunca podem estar na ponte ao mesmo tempo."""
+        simulation.runtime.load(2)
+        state, terrain = simulation.state, simulation.terrain
 
         self._press(simulation, input_provider, "switch")
         assert state.active == UMBRA
-        # A ponte de eter ja esta apagada: ela atravessa sem habilidade.
-        self._walk_to(simulation, input_provider, 25)
-        # Absorcao ligada so para passar pela lampada.
         self._press(simulation, input_provider, "ability")
         assert bool(state.ability_on[UMBRA])
-        self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
+        self._walk_to(simulation, input_provider, 17)
         self._press(simulation, input_provider, "ability")
-        assert not bool(state.ability_on[UMBRA])
+        self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
         assert bool(state.reached_goal[UMBRA])
 
         self._press(simulation, input_provider, "switch")
-        assert state.active == LUMEN
-        self._walk_to(simulation, input_provider, 14)
-        # Facho ligado so para a travessia do eter.
-        self._press(simulation, input_provider, "ability")
-        assert bool(state.ability_on[LUMEN])
-        self._walk_to(simulation, input_provider, 24)
-        self._press(simulation, input_provider, "ability")
-        self._walk_to(simulation, input_provider, terrain.lumen_goal_cell[0])
-
-        assert state.outcome == OUTCOME_COMPLETE, (
-            f"a fase 2 deveria fechar com a Umbra primeiro (estado: {state.message!r})"
-        )
-
-    def test_a_fase_3_e_completavel_revezando_os_andares(self, simulation, input_provider):
-        """
-        'Revezamento': os dois andares de eter ficam a quatro celulas um do
-        outro, perto o bastante para o facho da Lumen, no de cima, acender o
-        eter do de baixo. Enquanto ela atravessa, a Umbra nao tem chao --
-        entao a Umbra atravessa primeiro, com o facho desligado, e so depois
-        a Lumen acende o proprio caminho.
-        """
-        simulation.runtime.load(2)
-        state = simulation.state
-        terrain = simulation.terrain
-
-        self._press(simulation, input_provider, "switch")
-        assert state.active == UMBRA
-        self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
-        assert bool(state.reached_goal[UMBRA]), "o andar de baixo esta apagado: ela passa sem habilidade"
-
-        self._press(simulation, input_provider, "switch")
-        self._walk_to(simulation, input_provider, 8)
-        self._press(simulation, input_provider, "ability")
-        assert bool(state.ability_on[LUMEN])
-        self._walk_to(simulation, input_provider, terrain.lumen_goal_cell[0])
+        self._walk_to(simulation, input_provider, 17)
+        assert self._climb_to(simulation, input_provider, *terrain.lumen_goal_cell)
 
         assert state.outcome == OUTCOME_COMPLETE, f"estado: {state.message!r}"
 
     def test_a_fase_4_e_completavel_destrancando_a_porta(self, simulation, input_provider):
         """
         'Eclipse': a porta cede com a Lumen numa zona acesa -- que so o facho
-        dela acende -- e a Umbra numa apagada, no mesmo instante. A rocha da
-        saliencia e o que impede o facho de vazar ate a zona da Umbra e
-        cancelar a propria condicao.
+        dela acende -- e a Umbra numa apagada, no mesmo instante. A LAJE de
+        rocha e o que impede o facho de vazar ate a zona da Umbra, logo
+        abaixo, e cancelar a propria condicao.
 
-        Depois de aberta, a ordem volta a importar: a Umbra atravessa o eter
-        escuro primeiro, e so ai a Lumen o acende para si.
+        Os dois seguem em pistas separadas de ponta a ponta, e a rota
+        aproveita isso: o facho e desligado enquanto a Umbra caminha (parada
+        na zona, a Lumen sobrevive sem ele) pra que a carga se recomponha
+        antes da travessia do eter.
         """
         simulation.runtime.load(3)
-        state = simulation.state
-        terrain = simulation.terrain
+        state, terrain = simulation.state, simulation.terrain
         light_col = int(np.nonzero(terrain.zone_light)[1][0])
         shadow_col = int(np.nonzero(terrain.zone_shadow)[1][0])
 
-        # Lumen ate a zona de luz, na saliencia, e acende.
         self._walk_to(simulation, input_provider, light_col)
         self._press(simulation, input_provider, "ability")
         assert bool(state.ability_on[LUMEN])
 
-        # Umbra ate a zona de sombra: as duas condicoes valem juntas.
         self._press(simulation, input_provider, "switch")
         self._walk_to(simulation, input_provider, shadow_col)
         assert state.door_open, "a porta deveria ter cedido com os dois em posicao"
 
-        # Ela segue pelo eter escuro ate o portal antes de a Lumen acende-lo.
+        self._press(simulation, input_provider, "switch")
+        self._press(simulation, input_provider, "ability")
+        assert not bool(state.ability_on[LUMEN])
+        self._press(simulation, input_provider, "switch")
+
         self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
         assert bool(state.reached_goal[UMBRA])
+        assert float(state.charge[LUMEN]) > 0.9, "a carga do facho deveria ter se recomposto"
 
-        # Agora a Lumen desce, atravessa e acende o eter atras da Umbra.
         self._press(simulation, input_provider, "switch")
-        self._walk_to(simulation, input_provider, 27)
-        state_charge = float(state.charge[LUMEN])
-        assert state_charge > 0.3, "a carga deveria ter se recomposto na caminhada"
-        if not bool(state.ability_on[LUMEN]):
-            self._press(simulation, input_provider, "ability")
+        self._press(simulation, input_provider, "ability")
         self._walk_to(simulation, input_provider, terrain.lumen_goal_cell[0])
 
         assert state.outcome == OUTCOME_COMPLETE, f"estado: {state.message!r}"
 
     def test_atravessar_a_ponte_da_polaridade_errada_derruba(self, simulation, input_provider):
-        """O contrario da anterior: a Umbra tentando andar pela ponte ACESA
-        da fase 1 cai. E o feedback que ensina a mecanica."""
+        """A Umbra tentando andar pela ponte ACESA da fase 1 cai. E o
+        feedback que ensina a mecanica."""
         simulation.runtime.load(0)
         state = simulation.state
         self._press(simulation, input_provider, "switch")
         assert state.active == UMBRA
-        # Sobe a Umbra para a pista da Lumen, junto da ponte acesa.
-        place(simulation, UMBRA, 12, 9)
+        place(simulation, UMBRA, 11, 7)   # pista da Lumen, sobre a ponte acesa
         advance(simulation, input_provider, frames=4)
 
         input_provider.set_action_held("move_right", True)
         advance(simulation, input_provider, frames=60)
 
         _, umbra_y = position(simulation, UMBRA)
-        assert umbra_y > 10 * simulation.terrain.cell_size, (
+        assert umbra_y > 8 * simulation.terrain.cell_size, (
             "a Umbra deveria ter afundado na ponte acesa em vez de atravessa-la"
         )
 

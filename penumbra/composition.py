@@ -49,6 +49,7 @@ from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
 from penumbra.scenes import PenumbraScene
 from penumbra.state import DualityState, LevelRuntime, LUMEN, UMBRA
+from penumbra.systems.crust_break_system import CrustBreakSystem
 from penumbra.systems.duality_control_system import DualityControlSystem
 from penumbra.systems.light_field_system import LightFieldSystem
 from penumbra.systems.outcome_system import OutcomeSystem
@@ -204,9 +205,10 @@ def _assemble(
        a unica posicao valida pra um sistema de input (o mesmo contrato do
        vertical slice do Platformer)
     7. `LightFieldSystem`     -- recalcula a luz e as duas grades
-    8. `PolarityDoorSystem`   -- le a luz deste frame
-    9. `OutcomeSystem`        -- le posicoes ja resolvidas
-    10. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
+    8. `CrustBreakSystem`     -- o verbo da Umbra; muta o terreno
+    9. `PolarityDoorSystem`   -- le a luz deste frame
+    10. `OutcomeSystem`       -- le posicoes ja resolvidas
+    11. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
     """
     world.create_pool(SHADOW_HITBOX_POOL, HITBOX_DTYPE)
     ArchetypeLoader(ARCHETYPES_DIR).load_and_register_all(world)
@@ -231,6 +233,17 @@ def _assemble(
 
     world.register_system(DualityControlSystem(input_provider, state, tuning, tile_collision_systems))
     world.register_system(LightFieldSystem(terrain, state, tuning, lumen_grid, umbra_grid))
+    # Depois do LightFieldSystem: ele e quem atualiza `state.cell`, e o alvo
+    # de ruptura e a celula vizinha a da Umbra. Romper aqui muta o `Terrain`,
+    # entao a mudanca so aparece nas grades no frame seguinte -- um frame de
+    # atraso invisivel, e a alternativa (mutar antes da luz ser calculada)
+    # usaria a posicao do frame anterior, que e pior.
+    world.register_system(
+        CrustBreakSystem(
+            input_provider, terrain, state, umbra_tile_collision,
+            tuning.umbra.crust_break_seconds,
+        )
+    )
     world.register_system(PolarityDoorSystem(terrain, state))
     world.register_system(OutcomeSystem(terrain, state, tuning))
     world.register_system(

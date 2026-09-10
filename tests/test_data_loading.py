@@ -16,7 +16,7 @@ from penumbra.levels import LevelCatalog, LevelCatalogError
 from penumbra.terrain import Terrain, TerrainDefinitionError
 from penumbra.tuning import DualityTuning, TuningDefinitionError
 
-from tests.conftest import DIFFICULTY_PATH, make_rows
+from tests.conftest import DIFFICULTY_PATH, GRID_COLS, GRID_ROWS, make_rows
 
 
 def _write_difficulty(tmp_path, **overrides):
@@ -67,16 +67,16 @@ class TestTuning:
 class TestTerrain:
     @pytest.fixture
     def terrain(self):
-        return Terrain(cols=40, rows=22, cell_size=24.0)
+        return Terrain(cols=GRID_COLS, rows=GRID_ROWS, cell_size=32.0)
 
-    _VALID = {17: "..A.....B.........X.....Y", 18: "#" * 40}
+    _VALID = {14: "..A.....B.........X....Y..", 15: "#" * GRID_COLS}
 
     def test_uma_fase_valida_carrega(self, terrain):
         terrain.load_rows(make_rows(self._VALID))
-        assert terrain.lumen_spawn_cell == (2, 17)
-        assert terrain.umbra_spawn_cell == (8, 17)
-        assert terrain.lumen_goal_cell == (18, 17)
-        assert terrain.umbra_goal_cell == (24, 17)
+        assert terrain.lumen_spawn_cell == (2, 14)
+        assert terrain.umbra_spawn_cell == (8, 14)
+        assert terrain.lumen_goal_cell == (18, 14)
+        assert terrain.umbra_goal_cell == (23, 14)
         assert not terrain.has_door
 
     def test_recarregar_no_lugar_nao_deixa_residuo_da_fase_anterior(self, terrain):
@@ -94,11 +94,11 @@ class TestTerrain:
 
     def test_numero_de_linhas_errado_e_recusado(self, terrain):
         with pytest.raises(TerrainDefinitionError, match="linhas"):
-            terrain.load_rows(("." * 40,) * 21)
+            terrain.load_rows(("." * GRID_COLS,) * (GRID_ROWS - 1))
 
     def test_numero_de_colunas_errado_e_recusado(self, terrain):
         rows = list(make_rows(self._VALID))
-        rows[5] = "." * 39
+        rows[5] = "." * (GRID_COLS - 1)
         with pytest.raises(TerrainDefinitionError, match="colunas"):
             terrain.load_rows(tuple(rows))
 
@@ -112,14 +112,14 @@ class TestTerrain:
 
     def test_marcador_ausente_e_recusado(self, terrain):
         with pytest.raises(TerrainDefinitionError, match="marcador obrigatorio"):
-            terrain.load_rows(make_rows({17: "..A.....B.........X"}))
+            terrain.load_rows(make_rows({14: "..A.....B.........X"}))
 
     def test_ultima_linha_nao_vazia_e_recusada(self, terrain):
         """A ultima linha e o abismo. Sem ela ninguem cai de verdade --
         `Grid2D` trata fora-dos-limites como solido, entao o ser que
         perdesse o chao simplesmente pousaria na borda de baixo."""
         rows = list(make_rows(self._VALID))
-        rows[-1] = "#" * 40
+        rows[-1] = "#" * GRID_COLS
         with pytest.raises(TerrainDefinitionError, match="abismo"):
             terrain.load_rows(tuple(rows))
 
@@ -142,7 +142,7 @@ class TestLevelCatalog:
 
         catalog = LevelCatalog.load_from_directory(LEVELS_DIR)
         assert catalog.count == 4
-        catalog.validate_all(Terrain(cols=40, rows=22, cell_size=24.0))
+        catalog.validate_all(Terrain(cols=GRID_COLS, rows=GRID_ROWS, cell_size=32.0))
         for index in range(catalog.count):
             level = catalog.at(index)
             assert level.name and level.hint, "toda fase precisa de nome e de uma dica"
@@ -163,4 +163,4 @@ class TestLevelCatalog:
         )
         catalog = LevelCatalog.load_from_directory(tmp_path)
         with pytest.raises(LevelCatalogError, match="quebrada"):
-            catalog.validate_all(Terrain(cols=40, rows=22, cell_size=24.0))
+            catalog.validate_all(Terrain(cols=GRID_COLS, rows=GRID_ROWS, cell_size=32.0))

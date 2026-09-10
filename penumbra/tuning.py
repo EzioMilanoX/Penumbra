@@ -12,7 +12,7 @@ uma constante de balanceamento propria.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import MISSING, dataclass
 
 
 class TuningDefinitionError(Exception):
@@ -54,6 +54,10 @@ class CharacterTuning:
     ability_refill_per_second: float
     peril_seconds: float
     peril_recovery_per_second: float
+    crust_break_seconds: float = 0.0
+    """Segundos empurrando pra romper uma celula de crosta. So a Umbra
+    rompe, entao so a secao dela precisa declarar isto -- o default zerado
+    do lado da Lumen nunca e lido (`CrustBreakSystem` so olha a Umbra)."""
 
 
 @dataclass(frozen=True)
@@ -137,11 +141,17 @@ def _section(raw: dict, key: str, schema: type, path: str) -> dict:
     section = raw.get(key)
     if not isinstance(section, dict):
         raise TuningDefinitionError(f"{path}: secao obrigatoria {key!r} ausente ou nao e um objeto")
-    expected = tuple(schema.__dataclass_fields__)
-    missing = [field for field in expected if field not in section]
+    fields = schema.__dataclass_fields__
+    expected = tuple(fields)
+    # Campos com default sao opcionais no JSON; os demais, obrigatorios.
+    required = [
+        name for name, field in fields.items()
+        if field.default is MISSING and field.default_factory is MISSING
+    ]
+    missing = [field for field in required if field not in section]
     if missing:
         raise TuningDefinitionError(f"{path}: secao {key!r} sem os campos obrigatorios {missing}")
-    return {field: section[field] for field in expected}
+    return {field: section[field] for field in expected if field in section}
 
 
 def _validate(tuning: DualityTuning, path: str) -> None:
@@ -170,5 +180,7 @@ def _validate(tuning: DualityTuning, path: str) -> None:
             )
         if character.jump_velocity_y >= 0.0:
             raise TuningDefinitionError(f"{path}: '{who}.jump_velocity_y' precisa ser negativo (+y = baixo)")
+        if character.crust_break_seconds < 0.0:
+            raise TuningDefinitionError(f"{path}: '{who}.crust_break_seconds' nao pode ser negativo")
         if character.peril_seconds <= 0.0 or character.ability_charge_seconds <= 0.0:
             raise TuningDefinitionError(f"{path}: {who!r} precisa de peril_seconds/ability_charge_seconds positivos")

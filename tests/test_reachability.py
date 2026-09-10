@@ -20,12 +20,18 @@ import pytest
 from penumbra.reachability import JumpModel, TraversalGraph, solid_mask
 from penumbra.terrain import Terrain
 
-from tests.conftest import make_rows
+from tests.conftest import GRID_COLS, GRID_ROWS, make_rows
 
 
-def _graph(simulation, side_tuning, door_open: bool = True) -> TraversalGraph:
+def _graph(
+    simulation, side_tuning, door_open: bool = True, crust_broken: bool = True
+) -> TraversalGraph:
+    """Grafo otimista por default: porta aberta e crosta rompida. Os dois
+    sao coisas que os seres CONSEGUEM fazer, entao a pergunta "ele alcanca?"
+    tem de considerar que ja foram feitas -- senao a fase 2, onde a crosta
+    tranca o caminho da Umbra de proposito, apareceria como insolvel."""
     model = JumpModel(simulation.tuning.world, side_tuning)
-    return TraversalGraph(solid_mask(simulation.terrain, door_open), model)
+    return TraversalGraph(solid_mask(simulation.terrain, door_open, crust_broken), model)
 
 
 class TestJumpModel:
@@ -39,55 +45,61 @@ class TestJumpModel:
         assert reaches == sorted(reaches, reverse=True)
         assert model.horizontal_reach(99) == 0.0
 
-    def test_a_umbra_sobe_um_degrau_e_a_lumen_tres(self, simulation):
+    def test_a_umbra_sobe_menos_degraus_que_a_lumen(self, simulation):
         """Subir num degrau exige >= 1 celula de deslocamento horizontal --
-        o topo do degrau nunca esta na coluna onde o ser esta de pe. A Umbra
-        ALCANCA 2 celulas de altura mas so desloca 0,47 la em cima, entao na
-        pratica ela sobe 1. Uma fase que exija 2 dela e intransponivel, e o
-        numero de cima (2,06) faz parecer que da."""
+        o topo do degrau nunca esta na coluna onde o ser esta de pe, porque
+        essa coluna e a que ela ocupa.
+
+        A altura maxima do salto engana: o que decide e quanto tempo o ser
+        FICA naquela altura. Este teste nao fixa os numeros (eles vem do
+        JSON de dificuldade e mudam com balanceamento) -- fixa a relacao que
+        precisa continuar valendo: a Lumen sobe estritamente mais, e a Umbra
+        sobe ao menos um degrau, senao o design vertical fecha pra ela."""
         world = simulation.tuning.world
-        assert JumpModel(world, simulation.tuning.umbra).max_climb == 1
-        assert JumpModel(world, simulation.tuning.lumen).max_climb == 3
+        umbra_climb = JumpModel(world, simulation.tuning.umbra).max_climb
+        lumen_climb = JumpModel(world, simulation.tuning.lumen).max_climb
+        assert umbra_climb >= 1, "sem subir nada, a Umbra so sabe andar"
+        assert lumen_climb > umbra_climb, "a agilidade da Lumen tem de significar algo"
 
     def test_um_bloco_sobre_a_cabeca_transforma_a_plataforma_em_beco(self, simulation):
         """O bug da fase 4, isolado: dois blocos na mesma coluna. De pe no
         de baixo, a celula acima esta solida -- o salto morre nela, e nao
         importa que o ser alcance a altura do de cima."""
-        terrain = Terrain(cols=40, rows=22, cell_size=simulation.tuning.world.cell_size)
+        terrain = Terrain(cols=GRID_COLS, rows=GRID_ROWS, cell_size=simulation.tuning.world.cell_size)
         empilhados = make_rows({
-            17: "..A.....B.........X.....Y",
-            18: "#" * 40,
-            16: ".............#",
-            14: ".............#",
+            14: "..A.....B.........X....Y..",
+            15: "#" * 28,
+            13: "..........#",
+            11: "..........#",
         })
         terrain.load_rows(empilhados)
         model = JumpModel(simulation.tuning.world, simulation.tuning.lumen)
         graph = TraversalGraph(solid_mask(terrain, door_open=True), model)
 
-        plataforma = (13, 15)
+        plataforma = (10, 12)
         assert plataforma in graph.standable
-        alcancavel_do_chao = graph.reachable_from((2, 17))
+        alcancavel_do_chao = graph.reachable_from((2, 14))
         assert plataforma in alcancavel_do_chao, "ela chega na plataforma de baixo"
-        assert (13, 13) not in graph.reachable_from(plataforma), (
+        assert (10, 10) not in graph.reachable_from(plataforma), (
             "mas o bloco de cima e teto: dali nao se sobe pra lugar nenhum"
         )
 
     def test_degraus_escalonados_sao_subiveis(self, simulation):
         """A correcao: deslocar as colunas. Mesmo alcance de salto, mesma
         altura, e agora o caminho existe."""
-        terrain = Terrain(cols=40, rows=22, cell_size=simulation.tuning.world.cell_size)
+        terrain = Terrain(cols=GRID_COLS, rows=GRID_ROWS, cell_size=simulation.tuning.world.cell_size)
         escalonados = make_rows({
-            17: "..A.....B.........X.....Y",
-            18: "#" * 40,
-            16: ".............#",
-            14: "...............#",
+            14: "..A.....B.........X....Y..",
+            15: "#" * 28,
+            13: "..........#",
+            11: "............#",
         })
         terrain.load_rows(escalonados)
         model = JumpModel(simulation.tuning.world, simulation.tuning.lumen)
         graph = TraversalGraph(solid_mask(terrain, door_open=True), model)
 
-        assert (13, 15) in graph.reachable_from((2, 17))
-        assert (15, 13) in graph.reachable_from((13, 15))
+        assert (10, 12) in graph.reachable_from((2, 14))
+        assert (12, 10) in graph.reachable_from((10, 12))
 
 
 class TestShippedLevelGeometry:
@@ -108,6 +120,25 @@ class TestShippedLevelGeometry:
                     f"fase {index + 1} ({level.name}): {who} nao alcanca o portal dela "
                     f"de {spawn} ate {goal}"
                 )
+
+    def test_a_crosta_e_de_fato_obrigatoria_em_alguma_fase(self, simulation):
+        """O verbo da Umbra tem de ser estruturalmente necessario, nao
+        situacional -- era esse o problema que ele veio resolver: a absorcao
+        dela era obrigatoria em 1 de 4 fases e o facho da Lumen em 3.
+
+        Se nenhuma fase ficar intransponivel com a crosta intacta, romper
+        virou decoracao."""
+        obrigatoria_em = []
+        for index, level in self._levels(simulation):
+            terrain = simulation.terrain
+            if not terrain.crust.any():
+                continue
+            graph = _graph(simulation, simulation.tuning.umbra, crust_broken=False)
+            if terrain.umbra_goal_cell not in graph.reachable_from(terrain.umbra_spawn_cell):
+                obrigatoria_em.append(level.name)
+        assert obrigatoria_em, (
+            "nenhuma fase exige romper a crosta -- o verbo da Umbra voltou a ser opcional"
+        )
 
     def test_cada_ser_alcanca_a_propria_zona_de_polaridade(self, simulation):
         """Com a porta ainda TRANCADA -- e o estado em que a zona precisa

@@ -15,25 +15,26 @@ from penumbra.state import LUMEN, OUTCOME_COMPLETE, OUTCOME_FAILED, OUTCOME_PLAY
 
 from tests.conftest import advance, load_custom, place, position
 
-# Chao de rocha nas colunas 0-4 e 15-39, com uma ponte de eter em 5-14 e o
-# vazio embaixo dela. Sem lampada: o eter comeca apagado.
+# Grade 28x17 (lida de `data/difficulties`, ver `tests.conftest`): rocha nas
+# colunas 0-3 e 11-27, ponte de eter em 4-10, e o vazio embaixo dela. Linha
+# de apoio 12, chao 13. Sem lampada: o eter comeca apagado.
 _DARK_BRIDGE = {
-    17: "..A..............B",
-    18: "#####~~~~~~~~~~#########################",
-    19: "#####..........#########################",
-    20: "#####..........#########################",
+    12: ".A...........B......X....Y..",
+    13: "####~~~~~~~#################",
+    14: "####.......#################",
+    15: "####.......#################",
 }
 
-# A mesma ponte, com uma lampada no meio dela: o eter comeca aceso.
+# A mesma ponte, com uma lampada sobre ela: o eter comeca aceso.
 _LIT_BRIDGE = {
-    17: "..A......*.......B",
-    18: "#####~~~~~~~~~~#########################",
-    19: "#####..........#########################",
-    20: "#####..........#########################",
+    12: ".A.....*.....B......X....Y..",
+    13: "####~~~~~~~#################",
+    14: "####.......#################",
+    15: "####.......#################",
 }
 
 
-_BRIDGE_ROW = 18
+_BRIDGE_ROW = 13
 """Linha de rocha/eter das fases de teste -- a superficie de apoio fica no
 topo dela."""
 
@@ -46,13 +47,11 @@ def _bridge_top(simulation) -> float:
     return _BRIDGE_ROW * simulation.terrain.cell_size
 
 
-def _add_goals(spec: dict, lumen_col: int = 30, umbra_col: int = 35) -> dict:
-    """Toda fase precisa dos quatro marcadores; os portais dos testes ficam
-    longe da area testada, sobre rocha."""
-    row = spec[17].ljust(40, ".")
-    row = row[:lumen_col] + "X" + row[lumen_col + 1:]
-    row = row[:umbra_col] + "Y" + row[umbra_col + 1:]
-    return {**spec, 17: row}
+def _add_goals(spec: dict) -> dict:
+    """Os quatro marcadores ja vem embutidos nos cenarios acima (X na coluna
+    20, Y na 25, os dois sobre rocha e longe da ponte). Esta funcao continua
+    existindo so pra deixar explicito nos testes que a fase esta completa."""
+    return spec
 
 
 class TestEtherPolarity:
@@ -61,8 +60,8 @@ class TestEtherPolarity:
 
     def test_eter_apagado_e_chao_da_umbra_e_abismo_da_lumen(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_DARK_BRIDGE))
-        place(simulation, LUMEN, 8, 17)
-        place(simulation, UMBRA, 12, 17)
+        place(simulation, LUMEN, 6, 12)
+        place(simulation, UMBRA, 9, 12)
 
         advance(simulation, input_provider, frames=18)
 
@@ -74,8 +73,8 @@ class TestEtherPolarity:
 
     def test_eter_aceso_e_chao_da_lumen_e_abismo_da_umbra(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_LIT_BRIDGE))
-        place(simulation, LUMEN, 6, 17)
-        place(simulation, UMBRA, 13, 17)
+        place(simulation, LUMEN, 4, 7)
+        place(simulation, UMBRA, 9, 12)
 
         advance(simulation, input_provider, frames=18)
 
@@ -116,37 +115,37 @@ class TestAbilities:
 
     def test_facho_da_lumen_solidifica_eter_apagado(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_DARK_BRIDGE))
-        place(simulation, LUMEN, 8, 17)
+        place(simulation, LUMEN, 6, 12)
         advance(simulation, input_provider, frames=2)
-        assert not bool(simulation.state.lit[18, 8]), "sem lampada, o eter comeca apagado"
+        assert not bool(simulation.state.lit[13, 6]), "sem lampada, o eter comeca apagado"
 
         input_provider.set_action_held("ability", True)
         advance(simulation, input_provider, frames=2)
 
         assert bool(simulation.state.ability_on[LUMEN])
-        assert bool(simulation.state.lit[18, 8]), "o facho deveria acender o eter sob a Lumen"
-        assert simulation.umbra_grid.cells[18, 8] == 0, "e retira-lo da Umbra no mesmo instante"
+        assert bool(simulation.state.lit[13, 6]), "o facho deveria acender o eter sob a Lumen"
+        assert simulation.umbra_grid.cells[13, 6] == 0, "e retira-lo da Umbra no mesmo instante"
 
     def test_absorcao_da_umbra_apaga_a_lampada(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_LIT_BRIDGE))
         simulation.state.active = UMBRA
-        place(simulation, UMBRA, 9, 16)
+        place(simulation, UMBRA, 7, 12)
         advance(simulation, input_provider, frames=2)
-        assert bool(simulation.state.lit[18, 9]), "com a lampada, o eter comeca aceso"
+        assert bool(simulation.state.lit[13, 7]), "com a lampada, o eter comeca aceso"
 
         input_provider.set_action_held("ability", True)
         advance(simulation, input_provider, frames=2)
 
         assert bool(simulation.state.ability_on[UMBRA])
-        assert bool(simulation.state.absorbed[17, 9]), "a lampada deveria estar dentro do bolsao"
-        assert not bool(simulation.state.lit[18, 9]), "o eter deveria voltar a ser chao da Umbra"
+        assert bool(simulation.state.absorbed[12, 7]), "a lampada deveria estar dentro do bolsao"
+        assert not bool(simulation.state.lit[13, 7]), "o eter deveria voltar a ser chao da Umbra"
 
     def test_a_carga_drena_e_desliga_a_habilidade_sozinha(self, simulation, input_provider):
         """A carga e o que torna a solidificacao TEMPORARIA -- sem ela cada
         fase se resolveria ligando a habilidade uma vez e esquecendo."""
         load_custom(simulation, _add_goals(_DARK_BRIDGE))
         state = simulation.state
-        place(simulation, LUMEN, 2, 17)
+        place(simulation, LUMEN, 1, 12)
 
         input_provider.set_action_held("ability", True)
         advance(simulation, input_provider, frames=2)
@@ -175,7 +174,7 @@ class TestOutcomes:
 
     def test_lumen_se_apaga_no_escuro(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_DARK_BRIDGE))
-        place(simulation, LUMEN, 2, 17)
+        place(simulation, LUMEN, 1, 12)
         frames = int(simulation.tuning.lumen.peril_seconds * 60) + 10
 
         advance(simulation, input_provider, frames=frames)
@@ -186,9 +185,9 @@ class TestOutcomes:
     def test_umbra_se_dissolve_na_luz(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_LIT_BRIDGE))
         # Sobre rocha, ao lado da lampada: ela nao cai, ela se dissolve.
-        place(simulation, UMBRA, 16, 17)
-        place(simulation, LUMEN, 2, 17)
-        simulation.terrain.lamp[17, 16] = 1.0
+        place(simulation, UMBRA, 13, 12)
+        place(simulation, LUMEN, 1, 12)
+        simulation.terrain.lamp[12, 13] = 1.0
         frames = int(simulation.tuning.umbra.peril_seconds * 60) + 10
 
         advance(simulation, input_provider, frames=frames)
@@ -202,14 +201,14 @@ class TestOutcomes:
         o sentido."""
         load_custom(simulation, _add_goals(_LIT_BRIDGE))
         state = simulation.state
-        # Longe da lampada (col 9), sobre a rocha: escuro o bastante pra
+        # Longe da lampada (col 7), sobre a rocha: escuro o bastante pra
         # comecar a apagar, sem risco de cair.
-        place(simulation, LUMEN, 25, 17)
+        place(simulation, LUMEN, 20, 12)
         advance(simulation, input_provider, frames=30)
         peril_no_escuro = float(state.peril[LUMEN])
         assert peril_no_escuro > 0.0
 
-        place(simulation, LUMEN, 9, 17)  # em cima da lampada
+        place(simulation, LUMEN, 7, 12)  # em cima da lampada
         advance(simulation, input_provider, frames=20)
 
         assert float(state.peril[LUMEN]) < peril_no_escuro
@@ -217,8 +216,8 @@ class TestOutcomes:
 
     def test_contato_entre_os_dois_anula_os_dois(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_LIT_BRIDGE))
-        place(simulation, LUMEN, 16, 17)
-        place(simulation, UMBRA, 16, 17)
+        place(simulation, LUMEN, 13, 12)
+        place(simulation, UMBRA, 13, 12)
 
         advance(simulation, input_provider, frames=2)
 
@@ -236,11 +235,11 @@ class TestOutcomes:
 
     def test_os_dois_portais_ao_mesmo_tempo_completam_a_fase(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_LIT_BRIDGE))
-        place(simulation, LUMEN, 30, 17)
+        place(simulation, LUMEN, 20, 12)
         advance(simulation, input_provider, frames=2)
         assert simulation.state.outcome == OUTCOME_PLAYING, "um portal so nao completa nada"
 
-        place(simulation, UMBRA, 35, 17)
+        place(simulation, UMBRA, 25, 12)
         advance(simulation, input_provider, frames=2)
 
         assert simulation.state.outcome == OUTCOME_COMPLETE
@@ -265,8 +264,8 @@ class TestSwitching:
 
     def test_apenas_o_ser_ativo_se_move(self, simulation, input_provider):
         load_custom(simulation, _add_goals(_LIT_BRIDGE))
-        place(simulation, LUMEN, 2, 17)
-        place(simulation, UMBRA, 16, 17)
+        place(simulation, LUMEN, 1, 12)
+        place(simulation, UMBRA, 13, 12)
         advance(simulation, input_provider, frames=2)
         lumen_start_x, _ = position(simulation, LUMEN)
         umbra_start_x, _ = position(simulation, UMBRA)
@@ -284,8 +283,8 @@ class TestSwitching:
         jogador acender o eter sob a Umbra enquanto comanda a Lumen, ela
         cai -- e e por isso que cada fase e um problema de sequencia."""
         load_custom(simulation, _add_goals(_DARK_BRIDGE))
-        place(simulation, LUMEN, 10, 17)
-        place(simulation, UMBRA, 8, 17)
+        place(simulation, LUMEN, 8, 12)
+        place(simulation, UMBRA, 5, 12)
         advance(simulation, input_provider, frames=2)
         _, umbra_start_y = position(simulation, UMBRA)
 
@@ -301,21 +300,22 @@ class TestPolarityDoor:
     """A porta que exige os dois ao mesmo tempo."""
 
     _DOOR_LEVEL = {
-        12: "....*A.....L......*.DD..*............*..",
-        13: "...#########........DD..................",
-        14: ".............#......DD..................",
-        16: ".............#......DD..................",
-        17: "...B.....S..........DD.............X..Y.",
-        18: "############################~~~~~~######",
-        19: "############################......######",
-        20: "############################......######",
+        7: "...*A....L..................",
+        8: "..#########.................",
+        10: "............#...............",
+        12: "...........#................",
+        14: "...B....S...........X...Y...",
+        15: "############################",
     }
+    """Saliencia (rocha na linha 8) com a zona de luz em cima, zona de sombra
+    no chao logo abaixo dela: e a rocha da saliencia que impede o facho da
+    Lumen de vazar ate a zona da Umbra e cancelar a propria condicao."""
 
     def _with_door_column(self, spec: dict) -> dict:
         rows = dict(spec)
-        for row in range(6, 18):
-            content = rows.get(row, "").ljust(40, ".")
-            rows[row] = content[:20] + "DD" + content[22:]
+        for row in range(4, 15):
+            content = rows.get(row, "").ljust(28, ".")
+            rows[row] = content[:13] + "D" + content[14:]
         return rows
 
     def test_a_porta_cede_com_lumen_na_luz_e_umbra_na_sombra(self, simulation, input_provider):
@@ -323,8 +323,8 @@ class TestPolarityDoor:
         state = simulation.state
         assert not state.door_open, "a porta comeca trancada"
 
-        place(simulation, LUMEN, 11, 12)
-        place(simulation, UMBRA, 9, 17)
+        place(simulation, LUMEN, 9, 7)
+        place(simulation, UMBRA, 8, 14)
         state.ability_on[LUMEN] = True  # so o facho acende a zona dela
         advance(simulation, input_provider, frames=3)
 
@@ -332,8 +332,8 @@ class TestPolarityDoor:
 
     def test_a_porta_nao_cede_sem_o_facho(self, simulation, input_provider):
         load_custom(simulation, self._with_door_column(self._DOOR_LEVEL))
-        place(simulation, LUMEN, 11, 12)
-        place(simulation, UMBRA, 9, 17)
+        place(simulation, LUMEN, 9, 7)
+        place(simulation, UMBRA, 8, 14)
         advance(simulation, input_provider, frames=3)
         assert not simulation.state.door_open
 
@@ -343,17 +343,17 @@ class TestPolarityDoor:
         -- sair da zona e exatamente o que atravessar exige."""
         load_custom(simulation, self._with_door_column(self._DOOR_LEVEL))
         state = simulation.state
-        place(simulation, LUMEN, 11, 12)
-        place(simulation, UMBRA, 9, 17)
+        place(simulation, LUMEN, 9, 7)
+        place(simulation, UMBRA, 8, 14)
         state.ability_on[LUMEN] = True
         advance(simulation, input_provider, frames=3)
         assert state.door_open
 
         state.ability_on[LUMEN] = False
-        place(simulation, LUMEN, 5, 12)
-        place(simulation, UMBRA, 3, 17)
+        place(simulation, LUMEN, 4, 7)
+        place(simulation, UMBRA, 3, 14)
         advance(simulation, input_provider, frames=5)
 
         assert state.door_open
-        assert simulation.lumen_grid.cells[10, 20] == 0, "a porta aberta deixa de ser solida"
-        assert simulation.umbra_grid.cells[10, 20] == 0
+        assert simulation.lumen_grid.cells[10, 13] == 0, "a porta aberta deixa de ser solida"
+        assert simulation.umbra_grid.cells[10, 13] == 0

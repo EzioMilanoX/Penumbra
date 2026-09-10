@@ -19,12 +19,22 @@ from ouroboros.interfaces.null.null_input_provider import NullInputProvider
 
 from penumbra.composition import build_simulation
 from penumbra.state import LUMEN, UMBRA
+from penumbra.tuning import DualityTuning
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "penumbra" / "config.json"
 DIFFICULTY_PATH = PROJECT_ROOT / "data" / "difficulties" / "penumbra" / "basic.json"
 
 FRAME = 1.0 / 60.0
+
+_WORLD = DualityTuning.from_json(str(DIFFICULTY_PATH)).world
+GRID_COLS = _WORLD.grid_cols
+GRID_ROWS = _WORLD.grid_rows
+CELL_SIZE = _WORLD.cell_size
+"""Dimensoes lidas do MESMO arquivo de dados que o jogo le. Nenhum teste
+deve escrever 28 ou 17 na mao: quando a grade mudou de 40x22 pra 28x17, todo
+numero literal espalhado pelos testes virou uma falha de manutencao em vez
+de um sinal de regressao."""
 
 
 @pytest.fixture
@@ -54,7 +64,7 @@ def advance(simulation, input_provider, frames: int = 1, delta_time: float = FRA
         simulation.world.step(delta_time)
 
 
-def make_rows(spec: Dict[int, str], cols: int = 40, rows: int = 22) -> Tuple[str, ...]:
+def make_rows(spec: Dict[int, str], cols: int = GRID_COLS, rows: int = GRID_ROWS) -> Tuple[str, ...]:
     """Monta um ASCII de fase a partir de `{indice_da_linha: prefixo}`,
     completando com vazio a direita e as linhas omitidas. Permite que cada
     teste declare a geometria minima do que ele testa em duas ou tres
@@ -73,9 +83,13 @@ def load_custom(simulation, spec: Dict[int, str]) -> None:
 
     Usa exatamente o caminho que o jogo usa pra trocar de fase (as
     mascaras sao reescritas no lugar, nenhuma entidade e criada ou
-    destruida), o que tambem exercita esse caminho de graca."""
-    simulation.terrain.load_rows(make_rows(spec))
-    simulation.runtime.reset()
+    destruida), o que tambem exercita esse caminho de graca.
+
+    Passa por `LevelRuntime.load_rows` -- e nao por `terrain.load_rows`
+    direto -- porque `reset()` restaura o ASCII carregado (a crosta rompida
+    tem de voltar), e um cenario montado por fora do runtime seria
+    descartado no primeiro reset."""
+    simulation.runtime.load_rows(make_rows(spec))
 
 
 def place(simulation, side: int, col: float, row: float) -> None:
@@ -98,7 +112,10 @@ def position(simulation, side: int) -> Tuple[float, float]:
 
 
 __all__ = [
+    "CELL_SIZE",
     "FRAME",
+    "GRID_COLS",
+    "GRID_ROWS",
     "LUMEN",
     "UMBRA",
     "advance",

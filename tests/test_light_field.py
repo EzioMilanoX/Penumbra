@@ -13,13 +13,25 @@ from penumbra.state import LUMEN, UMBRA
 
 from tests.conftest import advance, load_custom, place
 
-# Uma unica lampada no meio do vazio, com chao de rocha so na ultima linha
-# util -- nada pra ocluir, pra que o alcance medido seja o alcance puro.
+# Uma unica lampada no meio do vazio (linha 4, coluna 14), com chao de rocha
+# so na ultima linha util -- nada pra ocluir, pra que o alcance medido seja o
+# alcance puro. Grade 28x17, ver `tests.conftest`.
 _OPEN_ROOM = {
-    5: "." * 20 + "*",
-    19: "..A......B.........X.........Y",
-    20: "#" * 40,
+    4: "." * 14 + "*",
+    14: ".A......B.......X....Y..",
+    15: "#" * 28,
 }
+
+# A mesma sala, com uma parede logo abaixo da lampada.
+_WALLED_ROOM = {
+    4: "." * 14 + "*",
+    5: "#" * 28,
+    14: ".A......B.......X....Y..",
+    15: "#" * 28,
+}
+
+_LAMP = (4, 14)
+"""`(row, col)` da lampada -- a mesma ordem que `_reach_in_direction` usa."""
 
 
 def _reach_in_direction(state, threshold, origin, step, limit=20):
@@ -50,7 +62,7 @@ class TestLightReach:
         light = simulation.tuning.light
         expected = (light.lamp_intensity - light.solid_threshold) * light.falloff_radius_cells
         measured = _reach_in_direction(
-            simulation.state, light.solid_threshold, origin=(5, 20), step=(0, 1)
+            simulation.state, light.solid_threshold, origin=_LAMP, step=(0, 1)
         )
         assert measured == pytest.approx(expected, abs=1.0)
 
@@ -64,8 +76,8 @@ class TestLightReach:
         advance(simulation, input_provider, frames=2)
 
         threshold = simulation.tuning.light.solid_threshold
-        straight = _reach_in_direction(simulation.state, threshold, (5, 20), (0, -1))
-        diagonal = _reach_in_direction(simulation.state, threshold, (5, 20), (1, -1))
+        straight = _reach_in_direction(simulation.state, threshold, _LAMP, (0, -1))
+        diagonal = _reach_in_direction(simulation.state, threshold, _LAMP, (1, -1))
         assert straight > 0.0
         assert diagonal >= 0.85 * straight, (
             f"diagonal {diagonal:.2f} vs reta {straight:.2f} -- o campo voltou a ser um losango"
@@ -75,85 +87,61 @@ class TestLightReach:
         """Sem oclusao, uma lampada iluminaria o outro lado de uma parede e
         a sombra projetada pela rocha -- de que a fase 'Eclipse' depende
         inteiramente -- deixaria de existir."""
-        load_custom(
-            simulation,
-            {
-                5: "." * 20 + "*",
-                6: "#" * 40,
-                19: "..A......B.........X.........Y",
-                20: "#" * 40,
-            },
-        )
+        load_custom(simulation, _WALLED_ROOM)
         advance(simulation, input_provider, frames=2)
 
         state = simulation.state
-        assert float(state.light[5, 20]) > 0.0, "a celula da lampada esta acesa"
-        assert float(state.light[6, 20]) == 0.0, "a rocha nao guarda luz"
-        assert float(state.light[7, 20]) == 0.0, "e nao deixa a luz passar"
+        assert float(state.light[4, 14]) > 0.0, "a celula da lampada esta acesa"
+        assert float(state.light[5, 14]) == 0.0, "a rocha nao guarda luz"
+        assert float(state.light[6, 14]) == 0.0, "e nao deixa a luz passar"
 
     def test_celulas_bloqueadoras_parecem_iluminadas_sem_conduzir_luz(self, simulation, input_provider):
         """`display_light` e so apresentacao: uma parede com luz de um lado
         precisa PARECER iluminada. Nenhuma regra de jogo pode ler isso --
         se lesse, a rocha conduziria luz."""
-        load_custom(
-            simulation,
-            {
-                5: "." * 20 + "*",
-                6: "#" * 40,
-                19: "..A......B.........X.........Y",
-                20: "#" * 40,
-            },
-        )
+        load_custom(simulation, _WALLED_ROOM)
         advance(simulation, input_provider, frames=2)
 
         state = simulation.state
-        assert float(state.display_light[6, 20]) > 0.0
-        assert float(state.light[6, 20]) == 0.0
+        assert float(state.display_light[5, 14]) > 0.0
+        assert float(state.light[5, 14]) == 0.0
 
 
 class TestShadow:
     def test_a_absorcao_apaga_a_lampada_dentro_do_bolsao(self, simulation, input_provider):
         load_custom(simulation, _OPEN_ROOM)
         state = simulation.state
-        place(simulation, UMBRA, 20, 6)
+        place(simulation, UMBRA, 14, 5)
         state.ability_on[UMBRA] = True
         advance(simulation, input_provider, frames=2)
 
-        assert bool(state.absorbed[5, 20]), "a lampada esta dentro do bolsao"
-        assert float(state.light[5, 20]) == 0.0, "e portanto apagada"
+        assert bool(state.absorbed[4, 14]), "a lampada esta dentro do bolsao"
+        assert float(state.light[4, 14]) == 0.0, "e portanto apagada"
 
     def test_o_bolsao_de_sombra_respeita_a_rocha(self, simulation, input_provider):
         """A sombra usa o MESMO flood da luz, com outra semente -- entao ela
         contorna paredes em vez de vazar por elas. Um disco euclidiano
         simples deixaria a Umbra apagar eter do outro lado de uma parede."""
-        load_custom(
-            simulation,
-            {
-                5: "." * 20 + "*",
-                6: "#" * 40,
-                19: "..A......B.........X.........Y",
-                20: "#" * 40,
-            },
-        )
+        load_custom(simulation, _WALLED_ROOM)
         state = simulation.state
-        place(simulation, UMBRA, 20, 8)  # logo abaixo da parede
+        place(simulation, UMBRA, 14, 7)  # logo abaixo da parede
         state.ability_on[UMBRA] = True
         advance(simulation, input_provider, frames=2)
 
-        assert bool(state.absorbed[8, 20]), "a celula da propria Umbra esta no bolsao"
-        assert not bool(state.absorbed[5, 20]), "a parede deveria proteger a lampada"
+        assert bool(state.absorbed[7, 14]), "a celula da propria Umbra esta no bolsao"
+        assert not bool(state.absorbed[4, 14]), "a parede deveria proteger a lampada"
 
     def test_o_raio_de_absorcao_segue_o_valor_ajustado(self, simulation, input_provider):
         load_custom(simulation, _OPEN_ROOM)
         state = simulation.state
-        place(simulation, UMBRA, 20, 10)
+        place(simulation, UMBRA, 14, 9)
         state.ability_on[UMBRA] = True
         advance(simulation, input_provider, frames=2)
 
         expected = simulation.tuning.light.absorb_radius_cells
         reached = 0
         for k in range(1, 20):
-            if not bool(state.absorbed[10, 20 + k]):
+            if not bool(state.absorbed[9, 14 + k]):
                 break
             reached = k
         assert reached == pytest.approx(expected, abs=1.0)
@@ -166,18 +154,18 @@ class TestBeam:
         load_custom(
             simulation,
             {
-                17: "..A......B.........X.........Y",
-                18: "#####~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"[:40],
+                14: ".A......B.......X....Y..",
+                15: "####" + "~" * 24,
             },
         )
         state = simulation.state
-        place(simulation, LUMEN, 8, 17)
+        place(simulation, LUMEN, 6, 14)
         state.ability_on[LUMEN] = True
         advance(simulation, input_provider, frames=2)
-        assert bool(state.lit[18, 8])
+        assert bool(state.lit[15, 6])
 
-        place(simulation, LUMEN, 30, 17)
+        place(simulation, LUMEN, 22, 14)
         advance(simulation, input_provider, frames=2)
 
-        assert bool(state.lit[18, 30]), "o eter sob a nova posicao acende"
-        assert not bool(state.lit[18, 8]), "e o de tras volta a ser chao da Umbra"
+        assert bool(state.lit[15, 22]), "o eter sob a nova posicao acende"
+        assert not bool(state.lit[15, 6]), "e o de tras volta a ser chao da Umbra"

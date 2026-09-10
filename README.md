@@ -34,10 +34,11 @@ outro.
 |  | **Lumen** (luz) | **Umbra** (sombra) |
 |---|---|---|
 | corpo | círculo branco, pequeno | bloco escuro com orla, largo |
-| movimento | 200 px/s, sobe degraus de até **3** células | 108 px/s, sobe degraus de **1** célula |
+| movimento | 200 px/s, sobe degraus de até **3** células | 142 px/s, sobe degraus de **2** células |
 | pisa em | rocha + éter **aceso** | rocha + éter **apagado** |
 | morre | onde a luz cai abaixo de `0.12` (**se apaga**) | onde a luz passa de `0.60` (**se dissolve**) |
 | habilidade (**J**) | **Facho** — emite luz ao redor de si, solidificando éter escuro | **Absorção** — abre um bolsão de escuridão, apagando lâmpadas dentro dele |
+| só ela faz | — | **rompe a crosta**, empurrando com A/D. Irreversível. |
 
 Nenhuma das duas mortes é instantânea: um medidor sobe enquanto o perigo dura
 e desce quando passa. Atravessar correndo uma nesga da polaridade errada é uma
@@ -78,24 +79,42 @@ Disso saem as situações que as fases exploram:
 - **O ser inativo não está protegido.** Ele fica parado, mas continua sujeito
   à gravidade e ao próprio chão. Se você mudar a polaridade sob ele enquanto
   comanda o outro, ele cai.
+- **A crosta não volta.** Todo o resto do terreno é interruptor — acender,
+  apagar, acender de novo. A crosta, não: rompida, rompida para a fase
+  inteira. É a única decisão do jogo que não dá para desfazer. E como ela é
+  **opaca**, o buraco que a Umbra abre para passar deixa entrar a luz que ela
+  barrava — e é a Umbra quem se dissolve na luz. Até aqui toda destruição de
+  terreno ia da Lumen para a Umbra; esta vai da Umbra para ela mesma.
 
 ## As quatro fases
 
 | # | Nome | O que ela ensina |
 |---|---|---|
 | 1 | **Duas Polaridades** | Alternância (TAB) e leitura do terreno. Duas pistas, o mesmo material de éter: acesa em cima, apagada embaixo. Vencível **só andando** — nenhuma habilidade. |
-| 2 | **O Mesmo Chão** | As duas habilidades. Uma ponte só, escura por padrão: a Umbra atravessa de graça, a Lumen precisa do facho. Depois a Umbra tem que passar por uma lâmpada absorvendo — o que apaga o abrigo da Lumen do outro lado. |
-| 3 | **Revezamento** | Timing e carga. Dois andares de éter, quatro células um do outro: o facho da Lumen no andar de cima acende o éter do de baixo e derruba a Umbra. Um atravessa, depois o outro. |
-| 4 | **Eclipse** | A porta de polaridade, e a **sombra projetada pela rocha** — a saliência de pedra é o que impede o facho da Lumen de vazar até a zona de sombra da Umbra. |
+| 2 | **A Crosta** | Os **dois** verbos da Umbra, com um passo sem volta no meio. Ela rompe a crosta para passar — e o buraco deixa a lâmpada acender o éter do outro lado, que era o chão *dela*. Rompeu e se trancou fora da própria ponte: agora precisa absorver para devolvê-la ao escuro, atravessar, e desligar depois, para que a Lumen a encontre acesa. |
+| 3 | **O Mesmo Chão** | As duas habilidades em disputa. A lâmpada sobre a ponte faz dela chão da Lumen; a Umbra só a toma absorvendo — e absorver apaga a lâmpada, então os dois nunca podem estar na ponte ao mesmo tempo. |
+| 4 | **Eclipse** | A porta de polaridade, e a **sombra projetada pela rocha**: a zona de luz fica em cima de uma laje e a de sombra exatamente embaixo, então é a própria laje que impede o facho da Lumen de vazar até a zona da Umbra e cancelar a condição. |
+
+Três princípios de desenho, todos aprendidos errando:
+
+- **Spawn perto do portal.** O obstáculo é a polaridade, não a distância. A
+  primeira versão custava ~11 s de caminhada por fase com 1–4 decisões: uma
+  decisão a cada 3 segundos, e na fase 1 uma a cada 11. Agora são 4–7 s.
+- **Teto sobre todo vão de éter.** A Lumen cobre **5,5 células** num salto
+  completo — sem teto ela pula por cima e o puzzle vira opcional.
+- **Pistas separadas.** Se os dois percorrem o mesmo corredor em sequência, o
+  segundo passa por cima do primeiro parado e os dois se anulam. Foi assim
+  que três desenhos meus morreram antes de chegar a este.
 
 ### Alfabeto das fases (`data/levels/*.json`)
 
 ```
 #  rocha (sólida para os dois, bloqueia luz)     A  spawn da Lumen
 ~  éter (sólido para um por vez)                 B  spawn da Umbra
-*  lâmpada                                       X  portal da Lumen
-D  porta de polaridade                           Y  portal da Umbra
-L  zona de luz (gatilho da Lumen)                .  vazio
+%  crosta (sólida, opaca, só a Umbra rompe)      X  portal da Lumen
+*  lâmpada                                       Y  portal da Umbra
+D  porta de polaridade                           .  vazio
+L  zona de luz (gatilho da Lumen)
 S  zona de sombra (gatilho da Umbra)
 ```
 
@@ -104,17 +123,17 @@ fora-dos-limites como sólido, então sem essa linha ninguém cairia de verdade.
 
 ## Como a luz funciona
 
-Um flood geodésico de 8 vizinhos, relaxado 14 vezes por frame sobre a grade
-40×22 — cada passe empurra a luz uma célula, perdendo `1/9` de intensidade
+Um flood geodésico de 8 vizinhos, relaxado 10 vezes por frame sobre a grade
+28×17 — cada passe empurra a luz uma célula, perdendo `1/7` de intensidade
 (diagonais custam `√2` a mais). Isso dá três coisas que uma soma de discos não
 daria:
 
 1. **A luz contorna paredes em vez de vazar por elas** — a sombra projetada
    pela rocha, de que a fase 4 depende inteiramente, existe de graça.
 2. **O alcance de uma fonte sai da intensidade dela**:
-   `(I − 0.35) × 9` células até deixar de solidificar éter. Uma lâmpada
-   alcança 5,85 células; a Lumen fica segura até 7,92 dela; a Umbra se
-   dissolve dentro de 3,6. São esses três números que permitem desenhar uma
+   `(I − 0.35) × 7` células até deixar de solidificar éter. Uma lâmpada
+   alcança 4,55 células; a Lumen fica segura até 6,16 dela; a Umbra se
+   dissolve dentro de 2,8. São esses três números que permitem desenhar uma
    fase sem adivinhar.
 3. **A sombra obedece a mesma geometria da luz** — é o mesmo flood com outra
    semente, então o bolsão da Umbra também respeita paredes.
@@ -122,6 +141,9 @@ daria:
 Os vizinhos diagonais não são cosméticos: só com os 4 ortogonais a distância
 resultante é a de Manhattan e uma lâmpada acende um **losango**, com alcance
 diagonal ~71% do horizontal. `tests/test_light_field.py` guarda isso.
+
+A **crosta** também é opaca, e é disso que o verbo da Umbra vive: sem
+oclusão, rompê-la seria apenas abrir passagem.
 
 ## Arquitetura
 
@@ -140,6 +162,7 @@ penumbra/
   systems/
     duality_control_system.py   input -> velocity dos dois seres
     light_field_system.py       a luz, e as duas grades de colisão
+    crust_break_system.py       o verbo da Umbra; muta o terreno
     polarity_door_system.py     a porta que exige os dois ao mesmo tempo
     outcome_system.py           as quatro mortes e a única vitória
     presentation_system.py      estado -> pixels
@@ -179,10 +202,11 @@ faz a ação de um ser desfazer o terreno do outro.
 5. GravitySystem          (Penumbra) fecha o contrato Physics -> Tile* -> Gravity
 6. DualityControlSystem              escreve `velocity` depois de tudo acima
 7. LightFieldSystem                  recalcula a luz e as duas grades
-8. PolarityDoorSystem                lê a luz deste frame
-9. OutcomeSystem                     lê posições já resolvidas
-10. PresentationSystem               só pixels
-11. QuitOnActionSystem
+8. CrustBreakSystem                  o verbo da Umbra; muta o terreno
+9. PolarityDoorSystem                lê a luz deste frame
+10. OutcomeSystem                    lê posições já resolvidas
+11. PresentationSystem               só pixels
+12. QuitOnActionSystem
 ```
 
 `CompositionRoot.build()` registra 1–3 e sempre nessa ordem; `gravity_y` é
@@ -197,8 +221,8 @@ engine exigem.
   alocado na composição; `update()` só faz ufuncs NumPy com `out=`. As 880
   entidades de célula e os dois seres existem do primeiro ao último frame do
   processo — **trocar de fase não cria nem destrói nenhuma entidade**, só
-  reescreve as máscaras do `Terrain` no lugar. Custo medido: **2,8 ms/frame**
-  (teto de ~354 fps).
+  reescreve as máscaras do `Terrain` no lugar. Custo medido: **1,8 ms/frame**
+  (teto de ~570 fps).
 - **Logic vs Presentation.** Nenhum módulo de `penumbra` importa `pygame`. O
   HUD usa `draw_text`/`draw_ui_rect`, que alocam, e por isso vive no callback
   de `GameLoop.set_on_draw_ui` — nunca dentro de um `ISystem`.
@@ -251,7 +275,9 @@ de design original:
 - **Controle simultâneo** dos dois seres (um em cada analógico)
 - **Boss fight** e a narrativa com a escolha da fusão
 - **Áudio** — a engine tem `IAudioEngine` e bancos data-driven, mas o slice
-  não tem nenhum asset de som
+  não tem nenhum asset de som. É a lacuna mais funcional das que restam: o
+  medidor de perigo é hoje **só visual**, e você olha o ser que comanda
+  enquanto o outro morre fora da sua atenção
 
 ## Paleta
 

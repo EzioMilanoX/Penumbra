@@ -16,6 +16,8 @@ do primeiro ao ultimo frame do processo.
 """
 from __future__ import annotations
 
+from typing import Optional, Tuple
+
 import numpy as np
 
 from ouroboros.core.world import World
@@ -85,6 +87,13 @@ class DualityState:
         """Celula `(col, row)` de cada ser no frame corrente."""
         self.reached_goal = np.zeros(2, dtype=bool)
 
+        # --- crosta que a Umbra esta rompendo agora ---
+        self.crust_target_col = -1
+        self.crust_target_row = -1
+        self.crust_progress = 0.0
+        """0..1. Nao vive no `Terrain` porque nao e terreno: e o esforco em
+        curso de UM ser sobre uma celula, e reinicia ao trocar de alvo."""
+
         # --- porta de polaridade ---
         self.door_open = False
         """Trava por fase: uma vez que os dois seres cumpriram as duas
@@ -144,6 +153,10 @@ class LevelRuntime:
         self._tuning = tuning
         self._transform_pool = world.get_pool("transform")
         self._velocity_pool = world.get_pool("velocity")
+        self._loaded_rows: Optional[Tuple[str, ...]] = None
+        """O ASCII que esta de fato carregado no `Terrain`. `reset()` recarrega
+        ISTO, e nao `current.rows`: senao um cenario montado por fora (um teste,
+        uma sonda de ferramenta) seria descartado pelo primeiro reset."""
 
     @property
     def current(self) -> LevelDefinition:
@@ -160,7 +173,14 @@ class LevelRuntime:
     def load(self, level_index: int) -> None:
         """Carrega a fase `level_index` e a coloca no estado inicial."""
         self._state.level_index = level_index % self._catalog.count
-        self._terrain.load_rows(self.current.rows)
+        self.load_rows(self.current.rows)
+
+    def load_rows(self, rows: Tuple[str, ...]) -> None:
+        """Carrega um ASCII arbitrario e o adota como o que `reset()` deve
+        restaurar. E por aqui que testes e ferramentas montam um cenario
+        proprio sem que o proximo reset o jogue fora."""
+        self._loaded_rows = tuple(rows)
+        self._terrain.load_rows(self._loaded_rows)
         self.reset()
 
     def advance(self) -> None:
@@ -169,8 +189,17 @@ class LevelRuntime:
         self.load(self._state.level_index + 1)
 
     def reset(self) -> None:
-        """Recomeca a fase corrente: seres nos pontos de spawn, cargas
-        cheias, habilidades desligadas, porta trancada de novo."""
+        """
+        Recomeca a fase corrente do zero.
+
+        Recarrega o ASCII, e nao apenas o estado: romper a crosta MUTA o
+        `Terrain` (`break_crust`), entao um reset que so zerasse cargas e
+        posicoes devolveria o jogador a uma fase com os buracos que ele
+        abriu na tentativa anterior -- e, sendo irreversivel, uma crosta
+        quebrada na hora errada deixaria a fase insolvel pra sempre, sem
+        nenhum jeito de recuperar.
+        """
+        self._terrain.load_rows(self._loaded_rows or self.current.rows)
         state = self._state
         state.outcome = OUTCOME_PLAYING
         state.message = ""
@@ -181,6 +210,9 @@ class LevelRuntime:
         state.charge[:] = 1.0
         state.peril[:] = 0.0
         state.reached_goal[:] = False
+        state.crust_target_col = -1
+        state.crust_target_row = -1
+        state.crust_progress = 0.0
         state.light[:] = 0.0
         state.display_light[:] = 0.0
         state.lit[:] = False

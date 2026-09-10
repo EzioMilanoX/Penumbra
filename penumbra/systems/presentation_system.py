@@ -31,6 +31,7 @@ from penumbra.terrain import (
     ROLE_LAMP,
     ROLE_LUMEN_GOAL,
     ROLE_ROCK,
+    ROLE_CRUST,
     ROLE_UMBRA_GOAL,
     ROLE_ZONE_LIGHT,
     ROLE_ZONE_SHADOW,
@@ -66,6 +67,16 @@ AIR_GLOW_MAX_ALPHA = 62.0
 claro da tela e lia como neblina por cima do nivel, abafando justamente o
 terreno que o jogador precisa ver."""
 
+# --- crosta: o unico terreno que a Umbra rompe ---
+CRUST_UNLIT = (78, 64, 56)
+CRUST_LIT = (198, 172, 146)
+"""Tom QUENTE, e e a unica quebra deliberada da paleta preto/branco/dourado
+no terreno. Rocha e eter ja se distinguem por forma (massa continua contra
+blocos recuados); uma terceira forma seria fina demais pra ler no escuro, e
+a crosta e justamente o terreno em que o jogador precisa reconhecer de
+longe -- e a unica coisa no jogo que so um dos dois resolve. Quente contra o
+cinza-azulado da rocha se le mesmo com pouca luz."""
+
 LAMP_ON = (255, 250, 232)
 LAMP_SNUFFED = (74, 70, 86)
 
@@ -75,7 +86,7 @@ UMBRA_BODY = (32, 30, 44)
 UMBRA_DISSOLVING = (164, 154, 196)
 UMBRA_RIM = (138, 136, 162)
 
-_ROLE_COUNT = 9
+_ROLE_COUNT = 10
 _CELL_SPRITE_UNIT = 8.0
 """`PygameRenderer.draw_batch` converte `transform.scale` em pixels
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
@@ -129,20 +140,22 @@ class PresentationSystem(ISystem):
         self._shape_by_role[ROLE_LAMP] = SHAPE_CIRCLE
         self._shape_by_role[ROLE_LUMEN_GOAL] = SHAPE_RING
         self._shape_by_role[ROLE_UMBRA_GOAL] = SHAPE_RING
-        self._shape_by_role[ROLE_ZONE_LIGHT] = SHAPE_RING
-        self._shape_by_role[ROLE_ZONE_SHADOW] = SHAPE_RING
+        # Zonas ficam RECT (placa no chao), portais ficam RING (destino).
+        # Como aneis os dois eram dourados e quase do mesmo tamanho, e nada
+        # na tela dizia qual era onde pisar e qual era onde terminar.
         self._size_by_role = np.ones(_ROLE_COUNT, dtype=np.float32)
         self._size_by_role[ROLE_LAMP] = 0.62
         self._size_by_role[ROLE_LUMEN_GOAL] = 0.92
         self._size_by_role[ROLE_UMBRA_GOAL] = 0.92
-        self._size_by_role[ROLE_ZONE_LIGHT] = 0.86
-        self._size_by_role[ROLE_ZONE_SHADOW] = 0.86
+        self._size_by_role[ROLE_ZONE_LIGHT] = 0.8
+        self._size_by_role[ROLE_ZONE_SHADOW] = 0.8
         # Eter RECUADO na celula, rocha sangrando ate a borda: a distincao
         # mais importante da tela nao pode depender so de brilho, porque os
         # dois terrenos passam a maior parte do tempo apagados e a essa
         # altura nenhum matiz se le. Recuado, o eter mostra uma grade de
         # blocos soltos; a rocha, uma massa continua.
         self._size_by_role[ROLE_ETHER] = 0.82
+        self._size_by_role[ROLE_CRUST] = 0.9
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
 
     def update(self, world: World, delta_time: float) -> None:
@@ -220,6 +233,12 @@ class PresentationSystem(ISystem):
         self._fill(self._mask_alt, LAMP_SNUFFED, LAMP_SNUFFED)
         np.copyto(self._alpha, 190.0, where=self._mask_alt)
 
+        # crosta: quente, e encolhendo enquanto a Umbra a empurra
+        np.equal(role, ROLE_CRUST, out=self._mask)
+        np.clip(light, 0.0, 1.0, out=self._ramp)
+        self._fill(self._mask, CRUST_UNLIT, CRUST_LIT)
+        np.copyto(self._alpha, 255.0, where=self._mask)
+
         # porta: parede dourada enquanto trancada, contorno tenue depois
         np.equal(role, ROLE_DOOR, out=self._mask)
         if state.door_open:
@@ -280,6 +299,15 @@ class PresentationSystem(ISystem):
         np.logical_or(self._mask, np.equal(role, ROLE_UMBRA_GOAL), out=self._mask)
         np.multiply(self._channel, 0.88 + 0.16 * pulse, out=self._ramp)
         np.copyto(self._channel, self._ramp, where=self._mask)
+
+        # A celula que a Umbra esta rompendo encolhe conforme o esforco
+        # sobe: e o unico aviso de que uma acao IRREVERSIVEL esta em curso,
+        # e o que a torna deliberada em vez de acidental.
+        state = self._state
+        if state.crust_target_col >= 0:
+            slot = state.crust_target_row * self._terrain.cols + state.crust_target_col
+            shrink = 1.0 - 0.72 * min(1.0, max(0.0, state.crust_progress))
+            self._channel[slot] *= shrink
 
         transform_view = self._transform_pool.active_view()
         transform_rows = self._cell_transform_rows

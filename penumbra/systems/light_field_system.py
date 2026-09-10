@@ -102,8 +102,13 @@ class LightFieldSystem(ISystem):
         self._refresh_character_cells()
 
         # --- celulas que bloqueiam qualquer propagacao ---
+        # A crosta entra aqui, e nao so na colisao: e opaca, e e disso que
+        # o verbo da Umbra vive. O buraco que ela abre pra passar deixa
+        # entrar a luz que a crosta barrava -- e e ela quem se dissolve na
+        # luz. Sem a crosta ocluir, romper seria so abrir passagem.
         np.logical_and(terrain.door, not state.door_open, out=self._mask_a)
-        np.logical_or(terrain.rock, self._mask_a, out=self._blocked)
+        np.logical_or(terrain.rock, terrain.crust, out=self._blocked)
+        np.logical_or(self._blocked, self._mask_a, out=self._blocked)
         np.logical_not(self._blocked, out=self._mask_b)
         np.copyto(self._open_solid, self._mask_b)
 
@@ -202,8 +207,8 @@ class LightFieldSystem(ISystem):
     def _compose_collision_grids(self) -> None:
         """Escreve as duas `Grid2D` lidas pelos dois `TileCollisionSystem`.
 
-        Rocha e porta trancada sao solidas pros DOIS -- e o chao neutro que
-        torna as fases solveis. O eter e solido so pra um: pra Lumen onde
+        Rocha, crosta e porta trancada sao solidas pros DOIS -- e o chao
+        neutro que torna as fases solveis. O eter e solido so pra um: pra Lumen onde
         esta aceso, pra Umbra onde esta apagado. Nenhuma celula e chao dos
         dois ao mesmo tempo, o que e exatamente o ponto."""
         terrain, state = self._terrain, self._state

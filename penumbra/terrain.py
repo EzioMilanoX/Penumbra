@@ -21,6 +21,7 @@ import numpy as np
 ROCK_CHAR = "#"
 EMPTY_CHAR = "."
 ETHER_CHAR = "~"
+CRUST_CHAR = "%"
 LAMP_CHAR = "*"
 DOOR_CHAR = "D"
 ZONE_LIGHT_CHAR = "L"
@@ -43,6 +44,7 @@ ROLE_ZONE_LIGHT = 5
 ROLE_ZONE_SHADOW = 6
 ROLE_LUMEN_GOAL = 7
 ROLE_UMBRA_GOAL = 8
+ROLE_CRUST = 9
 
 _MARKER_CHARS = frozenset(
     {LUMEN_SPAWN_CHAR, UMBRA_SPAWN_CHAR, LUMEN_GOAL_CHAR, UMBRA_GOAL_CHAR}
@@ -61,7 +63,14 @@ class Terrain:
     Mascaras de uma fase, todas com shape `(rows, cols)` e alocadas uma
     unica vez.
 
-    `rock` e `door` sao os dois tipos de celula que bloqueiam luz; `rock`
+    `crust` e a crosta: solida para os dois e opaca como a rocha, mas a
+    Umbra a rompe empurrando-a. Romper e IRREVERSIVEL dentro da fase, e a
+    consequencia interessante nao e a passagem -- e a luz. Como a crosta
+    bloqueia luz, abrir um buraco nela deixa entrar o que estava barrado do
+    outro lado, e a Umbra e quem se dissolve na luz. Ela deixa de ser vitima
+    da polaridade da Lumen e passa a ser agente do proprio risco.
+
+    `rock`, `crust` e `door` sao os tipos de celula que bloqueiam luz; `rock`
     e solida para os DOIS seres (a rocha e o unico chao neutro do mundo
     fragmentado, e e ela que torna as fases solveis), `door` e solida
     enquanto a porta de polaridade estiver trancada. `ether` e a materia
@@ -80,6 +89,7 @@ class Terrain:
         shape = (self._rows, self._cols)
 
         self.rock = np.zeros(shape, dtype=bool)
+        self.crust = np.zeros(shape, dtype=bool)
         self.ether = np.zeros(shape, dtype=bool)
         self.door = np.zeros(shape, dtype=bool)
         self.zone_light = np.zeros(shape, dtype=bool)
@@ -135,6 +145,7 @@ class Terrain:
         self._validate_shape(rows)
 
         self.rock[:] = False
+        self.crust[:] = False
         self.ether[:] = False
         self.door[:] = False
         self.zone_light[:] = False
@@ -150,6 +161,9 @@ class Terrain:
                 if char == ROCK_CHAR:
                     self.rock[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_ROCK
+                elif char == CRUST_CHAR:
+                    self.crust[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_CRUST
                 elif char == ETHER_CHAR:
                     self.ether[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_ETHER
@@ -195,6 +209,16 @@ class Terrain:
             )
         if (self.zone_light.any() or self.zone_shadow.any()) and not self.has_door:
             raise TerrainDefinitionError("fase com zona 'L'/'S' mas sem nenhuma celula de porta ('D')")
+
+    def break_crust(self, col: int, row: int) -> bool:
+        """Rompe a crosta em `(col, row)`. Devolve `False` se nao havia
+        crosta ali. Escreve tambem em `role`, senao a celula continuaria
+        desenhada como crosta depois de deixar de existir."""
+        if not bool(self.crust[row, col]):
+            return False
+        self.crust[row, col] = False
+        self.role[row, col] = ROLE_EMPTY
+        return True
 
     def _validate_shape(self, rows: Tuple[str, ...]) -> None:
         if len(rows) != self._rows:
