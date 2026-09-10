@@ -35,6 +35,15 @@ medidor de perigo precisa ser lido antes de ser pensado. O dourado nao
 podia servir -- ele significa cooperacao, o oposto do que este medidor
 avisa."""
 
+_TEXT_FAINT = (100, 102, 120, 255)
+
+_LINE_1 = 8.0
+_LINE_2 = 29.0
+_LINE_3 = 50.0
+"""Tres linhas de rodape. `config.json` reserva a altura para elas
+(`window_height - grid_rows * cell_size`); mexer numa coisa sem a outra
+corta a ultima linha."""
+
 _BAR_WIDTH = 30.0
 _BAR_HEIGHT = 3.0
 _BAR_GAP = 2.0
@@ -99,24 +108,34 @@ class PenumbraHud:
     # ------------------------------------------------------------------
 
     def _draw_footer(self, renderer: IRenderer) -> None:
+        """Uma linha para cada coisa.
+
+        A primeira versao punha a dica da fase e a lista de controles na
+        MESMA linha, uma ancorada a esquerda e outra a direita: as duas
+        somavam mais que a largura da janela e se sobrepunham no meio, nas
+        quatro fases. Texto de largura variavel nunca cabe em duas ancoras
+        opostas -- ou cada um tem sua linha, ou um deles tem de ser
+        truncado. Aqui cada um tem sua linha, e o rodape foi dimensionado
+        para as tres."""
         state, level = self._state, self._runtime.current
         top = self._playfield_height
         renderer.draw_ui_rect(0.0, top, self._width, self._height - top, _PANEL)
         renderer.draw_ui_rect(0.0, top, self._width, 1.0, _RULE)
 
         renderer.draw_text(
-            14.0, top + 8.0,
+            14.0, top + _LINE_1,
             f"{state.level_index + 1}/{self._runtime.count}  {level.name}",
             14, _TEXT,
         )
-        renderer.draw_text(14.0, top + 27.0, level.hint, 12, _TEXT_DIM)
-
-        active = state.active_name.upper()
-        renderer.draw_text(self._width - 14.0, top + 8.0, f"comando: {active}", 14, _GOLD, anchor="topright")
         renderer.draw_text(
-            self._width - 14.0, top + 27.0,
+            self._width - 14.0, top + _LINE_1,
+            f"comando: {state.active_name.upper()}", 14, _GOLD, anchor="topright",
+        )
+        renderer.draw_text(14.0, top + _LINE_2, level.hint, 12, _TEXT_DIM)
+        renderer.draw_text(
+            14.0, top + _LINE_3,
             "A/D mover   ESPACO pular   J habilidade   TAB trocar   R reiniciar   ESC sair",
-            11, _TEXT_DIM, anchor="topright",
+            11, _TEXT_FAINT,
         )
 
     # ------------------------------------------------------------------

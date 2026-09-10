@@ -34,7 +34,7 @@ outro.
 |  | **Lumen** (luz) | **Umbra** (sombra) |
 |---|---|---|
 | corpo | círculo branco, pequeno | bloco escuro com orla, largo |
-| movimento | 200 px/s, salto de 3,5 células | 108 px/s, salto de 2 células |
+| movimento | 200 px/s, sobe degraus de até **3** células | 108 px/s, sobe degraus de **1** célula |
 | pisa em | rocha + éter **aceso** | rocha + éter **apagado** |
 | morre | onde a luz cai abaixo de `0.12` (**se apaga**) | onde a luz passa de `0.60` (**se dissolve**) |
 | habilidade (**J**) | **Facho** — emite luz ao redor de si, solidificando éter escuro | **Absorção** — abre um bolsão de escuridão, apagando lâmpadas dentro dele |
@@ -43,6 +43,13 @@ Nenhuma das duas mortes é instantânea: um medidor sobe enquanto o perigo dura
 e desce quando passa. Atravessar correndo uma nesga da polaridade errada é uma
 decisão possível — e é o que dá às habilidades a função de ferramenta em vez
 de interruptor.
+
+Sobre o salto: o que decide se um degrau é subível **não é a altura máxima**,
+é quanto tempo o ser fica naquela altura. Subir num degrau exige ao menos 1
+célula de deslocamento horizontal — o topo do degrau nunca está na coluna onde
+o ser está de pé. A Umbra alcança 2,06 células de altura mas só desloca 0,47
+lá em cima: na prática ela sobe **um** degrau. `penumbra/reachability.py`
+modela isso, e é o que impede uma fase de pedir dela o que ela não faz.
 
 ## O conflito, concretamente
 
@@ -126,6 +133,7 @@ penumbra/
   tuning.py          lê data/difficulties/penumbra/basic.json
   terrain.py         máscaras densas de uma fase, recarregáveis no lugar
   levels.py          catálogo de data/levels/*.json
+  reachability.py    modelo de salto + grafo de alcance (auditoria de geometria)
   state.py           estado compartilhado + troca de fase
   scenes.py          quando o mundo anda e quando congela
   hud.py             HUD e avisos de fim de fase
@@ -138,7 +146,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/               63 testes headless
+tests/               72 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -203,9 +211,17 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 63 testes, ~8 s, headless
-python -m tools.audit_levels   # relatório de balanceamento de luz por fase
+pytest -q                      # 72 testes, ~15 s, headless
+python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
+
+Uma fase tem **duas** maneiras independentes de ser insolúvel, e cada uma tem
+seu guardião:
+
+- **polaridade** — o éter não acende onde precisa, ou o facho da Lumen vaza até
+  a zona de sombra e a porta nunca abre (`tests/test_shipped_levels.py`);
+- **geometria** — o degrau é alto demais, ou há um bloco exatamente sobre a
+  cabeça e o salto morre no teto (`tests/test_reachability.py`).
 
 Os testes rodam a **simulação real**: `build_simulation` monta o mesmo `World`
 com os mesmos sistemas na mesma ordem que o jogo com janela, só sem

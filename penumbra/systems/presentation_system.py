@@ -44,18 +44,27 @@ GOLD = (196, 158, 82)
 GOLD_BRIGHT = (247, 214, 138)
 
 # --- rocha: o chao neutro, cinza-azulado ---
-ROCK_UNLIT = (25, 25, 33)
-ROCK_LIT = (152, 156, 172)
+ROCK_UNLIT = (52, 54, 66)
+ROCK_LIT = (170, 174, 190)
+"""A rocha apagada precisa ser VISIVEL, nao apenas existir. Ela e o chao
+neutro -- o unico lugar onde um ser espera em seguranca enquanto o jogador
+comanda o outro -- entao saber onde ela esta e a informacao com que o
+jogador planeja a sequencia inteira. A primeira versao usava (25,25,33)
+sobre um fundo (8,8,14): num nivel majoritariamente apagado nao se enxergava
+onde estava o chao."""
 
 # --- eter: a materia potencial, o unico terreno que troca de dono ---
-ETHER_SHADOW_DEEP = (42, 40, 56)
-ETHER_SHADOW_EDGE = (88, 84, 112)
-ETHER_LIT_EDGE = (156, 162, 198)
-ETHER_LIT_FULL = (242, 246, 255)
+ETHER_SHADOW_DEEP = (58, 54, 78)
+ETHER_SHADOW_EDGE = (104, 98, 132)
+ETHER_LIT_EDGE = (170, 176, 210)
+ETHER_LIT_FULL = (244, 248, 255)
 
 # --- luz no ar: branco frio, translucido ---
 AIR_GLOW = (206, 218, 255)
-AIR_GLOW_MAX_ALPHA = 118.0
+AIR_GLOW_MAX_ALPHA = 62.0
+"""O brilho no ar e atmosfera, nao informacao. A 118 ele era o elemento mais
+claro da tela e lia como neblina por cima do nivel, abafando justamente o
+terreno que o jogador precisa ver."""
 
 LAMP_ON = (255, 250, 232)
 LAMP_SNUFFED = (74, 70, 86)
@@ -120,10 +129,20 @@ class PresentationSystem(ISystem):
         self._shape_by_role[ROLE_LAMP] = SHAPE_CIRCLE
         self._shape_by_role[ROLE_LUMEN_GOAL] = SHAPE_RING
         self._shape_by_role[ROLE_UMBRA_GOAL] = SHAPE_RING
+        self._shape_by_role[ROLE_ZONE_LIGHT] = SHAPE_RING
+        self._shape_by_role[ROLE_ZONE_SHADOW] = SHAPE_RING
         self._size_by_role = np.ones(_ROLE_COUNT, dtype=np.float32)
-        self._size_by_role[ROLE_LAMP] = 0.44
+        self._size_by_role[ROLE_LAMP] = 0.62
         self._size_by_role[ROLE_LUMEN_GOAL] = 0.92
         self._size_by_role[ROLE_UMBRA_GOAL] = 0.92
+        self._size_by_role[ROLE_ZONE_LIGHT] = 0.86
+        self._size_by_role[ROLE_ZONE_SHADOW] = 0.86
+        # Eter RECUADO na celula, rocha sangrando ate a borda: a distincao
+        # mais importante da tela nao pode depender so de brilho, porque os
+        # dois terrenos passam a maior parte do tempo apagados e a essa
+        # altura nenhum matiz se le. Recuado, o eter mostra uma grade de
+        # blocos soltos; a rocha, uma massa continua.
+        self._size_by_role[ROLE_ETHER] = 0.82
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
 
     def update(self, world: World, delta_time: float) -> None:
@@ -229,10 +248,14 @@ class PresentationSystem(ISystem):
             np.logical_and(self._mask, lit_flat, out=self._mask_alt)
         else:
             np.logical_and(self._mask, np.logical_not(lit_flat), out=self._mask_alt)
-        self._fill(self._mask, GOLD_DIM, GOLD_DIM)
-        np.copyto(self._alpha, 44.0, where=self._mask)
-        self._fill(self._mask_alt, GOLD, GOLD)
-        np.copyto(self._alpha, 132.0, where=self._mask_alt)
+        # Uma zona precisa ser vista ANTES de ser cumprida -- e antes que
+        # o jogador saiba onde ficar de pe, nao depois. A 44 de alpha ela
+        # era invisivel exatamente quando importava, e a porta da fase 4
+        # ficava sem pista nenhuma de como abrir.
+        self._fill(self._mask, GOLD, GOLD)
+        np.copyto(self._alpha, 120.0, where=self._mask)
+        self._fill(self._mask_alt, GOLD_BRIGHT, GOLD_BRIGHT)
+        np.copyto(self._alpha, 225.0, where=self._mask_alt)
 
     def _paint_goal(self, role: np.ndarray, role_id: int, side: int, pulse: float) -> None:
         np.equal(role, role_id, out=self._mask)
@@ -285,9 +308,19 @@ class PresentationSystem(ISystem):
             sprite_view["tint_b"][row] = _mix(dark[2], bright[2], ratio)
 
     def _paint_auras(self) -> None:
-        """Tres entidades de acompanhamento: o halo da Lumen, a orla da
-        Umbra (sem ela, um corpo quase preto no fundo quase preto seria
-        invisivel) e o anel dourado que marca quem o jogador comanda."""
+        """
+        Tres entidades de acompanhamento: o alcance do facho da Lumen, o do
+        bolsao da Umbra, e o anel dourado que marca quem o jogador comanda.
+
+        Os dois primeiros sao ANEIS, nao discos. A primeira versao desenhava
+        o facho como um disco translucido cheio, e ele saia como uma mancha
+        cinza de borda dura por cima do nivel -- lia como artefato, e ainda
+        competia com o campo de luz que era justamente o que ele deveria
+        representar. Um anel na borda do alcance nao compete com nada e
+        entrega a informacao que o jogador de fato precisa: **ate onde** a
+        habilidade solidifica terreno. E o unico jeito de saber isso sem
+        contar celulas na tela.
+        """
         state, tuning = self._state, self._tuning
         cell_size = self._terrain.cell_size
         transform_view = self._transform_pool.active_view()
@@ -302,14 +335,18 @@ class PresentationSystem(ISystem):
         ) * tuning.light.falloff_radius_cells
         absorb_reach = tuning.light.absorb_radius_cells
 
-        halo_cells = beam_reach if state.ability_on[LUMEN] else 0.85
-        rim_cells = absorb_reach if state.ability_on[UMBRA] else 0.85
+        # Desligada, a aura encolhe ate virar so o contorno do corpo -- some
+        # da tela sem sumir de vez, e o jogador ve a habilidade "recolher".
+        beam_on = bool(state.ability_on[LUMEN])
+        absorb_on = bool(state.ability_on[UMBRA])
+        halo_cells = beam_reach if beam_on else 0.9
+        rim_cells = absorb_reach if absorb_on else 0.9
 
-        self._place_aura(0, lumen_x, lumen_y, halo_cells * 2.0 * cell_size, SHAPE_CIRCLE,
-                         AIR_GLOW, 30.0 if state.ability_on[LUMEN] else 66.0,
+        self._place_aura(0, lumen_x, lumen_y, halo_cells * 2.0 * cell_size, SHAPE_RING,
+                         AIR_GLOW, 104.0 if beam_on else 70.0,
                          transform_view, sprite_view)
         self._place_aura(1, umbra_x, umbra_y, rim_cells * 2.0 * cell_size, SHAPE_RING,
-                         UMBRA_RIM, 150.0 if state.ability_on[UMBRA] else 105.0,
+                         UMBRA_RIM, 150.0 if absorb_on else 112.0,
                          transform_view, sprite_view)
 
         active_x, active_y = (lumen_x, lumen_y) if state.active == LUMEN else (umbra_x, umbra_y)

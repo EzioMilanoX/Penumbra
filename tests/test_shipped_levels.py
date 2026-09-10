@@ -175,6 +175,95 @@ class TestPlaythrough:
             f"a fase 1 deveria terminar so andando (estado: {simulation.state.message!r})"
         )
 
+    def _release(self, input_provider) -> None:
+        for action in ("move_right", "move_left", "jump"):
+            input_provider.set_action_held(action, False)
+
+    def _climb_to(
+        self, simulation, input_provider, target_col: int, target_row: int, max_frames: int = 600
+    ) -> bool:
+        """Conduz o ser ATIVO ate uma celula podendo SALTAR, e so considera
+        que chegou estando de pe (`is_grounded`) na linha certa -- checar so
+        a linha aceitaria um apice de salto de passagem e o teste passaria
+        com o ser caindo de volta no frame seguinte."""
+        side = simulation.state.active
+        tile_collision = simulation.tile_collision_systems[side]
+        entity_index = int(simulation.state.entity_index[side])
+        cell_size = simulation.terrain.cell_size
+        target_x = (target_col + 0.5) * cell_size
+        pulsing = False
+
+        for _ in range(max_frames):
+            current_x, current_y = position(simulation, side)
+            row = int(current_y // cell_size)
+            grounded = tile_collision.is_grounded(entity_index)
+            if grounded and row == target_row and abs(current_x - target_x) <= 8.0:
+                self._release(input_provider)
+                advance(simulation, input_provider, frames=2)
+                return True
+            input_provider.set_action_held("move_right", target_x - current_x > 5.0)
+            input_provider.set_action_held("move_left", target_x - current_x < -5.0)
+            # O pulo e por borda: manter a tecla pressionada dispara uma vez
+            # so, entao o bot alterna a cada frame em que esta no chao.
+            wants_jump = grounded and row > target_row
+            input_provider.set_action_held("jump", wants_jump and not pulsing)
+            pulsing = wants_jump and not pulsing
+            advance(simulation, input_provider, frames=1)
+
+        self._release(input_provider)
+        advance(simulation, input_provider, frames=2)
+        return False
+
+    def test_a_fase_4_perdoa_descer_antes_de_abrir_a_porta(self, simulation, input_provider):
+        """
+        O bug que o jogador encontrou, agora como regressao jogada.
+
+        Descer da saliencia pra olhar a porta de perto e o movimento mais
+        natural do mundo, e era irreversivel: os degraus estavam empilhados
+        na mesma coluna, o de cima era teto do de baixo, e a zona de luz --
+        a unica coisa que destranca a porta -- ficava inalcancavel. Sem
+        morte, sem mensagem, sem aviso: so uma parede que nunca abria.
+
+        Aqui a Lumen desce PRIMEIRO, de proposito, e tem de conseguir voltar
+        pela escada escalonada e terminar a fase.
+        """
+        simulation.runtime.load(3)
+        state = simulation.state
+        terrain = simulation.terrain
+        light_col = int(np.nonzero(terrain.zone_light)[1][0])
+        light_row = int(np.nonzero(terrain.zone_light)[0][0])
+        shadow_col = int(np.nonzero(terrain.zone_shadow)[1][0])
+
+        # Facho ligado: ela precisa dele pra sobreviver ao trecho escuro do
+        # chao, e a carga se recompoe entre os saltos.
+        self._press(simulation, input_provider, "ability")
+        assert bool(state.ability_on[LUMEN])
+
+        assert self._climb_to(simulation, input_provider, 18, 17), "nao chegou ao chao junto da porta"
+        assert state.outcome == OUTCOME_PLAYING, f"morreu na descida: {state.message!r}"
+
+        # A volta, degrau por degrau.
+        for col, row in ((13, 15), (15, 13), (light_col, light_row)):
+            assert self._climb_to(simulation, input_provider, col, row), (
+                f"nao conseguiu subir de volta ate (col={col}, row={row}) -- a descida voltou "
+                f"a ser de mao unica e a fase esta insolvel"
+            )
+
+        if not bool(state.ability_on[LUMEN]):
+            self._press(simulation, input_provider, "ability")
+        self._press(simulation, input_provider, "switch")
+        self._walk_to(simulation, input_provider, shadow_col)
+        assert state.door_open, "a porta deveria ceder depois da volta a zona de luz"
+
+        self._walk_to(simulation, input_provider, terrain.umbra_goal_cell[0])
+        self._press(simulation, input_provider, "switch")
+        self._climb_to(simulation, input_provider, 27, 17)
+        if not bool(state.ability_on[LUMEN]):
+            self._press(simulation, input_provider, "ability")
+        self._walk_to(simulation, input_provider, terrain.lumen_goal_cell[0])
+
+        assert state.outcome == OUTCOME_COMPLETE, f"estado: {state.message!r}"
+
     def test_a_fase_2_e_completavel_levando_a_umbra_primeiro(self, simulation, input_provider):
         """
         'O Mesmo Chao' tem uma ORDEM obrigatoria, e e ela a licao da fase.

@@ -19,6 +19,10 @@ jogavel e que nao se enxergam olhando o ASCII:
 * **Autossuporte**: com o facho ligado, a Lumen acende o eter sob os
   proprios pes? Se nao, aquela ponte e intransponivel pra ela por qualquer
   caminho.
+* **Alcance geometrico**: os pes chegam? Um degrau alto demais, ou um bloco
+  exatamente sobre a cabeca, torna uma fase insolvel sem nenhuma relacao com
+  luz -- e sem gerar erro nenhum. Inclui a checagem de mao unica: de toda
+  celula alcancavel ainda ha volta pra zona de polaridade?
 
 Isto NAO e um teste (nao afirma nada, nao falha): e o instrumento que
 respondeu as perguntas de projeto das quatro fases. Os testes de regressao
@@ -33,6 +37,7 @@ import numpy as np
 from ouroboros.bootstrap.engine_config import EngineConfig
 
 from penumbra.composition import build_simulation
+from penumbra.reachability import JumpModel, TraversalGraph, solid_mask
 from penumbra.state import LUMEN, UMBRA
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "penumbra" / "config.json"
@@ -100,6 +105,7 @@ def audit_level(simulation, level_index: int) -> None:
     _report_standing(terrain, light, light_tuning)
     _report_self_support(simulation, light_tuning)
     _report_door_feasibility(simulation, light_tuning)
+    _report_reachability(simulation)
     print()
 
 
@@ -243,6 +249,45 @@ def _report_door_feasibility(simulation, light_tuning) -> None:
                 f" apagada={shadow_dark} Umbra_sobrevive={umbra_safe}   -> {verdict}"
             )
     state.ability_on[:] = False
+
+
+def _report_reachability(simulation) -> None:
+    """
+    Geometria, nao polaridade: os pes alcancam?
+
+    Mede as duas coisas que o ASCII esconde. Primeiro, se cada ser sai do
+    spawn e chega ao proprio portal. Segundo -- e e este que pegou o bug da
+    fase 4 -- se de TODA celula alcancavel ainda ha volta pra zona de
+    polaridade. Uma descida de mao unica nao mata, nao avisa e nao gera
+    erro: ela so deixa o jogador na frente de uma porta que nunca abre.
+    """
+    terrain, tuning = simulation.terrain, simulation.tuning
+    print("\n  alcance geometrico (rocha + eter + porta, otimista):")
+    for who, spawn, goal, zones, side_tuning in (
+        ("Lumen", terrain.lumen_spawn_cell, terrain.lumen_goal_cell,
+         terrain.zone_light, tuning.lumen),
+        ("Umbra", terrain.umbra_spawn_cell, terrain.umbra_goal_cell,
+         terrain.zone_shadow, tuning.umbra),
+    ):
+        model = JumpModel(tuning.world, side_tuning)
+        open_graph = TraversalGraph(solid_mask(terrain, door_open=True), model)
+        reachable = open_graph.reachable_from(spawn)
+        line = (
+            f"    {who}: sobe {model.max_climb} celula(s) | "
+            f"{len(reachable)} celulas alcancaveis | portal={'OK' if goal in reachable else 'INALCANCAVEL'}"
+        )
+        if terrain.has_door:
+            closed_graph = TraversalGraph(solid_mask(terrain, door_open=False), model)
+            closed_reachable = closed_graph.reachable_from(spawn)
+            zone_cells = [(int(col), int(row)) for row, col in zip(*np.nonzero(zones))]
+            one_way = [
+                cell for cell in closed_reachable
+                if not any(zone in closed_graph.reachable_from(cell) for zone in zone_cells)
+            ]
+            line += f" | sem volta pra zona: {len(one_way)}/{len(closed_reachable)}"
+            if one_way:
+                line += f"  <-- FASE TRAVA em {sorted(one_way)[:4]}"
+        print(line)
 
 
 def _ranges(values) -> str:
