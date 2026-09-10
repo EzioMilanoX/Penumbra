@@ -1,8 +1,8 @@
 # Penumbra — Luz e Sombra: Dualidade
 
 Puzzle-platformer de um jogador só sobre dois seres que não podem se tocar e
-não conseguem avançar separados. Oito fases, com menu e seleção, construído
-sobre a
+não conseguem avançar separados. **Doze fases**, menu com seleção visual,
+colecionáveis e **multiplayer local**, construído sobre a
 [OuroborosEngine](https://github.com/EzioMilanoX/OuroborosEngine) — a engine
 vive no repositório dela, não é vendorizada aqui.
 
@@ -18,12 +18,20 @@ cd Penumbra && python -m penumbra.main  # rodar SEMPRE da raiz, como módulo
 (`from penumbra...`) e os caminhos de `config.json` são relativos à raiz do
 projeto, então rodar `python penumbra/main.py` falha.
 
-No menu: **W/S** escolher a fase · **ESPAÇO** jogar · **ESC** sair.
-Na fase: **A/D** mover · **ESPAÇO** pular · **J** habilidade · **TAB** trocar de
-ser · **R** reiniciar · **ESC** voltar ao menu.
+**Menu**: W/A/S/D escolher na grade · ESPAÇO jogar · TAB alternar um/dois
+jogadores · ESC sair.
 
-Nenhuma fase é trancada. Com oito fases curtas, poder repetir a que ensinou
-uma mecânica vale mais que a cerimônia de desbloquear.
+**Um jogador**: A/D mover · ESPAÇO pular · J habilidade · TAB trocar de ser ·
+R reiniciar · ESC voltar ao menu.
+
+**Dois jogadores** (mesmo teclado): J1 = A/D, ESPAÇO, J · J2 = setas ←→, ↑, ↓.
+Ninguém espera, e o contato entre os dois continua aniquilando os dois — o que
+num jogador era uma armadilha ocasional, em dois é a fonte principal de
+desastre.
+
+Nenhuma fase é trancada. Com fases curtas, poder repetir a que ensinou uma
+mecânica vale mais que a cerimônia de desbloquear — e cada card já diz, com
+selos, o que você fez nela.
 
 ---
 
@@ -65,9 +73,14 @@ modela isso, e é o que impede uma fase de pedir dela o que ela não faz.
 | **éter** `~` | de exatamente um, decidido pela luz **agora** | o conflito central |
 | **crosta** `%` | dos dois — até a Umbra rompê-la | opaca. Romper é irreversível, e abre caminho para a luz que ela barrava |
 | **eclipse** `=` | **dos dois ao mesmo tempo** — a única célula assim | mas com prazo: o primeiro passo de qualquer um inicia o colapso da zona inteira |
+| **contra-éter** `;` | de exatamente um, **pela regra invertida** | sólido para a Lumen no *escuro* e para a Umbra na *luz* |
 
 E duas fontes de luz: a **lâmpada** `*`, fixa, e o **farol** `o`, que acende e
 apaga sozinho.
+
+Mais dois marcadores: a **placa de pressão** `_`, que mantém uma porta aberta
+só enquanto alguém está em cima dela, e o **fragmento da fonte** `+`, o
+colecionável opcional de cada fase.
 
 ## O conflito, concretamente
 
@@ -105,6 +118,15 @@ Disso saem as situações que as fases exploram:
   mecânica que os obriga a ocupar o *mesmo* espaço, em vez de pistas ou
   momentos separados — e o prazo só começa no primeiro passo, para não punir
   quem está pensando.
+- **O contra-éter troca a pergunta "acendo ou apago?" por "acendo *o quê*?"**
+  Com éter e contra-éter na mesma fase, uma única mudança de luz ajuda uma
+  ponte e destrói a outra no mesmo instante. E ele tem uma consequência que
+  nada mais no jogo tem: acender o próprio caminho **derruba a Lumen**, porque
+  no contra-éter o chão dela é o escuro.
+- **A placa dá função ao ser parado.** É o único lugar do jogo onde ele não
+  está apenas vulnerável: alguém tem de ficar em cima para a porta continuar
+  aberta. Em um jogador você estaciona e troca; em dois, um segura para o
+  outro passar — e é aí que a cooperação aparece de verdade.
 - **A crosta não volta.** Todo o resto do terreno é interruptor — acender,
   apagar, acender de novo. A crosta, não: rompida, rompida para a fase
   inteira. É a única decisão do jogo que não dá para desfazer. E como ela é
@@ -124,6 +146,10 @@ Disso saem as situações que as fases exploram:
 | 6 | **Farol** | A mesma ponte serve aos dois, em turnos que não são deles. Aceso, é chão da Lumen; apagado, da Umbra. Ninguém escolhe quando. |
 | 7 | **Contratempo** | Farol e crosta juntos: romper abre o caminho, o farol decide a hora. Uma coisa irreversível e uma periódica na mesma fase. |
 | 8 | **Fusão** | A porta de polaridade destranca a ponte de eclipse. No fim, os dois atravessam o mesmo chão — o único que aceita os dois, e por tempo contado. |
+| 9 | **Contra-Éter** | A regra ao contrário, na mesma fase que ela. O farol governa as duas pontes ao mesmo tempo e em sentidos opostos; a ilha de rocha no meio é onde se espera a virada. |
+| 10 | **A Placa** | Duas placas, uma de cada lado da porta: um segura para o outro passar, e quem passou segura de volta. |
+| 11 | **Espelhos** | Três pontes, duas delas invertidas. Uma virada do farol troca o dono de todas de uma vez. |
+| 12 | **A Fonte** | Placa e eclipse juntos: segurar a porta custa exatamente o tempo que a ponte dourada não tem. |
 
 Três princípios de desenho, todos aprendidos errando:
 
@@ -135,6 +161,10 @@ Três princípios de desenho, todos aprendidos errando:
 - **Pistas separadas.** Se os dois percorrem o mesmo corredor em sequência, o
   segundo passa por cima do primeiro parado e os dois se anulam. Foi assim
   que três desenhos meus morreram antes de chegar a este.
+- **Teto é rocha maciça até o topo, nunca uma laje de uma linha.** Uma laje é
+  uma *plataforma*: a Lumen subia nela e caminhava por cima da ponte, e o
+  facho ficava opcional em cinco fases. Onde não cabe teto, o vão tem de ter
+  mais de 5,45 células — a distância que ela cobre num salto completo.
 
 ### Alfabeto das fases (`data/levels/*.json`)
 
@@ -143,11 +173,10 @@ Três princípios de desenho, todos aprendidos errando:
 ~  éter (sólido para um por vez)                 B  spawn da Umbra
 %  crosta (sólida, opaca, só a Umbra rompe)      X  portal da Lumen
 =  eclipse (sólida para os dois, com prazo)      Y  portal da Umbra
+;  contra-éter (a regra invertida)               +  fragmento da fonte
 *  lâmpada fixa                                  .  vazio
 o  farol pulsante
-D  porta de polaridade
-L  zona de luz (gatilho da Lumen)
-S  zona de sombra (gatilho da Umbra)
+D  porta         L/S  zonas de polaridade      _  placa de pressão
 ```
 
 A última linha da grade é sempre vazia: é o abismo. `Grid2D` trata
@@ -189,7 +218,8 @@ penumbra/
   levels.py          catálogo de data/levels/*.json
   reachability.py    modelo de salto + grafo de alcance (auditoria de geometria)
   state.py           estado compartilhado + troca de fase
-  scenes.py          menu, seleção de fase, e quando o mundo congela
+  scenes.py          fluxo menu -> fase -> menu, e quando o mundo congela
+  menu.py            grade de cards, prévia do terreno, selos
   hud.py             HUD e avisos de fim de fase
   systems/
     duality_control_system.py   input -> velocity dos dois seres
@@ -202,7 +232,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/               87 testes headless
+tests/              104 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -272,7 +302,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 87 testes, ~6 s, headless
+pytest -q                      # 104 testes, ~9 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -301,6 +331,19 @@ respondeu às perguntas de projeto das quatro fases (onde o éter fica sólido,
 onde cada ser sobrevive, se o facho vaza até a zona de sombra). Ele achou um
 soft-lock real na fase 4 — a Lumen descia da saliência para atravessar a porta
 e não tinha como voltar à zona de luz —, corrigido com dois degraus de rocha.
+
+## O menu
+
+Grade de 4×3 cards, cada um com **numerão**, nome, dois selos (fase vencida,
+fragmento) e uma **prévia** da fase.
+
+A prévia é o **terreno real**, parseado pelo mesmo `Terrain` que o jogo usa —
+não uma imagem exportada à mão que envelheceria no primeiro ajuste de nível.
+Cada célula vira um retângulo de poucos pixels com as cores da paleta, então
+um terreno novo aparece no menu de graça. As cores da miniatura são
+deliberadamente mais claras que no jogo: a 4 px por célula, o contraste real
+(rocha quase preta sobre fundo quase preto) desapareceria, e a silhueta da
+fase é a única coisa que o card precisa entregar.
 
 ## Escopo
 

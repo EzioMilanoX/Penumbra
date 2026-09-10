@@ -7,5 +7,9 @@
   "restart": "KEY_R",
   "menu_up": "KEY_W",
   "menu_down": "KEY_S",
-  "quit": "KEY_ESCAPE"
+  "quit": "KEY_ESCAPE",
+  "p2_move_left": "KEY_LEFT",
+  "p2_move_right": "KEY_RIGHT",
+  "p2_jump": "KEY_UP",
+  "p2_ability": "KEY_DOWN"
 }

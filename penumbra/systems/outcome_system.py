@@ -44,6 +44,11 @@ class OutcomeSystem(ISystem):
     A ordem importa: `DualityState.fail` guarda so o primeiro motivo do
     frame, e cair no abismo enquanto se dissolvia deve contar uma historia
     so.
+
+    Fora dessas cinco, ha uma coisa que este sistema so REGISTRA: o
+    fragmento da fonte. Ele nao entra na vitoria nem na derrota -- e um
+    desvio opcional, e o que o torna interessante e que o caminho ate ele
+    quase sempre pede a polaridade oposta a da rota obvia.
     """
 
     def __init__(
@@ -70,6 +75,7 @@ class OutcomeSystem(ISystem):
         if self._state.outcome != 0:
             return
 
+        self._check_shard()
         self._check_void()
         self._check_contact()
         self._advance_peril(delta_time)
@@ -86,6 +92,20 @@ class OutcomeSystem(ISystem):
             row = pool.dense_row_of(int(self._state.entity_index[side]))
             self._position_x[side] = float(view["position_x"][row])
             self._position_y[side] = float(view["position_y"][row])
+
+    def _check_shard(self) -> None:
+        """Qualquer um dos dois apanha o fragmento -- ele nao tem polaridade.
+        O que tem polaridade e o CAMINHO ate ele, e e ai que esta o desvio."""
+        state, terrain = self._state, self._terrain
+        if state.shard_collected or terrain.shard_cell is None:
+            return
+        shard_x, shard_y = terrain.cell_center(terrain.shard_cell)
+        tolerance = _GOAL_TOLERANCE_CELLS * terrain.cell_size
+        for side in (LUMEN, UMBRA):
+            if (abs(self._position_x[side] - shard_x) <= tolerance
+                    and abs(self._position_y[side] - shard_y) <= tolerance):
+                state.shard_collected = True
+                return
 
     def _check_void(self) -> None:
         terrain = self._terrain

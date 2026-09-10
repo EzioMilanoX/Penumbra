@@ -22,7 +22,9 @@ from penumbra.state import (
     UMBRA,
 )
 
-from tests.conftest import FRAME, advance, place, position
+from penumbra.terrain import Terrain
+
+from tests.conftest import CELL_SIZE, FRAME, GRID_COLS, GRID_ROWS, advance, place, position
 
 
 def _level_indices(simulation):
@@ -82,8 +84,8 @@ class TestEveryLevelIsPlayable:
         for level_index in _level_indices(simulation):
             simulation.runtime.load(level_index)
             terrain = simulation.terrain
-            if not terrain.has_door:
-                continue
+            if not terrain.has_door or terrain.has_plate:
+                continue  # fase de placa tem porta sem zonas; ver test_reachability
             levels_with_doors += 1
 
             light_cells = list(zip(*np.nonzero(terrain.zone_light)))
@@ -392,6 +394,7 @@ class TestLevelFlow:
         flow = PenumbraFlow(
             loop, simulation.runtime, simulation.state,
             simulation.catalog, simulation.tuning, input_provider,
+            preview_terrain=Terrain(GRID_COLS, GRID_ROWS, CELL_SIZE),
         )
         flow.show_menu()
         return flow
@@ -416,14 +419,25 @@ class TestLevelFlow:
             assert simulation.state.level_index == index
 
     def test_escolher_no_menu_e_confirmar_comeca_a_fase(self, flow, simulation, input_provider):
-        input_provider.set_action_held("menu_down", True)
+        input_provider.set_action_held("move_right", True)
         self._drive(flow, simulation, input_provider, frames=1)
-        input_provider.set_action_held("menu_down", False)
+        input_provider.set_action_held("move_right", False)
         input_provider.set_action_held("jump", True)
         self._drive(flow, simulation, input_provider, frames=1)
 
         assert flow._game_loop.current_scene is flow.gameplay
-        assert simulation.state.level_index == 1, "W/S move a selecao, ESPACO entra"
+        assert simulation.state.level_index == 1, "A/D anda na grade, ESPACO entra"
+
+    def test_a_grade_do_menu_anda_em_duas_dimensoes(self, flow, simulation, input_provider):
+        """Quatro colunas: W/S pulam uma linha inteira (quatro fases), A/D
+        andam de uma em uma. Sem isso, chegar a fase 8 custaria sete toques."""
+        input_provider.set_action_held("menu_down", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert flow.menu.selected == 4, "S desce uma linha da grade"
+        input_provider.set_action_held("menu_down", False)
+        input_provider.set_action_held("move_right", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert flow.menu.selected == 5
 
     def test_esc_no_menu_encerra_o_jogo(self, flow, simulation, input_provider):
         input_provider.set_action_held("quit", True)

@@ -142,9 +142,13 @@ def build_game(config: EngineConfig) -> GameLoop:
     )
 
     world = simulation.world
+    # O menu desenha a miniatura de cada fase parseando o ASCII com um
+    # `Terrain` PROPRIO -- se usasse o do jogo, montar as previas na
+    # composicao sobrescreveria a fase carregada.
     flow = PenumbraFlow(
         game_loop, simulation.runtime, simulation.state,
         simulation.catalog, tuning, game_loop.input_provider,
+        preview_terrain=_make_terrain(tuning.world),
     )
     # O HUD e um callback GLOBAL (roda independente da cena no topo), entao
     # ele consulta `flow.hud_visible` -- senao desenha o rodape e os
@@ -278,12 +282,16 @@ def _assemble(
     )
 
 
+def _make_terrain(world_tuning) -> Terrain:
+    return Terrain(world_tuning.grid_cols, world_tuning.grid_rows, world_tuning.cell_size)
+
+
 def _load_data(config: EngineConfig):
     """Carrega e valida TODO o conteudo data-driven antes de qualquer
     entidade existir: balanceamento, dimensoes da grade e as quatro fases
     (cada uma parseada de verdade -- ver `LevelCatalog.validate_all`)."""
     tuning = DualityTuning.from_json(config.difficulty_path)
-    terrain = Terrain(tuning.world.grid_cols, tuning.world.grid_rows, tuning.world.cell_size)
+    terrain = _make_terrain(tuning.world)
     catalog = LevelCatalog.load_from_directory(LEVELS_DIR)
     catalog.validate_all(terrain)
     return tuning, terrain, catalog

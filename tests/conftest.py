@@ -18,7 +18,7 @@ from ouroboros.bootstrap.engine_config import EngineConfig
 from ouroboros.interfaces.null.null_input_provider import NullInputProvider
 
 from penumbra.composition import build_simulation
-from penumbra.state import LUMEN, UMBRA
+from penumbra.state import INITIAL_VELOCITY_Y, LUMEN, UMBRA
 from penumbra.tuning import DualityTuning
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -93,15 +93,26 @@ def load_custom(simulation, spec: Dict[int, str]) -> None:
 
 
 def place(simulation, side: int, col: float, row: float) -> None:
-    """Move um ser para o centro de uma celula, escrevendo direto na pool
-    `transform` -- o mesmo que `LevelRuntime._place` faz, mas para uma
-    celula arbitraria escolhida pelo teste."""
+    """Move um ser para o centro de uma celula, escrevendo direto nas pools
+    `transform` e `velocity` -- o mesmo que `LevelRuntime._place` faz, mas
+    para uma celula arbitraria escolhida pelo teste.
+
+    Zerar a velocidade e essencial e nao e detalhe: um teleporte que carrega
+    a velocidade herdada faz o ser chegar caindo depressa e atravessar a
+    celula antes de o campo de luz solidificar o chao dela -- um falso
+    negativo que parece bug de jogo e e do teste."""
     pool = simulation.world.get_pool("transform")
     dense_row = pool.dense_row_of(int(simulation.state.entity_index[side]))
     view = pool.active_view()
     cell_size = simulation.terrain.cell_size
     view["position_x"][dense_row] = (col + 0.5) * cell_size
     view["position_y"][dense_row] = (row + 0.5) * cell_size
+
+    velocity_pool = simulation.world.get_pool("velocity")
+    velocity_row = velocity_pool.dense_row_of(int(simulation.state.entity_index[side]))
+    velocity_view = velocity_pool.active_view()
+    velocity_view["linear_x"][velocity_row] = 0.0
+    velocity_view["linear_y"][velocity_row] = INITIAL_VELOCITY_Y
 
 
 def position(simulation, side: int) -> Tuple[float, float]:

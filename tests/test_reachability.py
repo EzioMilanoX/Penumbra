@@ -145,8 +145,8 @@ class TestShippedLevelGeometry:
         ser alcancavel, ja que e ela que destranca."""
         for index, level in self._levels(simulation):
             terrain = simulation.terrain
-            if not terrain.has_door:
-                continue
+            if not terrain.has_door or terrain.has_plate:
+                continue  # fase de placa nao tem zonas; ver o teste seguinte
             for who, spawn, zones, side_tuning in (
                 ("Lumen", terrain.lumen_spawn_cell, terrain.zone_light, simulation.tuning.lumen),
                 ("Umbra", terrain.umbra_spawn_cell, terrain.zone_shadow, simulation.tuning.umbra),
@@ -157,6 +157,28 @@ class TestShippedLevelGeometry:
                 assert any(cell in reachable for cell in cells), (
                     f"fase {index + 1} ({level.name}): {who} nao alcanca nenhuma zona dela"
                 )
+
+    def test_toda_placa_de_pressao_e_alcancavel_com_a_porta_fechada(self, simulation):
+        """A placa e o gatilho: se ninguem a alcanca com a porta fechada, a
+        fase e uma parede. E ao menos UMA placa precisa estar do lado de ca
+        -- a de tras so serve depois que alguem passou."""
+        for index, level in self._levels(simulation):
+            terrain = simulation.terrain
+            if not terrain.has_plate:
+                continue
+            plates = [(int(col), int(row)) for row, col in zip(*np.nonzero(terrain.plate))]
+            reached = False
+            for spawn, side_tuning in (
+                (terrain.lumen_spawn_cell, simulation.tuning.lumen),
+                (terrain.umbra_spawn_cell, simulation.tuning.umbra),
+            ):
+                graph = _graph(simulation, side_tuning, door_open=False)
+                reachable = graph.reachable_from(spawn)
+                if any(plate in reachable for plate in plates):
+                    reached = True
+            assert reached, (
+                f"fase {index + 1} ({level.name}): nenhuma placa e alcancavel com a porta fechada"
+            )
 
     def test_nenhuma_zona_de_polaridade_fica_sem_volta(self, simulation):
         """
@@ -173,6 +195,8 @@ class TestShippedLevelGeometry:
             terrain = simulation.terrain
             if not terrain.has_door:
                 continue
+            if terrain.has_plate:
+                continue  # a placa nao trava: sair de cima dela e reversivel
             for who, spawn, zones, side_tuning in (
                 ("Lumen", terrain.lumen_spawn_cell, terrain.zone_light, simulation.tuning.lumen),
                 ("Umbra", terrain.umbra_spawn_cell, terrain.zone_shadow, simulation.tuning.umbra),
@@ -196,6 +220,8 @@ class TestShippedLevelGeometry:
         for index, level in self._levels(simulation):
             terrain = simulation.terrain
             if not terrain.has_door:
+                continue
+            if terrain.has_plate:
                 continue
             for who, zones, goal, side_tuning in (
                 ("Lumen", terrain.zone_light, terrain.lumen_goal_cell, simulation.tuning.lumen),

@@ -86,6 +86,15 @@ class DualityState:
         self.cell = np.zeros((2, 2), dtype=np.int64)
         """Celula `(col, row)` de cada ser no frame corrente."""
         self.reached_goal = np.zeros(2, dtype=bool)
+        self.shard_collected = False
+        """Fragmento da fonte desta fase, apanhado nesta tentativa. E
+        opcional: nao entra na condicao de vitoria, e o desvio pra pegar
+        costuma pedir a polaridade oposta a da rota obvia."""
+        self.duo = False
+        """Dois jogadores, um em cada ser, ao mesmo tempo. No solo o ser
+        parado e a tensao (ele nao esta protegido); no duo ele e um parceiro
+        -- e o contato entre os dois continua aniquilando os dois, o que
+        transforma a cooperacao em algo que da errado de verdade."""
 
         # --- crosta que a Umbra esta rompendo agora ---
         self.crust_target_col = -1
@@ -228,6 +237,7 @@ class LevelRuntime:
         state.charge[:] = 1.0
         state.peril[:] = 0.0
         state.reached_goal[:] = False
+        state.shard_collected = False
         state.crust_target_col = -1
         state.crust_target_row = -1
         state.crust_progress = 0.0

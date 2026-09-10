@@ -79,6 +79,7 @@ class LightFieldSystem(ISystem):
         self._mask_a = np.zeros(shape, dtype=bool)
         self._mask_b = np.zeros(shape, dtype=bool)
         self._shared_solid = np.zeros(shape, dtype=bool)
+        self._dark = np.zeros(shape, dtype=bool)
         self._mask_b_float = np.zeros(shape, dtype=np.float32)
         self._dist_x = np.zeros(shape, dtype=np.float32)
         self._dist_y = np.zeros(shape, dtype=np.float32)
@@ -221,13 +222,20 @@ class LightFieldSystem(ISystem):
         terrain, state = self._terrain, self._state
         np.logical_or(self._blocked, terrain.eclipse, out=self._shared_solid)
 
+        np.logical_not(state.lit, out=self._dark)
+
+        # Lumen: eter ACESO + contra-eter APAGADO
         np.logical_and(terrain.ether, state.lit, out=self._mask_a)
         np.logical_or(self._shared_solid, self._mask_a, out=self._mask_b)
+        np.logical_and(terrain.counter_ether, self._dark, out=self._mask_a)
+        np.logical_or(self._mask_b, self._mask_a, out=self._mask_b)
         self._lumen_grid.cells[:] = self._mask_b
 
-        np.logical_not(state.lit, out=self._mask_a)
-        np.logical_and(terrain.ether, self._mask_a, out=self._mask_a)
+        # Umbra: o espelho exato disso
+        np.logical_and(terrain.ether, self._dark, out=self._mask_a)
         np.logical_or(self._shared_solid, self._mask_a, out=self._mask_b)
+        np.logical_and(terrain.counter_ether, state.lit, out=self._mask_a)
+        np.logical_or(self._mask_b, self._mask_a, out=self._mask_b)
         self._umbra_grid.cells[:] = self._mask_b
 
     def _compose_display_light(self) -> None:

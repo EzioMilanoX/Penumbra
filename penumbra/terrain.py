@@ -24,6 +24,9 @@ ETHER_CHAR = "~"
 CRUST_CHAR = "%"
 ECLIPSE_CHAR = "="
 BEACON_CHAR = "o"
+COUNTER_ETHER_CHAR = ";"
+PLATE_CHAR = "_"
+SHARD_CHAR = "+"
 LAMP_CHAR = "*"
 DOOR_CHAR = "D"
 ZONE_LIGHT_CHAR = "L"
@@ -49,6 +52,9 @@ ROLE_UMBRA_GOAL = 8
 ROLE_CRUST = 9
 ROLE_ECLIPSE = 10
 ROLE_BEACON = 11
+ROLE_COUNTER_ETHER = 12
+ROLE_PLATE = 13
+ROLE_SHARD = 14
 
 _MARKER_CHARS = frozenset(
     {LUMEN_SPAWN_CHAR, UMBRA_SPAWN_CHAR, LUMEN_GOAL_CHAR, UMBRA_GOAL_CHAR}
@@ -79,6 +85,18 @@ class Terrain:
     quando acende, o da Umbra deixa de ser. Os dois sentidos do conflito num
     unico objeto.
 
+    `counter_ether` e o contra-eter: a regra do eter, ao contrario -- solido
+    pra Lumen no ESCURO e pra Umbra na LUZ. Existe porque com os dois na
+    mesma fase uma unica mudanca de luz ajuda uma ponte e destroi a outra no
+    mesmo instante, e ai a pergunta deixa de ser "acendo ou apago?" e passa a
+    ser "acendo O QUE?".
+
+    `plate` e a placa de pressao: mantem a porta aberta SO enquanto alguem
+    esta em cima dela -- ao contrario das zonas de polaridade, que travam a
+    porta aberta pra sempre. E o unico lugar do jogo onde o ser parado tem
+    uma funcao em vez de so estar vulneravel; no modo de dois jogadores, e
+    onde um segura pro outro passar.
+
     `crust` e a crosta: solida para os dois e opaca como a rocha, mas a
     Umbra a rompe empurrando-a. Romper e IRREVERSIVEL dentro da fase, e a
     consequencia interessante nao e a passagem -- e a luz. Como a crosta
@@ -107,6 +125,8 @@ class Terrain:
         self.rock = np.zeros(shape, dtype=bool)
         self.crust = np.zeros(shape, dtype=bool)
         self.eclipse = np.zeros(shape, dtype=bool)
+        self.counter_ether = np.zeros(shape, dtype=bool)
+        self.plate = np.zeros(shape, dtype=bool)
         self.ether = np.zeros(shape, dtype=bool)
         self.door = np.zeros(shape, dtype=bool)
         self.zone_light = np.zeros(shape, dtype=bool)
@@ -129,6 +149,8 @@ class Terrain:
         self.umbra_goal_cell = (0, 0)
         self.has_door = False
         self.has_eclipse = False
+        self.has_plate = False
+        self.shard_cell = None
         self.has_beacon = False
 
     @property
@@ -167,6 +189,8 @@ class Terrain:
         self.rock[:] = False
         self.crust[:] = False
         self.eclipse[:] = False
+        self.counter_ether[:] = False
+        self.plate[:] = False
         self.ether[:] = False
         self.door[:] = False
         self.zone_light[:] = False
@@ -176,6 +200,7 @@ class Terrain:
         self.role[:] = ROLE_EMPTY
 
         markers: dict = {}
+        self.shard_cell = None
         for row_index, row in enumerate(rows):
             for col_index, char in enumerate(row):
                 if char == EMPTY_CHAR:
@@ -186,6 +211,17 @@ class Terrain:
                 elif char == CRUST_CHAR:
                     self.crust[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_CRUST
+                elif char == COUNTER_ETHER_CHAR:
+                    self.counter_ether[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_COUNTER_ETHER
+                elif char == PLATE_CHAR:
+                    self.plate[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_PLATE
+                elif char == SHARD_CHAR:
+                    if self.shard_cell is not None:
+                        raise TerrainDefinitionError("uma fase tem no maximo um fragmento ('+')")
+                    self.shard_cell = (col_index, row_index)
+                    self.role[row_index, col_index] = ROLE_SHARD
                 elif char == ECLIPSE_CHAR:
                     self.eclipse[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_ECLIPSE
@@ -231,14 +267,24 @@ class Terrain:
         self.has_door = bool(self.door.any())
         self.has_eclipse = bool(self.eclipse.any())
         self.has_beacon = bool(self.beacon.any())
+        self.has_plate = bool(self.plate.any())
 
-        if self.has_door and not (self.zone_light.any() and self.zone_shadow.any()):
+        has_zones = bool(self.zone_light.any() and self.zone_shadow.any())
+        if self.has_door and not (has_zones or self.has_plate):
             raise TerrainDefinitionError(
-                "fase com porta de polaridade ('D') precisa de ao menos uma zona de luz ('L') "
-                "e uma de sombra ('S') -- sem as duas a porta nunca abriria"
+                "fase com porta ('D') precisa de um gatilho: as duas zonas de polaridade "
+                "('L' e 'S') ou uma placa de pressao ('_') -- sem gatilho a porta e parede eterna"
             )
         if (self.zone_light.any() or self.zone_shadow.any()) and not self.has_door:
             raise TerrainDefinitionError("fase com zona 'L'/'S' mas sem nenhuma celula de porta ('D')")
+        if self.has_plate and not self.has_door:
+            raise TerrainDefinitionError("fase com placa de pressao ('_') mas sem nenhuma porta ('D')")
+        if self.has_plate and has_zones:
+            raise TerrainDefinitionError(
+                "fase com placa E zonas de polaridade: os dois gatilhos abrem a MESMA porta com "
+                "regras opostas (a placa exige alguem em cima, as zonas travam aberta), e nada na "
+                "tela diria qual esta valendo"
+            )
 
     def collapse_eclipse(self) -> int:
         """Faz TODAS as celulas de eclipse desaparecerem de uma vez, e devolve
@@ -250,6 +296,8 @@ class Terrain:
         if count:
             self.role[self.eclipse] = ROLE_EMPTY
             self.eclipse[:] = False
+        self.counter_ether[:] = False
+        self.plate[:] = False
         return count
 
     def break_crust(self, col: int, row: int) -> bool:

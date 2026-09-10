@@ -28,6 +28,8 @@ from ouroboros.interfaces.input_provider import IInputProvider
 from ouroboros.interfaces.renderer import IRenderer
 
 from penumbra.levels import LevelCatalog
+from penumbra.menu import LevelCardGrid, MenuChrome
+from penumbra.terrain import Terrain
 from penumbra.state import DualityState, LevelRuntime, OUTCOME_COMPLETE, OUTCOME_PLAYING
 from penumbra.tuning import DualityTuning
 
@@ -61,27 +63,43 @@ class PenumbraFlow:
         catalog: LevelCatalog,
         tuning: DualityTuning,
         input_provider: IInputProvider,
+        preview_terrain: Terrain,
     ) -> None:
         self._game_loop = game_loop
         self._runtime = runtime
         self._state = state
         self._catalog = catalog
         self.completed: List[bool] = [False] * catalog.count
-        self.menu = MenuScene(self, catalog, input_provider)
+        self.shards: List[bool] = [False] * catalog.count
+        self.duo = False
+        self.menu = MenuScene(self, catalog, preview_terrain, input_provider)
         self.gameplay = PenumbraScene(self, runtime, state, tuning, input_provider)
 
     def show_menu(self, message: str = "") -> None:
         self.menu.message = message
         self._game_loop.reset_scenes(self.menu)
 
+    def toggle_duo(self) -> None:
+        """Um ou dois jogadores. Vive no fluxo e nao no `DualityState` porque
+        e escolha de sessao, nao de partida -- trocar de fase nao devia
+        devolver o jogador ao modo solo."""
+        self.duo = not self.duo
+
     def start_level(self, level_index: int) -> None:
         self._runtime.load(level_index)
+        self._state.duo = self.duo
         self._game_loop.reset_scenes(self.gameplay)
 
     def finish_level(self, level_index: int) -> None:
         """Marca como vencida e segue pra proxima. Depois da ultima, volta ao
-        menu -- em vez de reiniciar o ciclo em silencio, como fazia antes."""
+        menu -- em vez de reiniciar o ciclo em silencio, como fazia antes.
+
+        O fragmento e registrado aqui, e nao no instante em que e apanhado:
+        so conta se a fase foi CONCLUIDA com ele. Pegar e morrer nao vale --
+        senao o desvio deixaria de ser um risco."""
         self.completed[level_index] = True
+        if self._state.shard_collected:
+            self.shards[level_index] = True
         if level_index + 1 < self._catalog.count:
             self.start_level(level_index + 1)
         else:
@@ -101,67 +119,63 @@ class PenumbraFlow:
 
 class MenuScene(IScene):
     """
-    Titulo e selecao de fase. Nenhuma fase e trancada: com oito fases curtas,
-    poder repetir a que ensinou uma mecanica vale mais que a cerimonia de
-    desbloquear -- e o proprio jogo diz, no rodape, quais voce ja venceu.
+    Selecao de fase em grade de cards, com a fase desenhada em miniatura.
+
+    Nenhuma fase e trancada: com fases curtas, poder repetir a que ensinou
+    uma mecanica vale mais que a cerimonia de desbloquear -- e cada card ja
+    diz, com selos, o que voce fez nela.
 
     Nao chama `world.step()`: o mundo fica exatamente onde estava.
     """
 
-    def __init__(self, flow: PenumbraFlow, catalog: LevelCatalog, input_provider: IInputProvider) -> None:
+    def __init__(
+        self,
+        flow: "PenumbraFlow",
+        catalog: LevelCatalog,
+        preview_terrain: Terrain,
+        input_provider: IInputProvider,
+    ) -> None:
         self._flow = flow
-        self._catalog = catalog
         self._input = input_provider
-        self._selected = 0
-        self.message = ""
+        self._grid = LevelCardGrid(catalog, preview_terrain)
+        self._chrome = MenuChrome()
 
-    def on_enter(self, world: World, renderer: IRenderer) -> None:
-        del world, renderer
+    @property
+    def message(self) -> str:
+        return self._chrome.message
+
+    @message.setter
+    def message(self, value: str) -> None:
+        self._chrome.message = value
+
+    @property
+    def selected(self) -> int:
+        return self._grid.selected
 
     def update(self, world: World, delta_time: float) -> None:
         del world, delta_time
-        if self._input.is_action_pressed("menu_down"):
-            self._selected = (self._selected + 1) % self._catalog.count
+        if self._input.is_action_pressed("move_left"):
+            self._grid.move(-1, 0)
+        if self._input.is_action_pressed("move_right"):
+            self._grid.move(1, 0)
         if self._input.is_action_pressed("menu_up"):
-            self._selected = (self._selected - 1) % self._catalog.count
+            self._grid.move(0, -1)
+        if self._input.is_action_pressed("menu_down"):
+            self._grid.move(0, 1)
+        if self._input.is_action_pressed("switch"):
+            self._flow.toggle_duo()
         if self._input.is_action_pressed("jump"):
-            self._flow.start_level(self._selected)
+            self._flow.start_level(self._grid.selected)
         elif self._input.is_action_pressed("quit"):
             self._flow.quit()
 
     def render(self, world: World, renderer: IRenderer) -> None:
         del world
-        width, height = renderer.get_viewport_size()
-        renderer.draw_ui_rect(0.0, 0.0, width, height, (8, 8, 14, 255))
-
-        center = width / 2.0
-        renderer.draw_text(center, 44.0, "PENUMBRA", 40, _TEXT, anchor="center")
-        renderer.draw_text(center, 92.0, "Luz e Sombra: Dualidade", 15, _GOLD, anchor="center")
-        renderer.draw_ui_rect(center - 190.0, 118.0, 380.0, 1.0, _RULE)
-
-        if self.message:
-            renderer.draw_text(center, 134.0, self.message, 13, _GOLD, anchor="center")
-
-        top = 168.0
-        row_height = 30.0
-        for index in range(self._catalog.count):
-            level = self._catalog.at(index)
-            selected = index == self._selected
-            y = top + index * row_height
-            if selected:
-                renderer.draw_ui_rect(center - 250.0, y - 5.0, 500.0, row_height - 4.0, (26, 24, 34, 255))
-                renderer.draw_ui_rect(center - 250.0, y - 5.0, 3.0, row_height - 4.0, _GOLD)
-            mark = "o" if self._flow.completed[index] else "-"
-            tone = _TEXT if selected else _TEXT_DIM
-            renderer.draw_text(center - 232.0, y, f"{mark}  {index + 1}. {level.name}", 15, tone)
-
-        footer = top + self._catalog.count * row_height + 22.0
-        renderer.draw_text(center, footer, "W/S escolher    ESPACO jogar    ESC sair", 12, _TEXT_FAINT, anchor="center")
-        renderer.draw_text(
-            center, footer + 22.0,
-            "'o' marca as fases que voce ja venceu nesta sessao",
-            11, _TEXT_FAINT, anchor="center",
+        self._chrome.draw(
+            renderer, self._flow.duo,
+            sum(1 for got in self._flow.shards if got), len(self._flow.shards),
         )
+        self._grid.draw(renderer, self._flow.completed, self._flow.shards)
 
 
 class PenumbraScene(IScene):

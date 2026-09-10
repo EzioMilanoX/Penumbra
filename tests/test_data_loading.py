@@ -123,9 +123,36 @@ class TestTerrain:
         with pytest.raises(TerrainDefinitionError, match="abismo"):
             terrain.load_rows(tuple(rows))
 
-    def test_porta_sem_zonas_e_recusada(self, terrain):
-        with pytest.raises(TerrainDefinitionError, match="zona de luz"):
+    def test_porta_sem_gatilho_e_recusada(self, terrain):
+        """Uma porta precisa de zonas de polaridade OU de uma placa de
+        pressao. Sem gatilho ela e parede eterna -- e a fase abriria sem
+        erro nenhum."""
+        with pytest.raises(TerrainDefinitionError, match="gatilho"):
             terrain.load_rows(make_rows({**self._VALID, 10: "....DD...."}))
+
+    def test_placa_sem_porta_e_recusada(self, terrain):
+        with pytest.raises(TerrainDefinitionError, match="sem nenhuma porta"):
+            terrain.load_rows(make_rows({**self._VALID, 13: ".......__..."}))
+
+    def test_placa_junto_com_zonas_e_recusada(self, terrain):
+        """Os dois gatilhos abrem a MESMA porta com regras opostas -- a placa
+        exige alguem em cima, as zonas travam aberta -- e nada na tela diria
+        qual esta valendo."""
+        with pytest.raises(TerrainDefinitionError, match="os dois gatilhos"):
+            terrain.load_rows(make_rows({
+                **self._VALID, 10: "....D.....", 11: "..L....S..", 13: ".._......."
+            }))
+
+    def test_dois_fragmentos_na_mesma_fase_sao_recusados(self, terrain):
+        with pytest.raises(TerrainDefinitionError, match="no maximo um fragmento"):
+            terrain.load_rows(make_rows({**self._VALID, 10: "..+....+.."}))
+
+    def test_a_placa_abre_a_porta_e_carrega_o_fragmento(self, terrain):
+        terrain.load_rows(make_rows({
+            **self._VALID, 10: "....D...+.", 13: ".._......."
+        }))
+        assert terrain.has_plate and terrain.has_door
+        assert terrain.shard_cell == (8, 10)
 
     def test_zonas_sem_porta_sao_recusadas(self, terrain):
         with pytest.raises(TerrainDefinitionError, match="sem nenhuma celula de porta"):

@@ -107,6 +107,13 @@ class TraversalGraph:
         return not bool(self._solid[row, col])
 
     def _is_standable(self, col: int, row: int) -> bool:
+        """A ULTIMA linha nunca conta como apoio, mesmo que `_free` diga que
+        ha solido abaixo dela -- fora dos limites e tratado como solido (ver
+        `Grid2D.batch_get`), e sem esta excecao o abismo virava um corredor
+        caminhavel no modelo. Foi assim que uma "rota" que na verdade mata o
+        ser aparecia como caminho valido."""
+        if row >= self._rows - 1:
+            return False
         return self._free(col, row) and not self._free(col, row + 1)
 
     def _compute_standable(self) -> Set[Cell]:
@@ -163,10 +170,16 @@ class TraversalGraph:
                 landing = self._land_from(edge_col, row)
                 if landing is not None:
                     yield landing
+                    # Deriva no ar, mas ATRAVESSANDO so o que esta livre: a
+                    # versao anterior derivava por cima de qualquer coisa e
+                    # inventava rotas atraves de uma porta fechada.
                     drift = int(self._model.fall_drift(landing[1] - row))
-                    for drift_step in range(1, drift + 1):
-                        for drift_dir in (-1, 1):
-                            drifted = self._land_from(edge_col + drift_dir * drift_step, row)
+                    for drift_dir in (-1, 1):
+                        for drift_step in range(1, drift + 1):
+                            drift_col = edge_col + drift_dir * drift_step
+                            if not self._free(drift_col, row):
+                                break
+                            drifted = self._land_from(drift_col, row)
                             if drifted is not None:
                                 yield drifted
                 break
@@ -212,7 +225,7 @@ def solid_mask(terrain, door_open: bool, crust_broken: bool = False) -> np.ndarr
     com a crosta intacta se mede se a fase e atravessavel SEM gastar o
     irreversivel; com ela rompida, se romper de fato abre o caminho.
     """
-    mask = terrain.rock | terrain.ether | terrain.eclipse
+    mask = terrain.rock | terrain.ether | terrain.counter_ether | terrain.eclipse
     if not crust_broken:
         mask = mask | terrain.crust
     if not door_open:

@@ -19,6 +19,11 @@ from ouroboros.interfaces.input_provider import IInputProvider
 from penumbra.state import DualityState, LUMEN, UMBRA
 from penumbra.tuning import DualityTuning
 
+_PLAYER_TWO_PREFIX = "p2_"
+"""Prefixo das acoes do segundo jogador em
+`data/input_bindings/penumbra_keyboard.json`. O modo duo nao duplica logica
+nenhuma: o mesmo `_drive` recebe o prefixo e o resto e identico."""
+
 _MIN_CHARGE_TO_ENGAGE = 0.08
 """Carga minima pra LIGAR a habilidade. Sem esse piso, uma carga
 praticamente vazia permitiria ligar e desligar por um frame, o que
@@ -29,18 +34,29 @@ como ver chegando."""
 
 class DualityControlSystem(ISystem):
     """
-    Le o input e escreve `velocity` do ser ATIVO; zera a horizontal do
-    inativo (ele espera parado, mas continua sujeito a gravidade e ao
-    proprio chao -- se a polaridade do terreno sob ele mudar enquanto o
-    jogador cuida do outro, ele cai, e e disso que as fases vivem).
+    Le o input e escreve `velocity`. Dois modos, um caminho de codigo.
 
-    Roda DEPOIS de `PhysicsSystem`/`TileCollisionSystem`/`GravitySystem`
-    (e o unico lugar possivel: `CompositionRoot` registra os tres
-    primeiro). Isso e o mesmo contrato do vertical slice do Platformer, e
-    e o que mantem valida a reconstrucao de posicao pre-movimento do
-    `TileCollisionSystem`: quando ele roda no frame seguinte, a unica
-    coisa que tocou `velocity` desde a ultima integracao foi este sistema
-    e o `GravitySystem`, nessa ordem.
+    **Solo**: comanda o ser ATIVO e zera a horizontal do inativo -- ele
+    espera parado, mas continua sujeito a gravidade e ao proprio chao. Se a
+    polaridade do terreno sob ele mudar enquanto o jogador cuida do outro,
+    ele cai, e e disso que as fases vivem.
+
+    **Duo** (dois jogadores locais): cada ser tem seu proprio conjunto de
+    acoes (`p2_*` para o segundo), os dois se movem ao mesmo tempo, ninguem
+    espera, e o TAB nao faz nada -- nao existe "ativo" pra alternar. O
+    contato entre eles continua aniquilando os dois: no solo era uma
+    armadilha ocasional, no duo e a fonte principal de desastre, e de graca.
+
+    Os dois modos passam pelo MESMO `_drive`, que recebe so o prefixo das
+    acoes -- uma regra nova de movimento nao pode divergir entre eles.
+
+    Roda DEPOIS de `PhysicsSystem`/`TileCollisionSystem`/`GravitySystem` (e
+    o unico lugar possivel: `CompositionRoot` registra os tres primeiro).
+    Isso e o mesmo contrato do vertical slice do Platformer, e e o que
+    mantem valida a reconstrucao de posicao pre-movimento do
+    `TileCollisionSystem`: quando ele roda no frame seguinte, a unica coisa
+    que tocou `velocity` desde a ultima integracao foi este sistema e o
+    `GravitySystem`, nessa ordem.
     """
 
     def __init__(
@@ -65,13 +81,25 @@ class DualityControlSystem(ISystem):
         state = self._state
         if self._input.is_action_pressed("restart"):
             state.restart_requested = True
+
+        if state.duo:
+            # Dois jogadores: cada um comanda o seu, e ninguem espera. O TAB
+            # nao faz nada aqui -- nao ha "ativo" pra alternar.
+            for side, prefix in ((LUMEN, ""), (UMBRA, _PLAYER_TWO_PREFIX)):
+                if self._input.is_action_pressed(f"{prefix}ability"):
+                    self._toggle_ability(side)
+            self._update_charges(delta_time)
+            for side, prefix in ((LUMEN, ""), (UMBRA, _PLAYER_TWO_PREFIX)):
+                self._drive(side, prefix)
+            return
+
         if self._input.is_action_pressed("switch"):
             state.active = UMBRA if state.active == LUMEN else LUMEN
         if self._input.is_action_pressed("ability"):
             self._toggle_ability(state.active)
 
         self._update_charges(delta_time)
-        self._drive_active()
+        self._drive(state.active, "")
         self._park_inactive()
 
     # ------------------------------------------------------------------
@@ -104,17 +132,20 @@ class DualityControlSystem(ISystem):
                 refilled = float(state.charge[side]) + tuning.ability_refill_per_second * delta_time
                 state.charge[side] = 1.0 if refilled > 1.0 else refilled
 
-    def _drive_active(self) -> None:
+    def _drive(self, side: int, prefix: str) -> None:
+        """Move UM ser a partir de um conjunto de acoes. `prefix` e ""
+        para o jogador 1 e `"p2_"` para o 2 -- o mesmo caminho de codigo
+        serve ao solo e ao duo, e e por isso que uma regra nova de
+        movimento nao pode divergir entre os modos."""
         state = self._state
-        side = state.active
         tuning = self._sides[side]
         entity_index = int(state.entity_index[side])
         pool = self._velocity_pool
         row = pool.dense_row_of(entity_index)
         view = pool.active_view()
 
-        moving_left = self._input.is_action_held("move_left")
-        moving_right = self._input.is_action_held("move_right")
+        moving_left = self._input.is_action_held(f"{prefix}move_left")
+        moving_right = self._input.is_action_held(f"{prefix}move_right")
         if moving_left and not moving_right:
             view["linear_x"][row] = -tuning.move_speed
         elif moving_right and not moving_left:
@@ -122,7 +153,8 @@ class DualityControlSystem(ISystem):
         else:
             view["linear_x"][row] = 0.0
 
-        if self._input.is_action_pressed("jump") and self._tile_collision_systems[side].is_grounded(entity_index):
+        jumped = self._input.is_action_pressed(f"{prefix}jump")
+        if jumped and self._tile_collision_systems[side].is_grounded(entity_index):
             view["linear_y"][row] = tuning.jump_velocity_y
 
     def _park_inactive(self) -> None:

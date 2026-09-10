@@ -30,8 +30,11 @@ from penumbra.terrain import (
     ROLE_ETHER,
     ROLE_LAMP,
     ROLE_LUMEN_GOAL,
+    ROLE_PLATE,
+    ROLE_SHARD,
     ROLE_ROCK,
     ROLE_BEACON,
+    ROLE_COUNTER_ETHER,
     ROLE_CRUST,
     ROLE_ECLIPSE,
     ROLE_UMBRA_GOAL,
@@ -83,6 +86,10 @@ LAMP_ON = (255, 250, 232)
 LAMP_SNUFFED = (74, 70, 86)
 BEACON_OFF = (92, 88, 104)
 
+PLATE_IDLE = (108, 88, 46)
+PLATE_PRESSED = (247, 214, 138)
+SHARD = (247, 214, 138)
+
 ECLIPSE_CALM = (168, 136, 72)
 ECLIPSE_URGENT = (250, 222, 150)
 """A zona de eclipse e a unica celula que aceita os DOIS -- e por isso o
@@ -97,7 +104,7 @@ UMBRA_BODY = (32, 30, 44)
 UMBRA_DISSOLVING = (164, 154, 196)
 UMBRA_RIM = (138, 136, 162)
 
-_ROLE_COUNT = 12
+_ROLE_COUNT = 15
 _CELL_SPRITE_UNIT = 8.0
 """`PygameRenderer.draw_batch` converte `transform.scale` em pixels
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
@@ -168,6 +175,14 @@ class PresentationSystem(ISystem):
         self._size_by_role[ROLE_ETHER] = 0.82
         self._size_by_role[ROLE_CRUST] = 0.9
         self._size_by_role[ROLE_BEACON] = 0.62
+        # Contra-eter: mesma familia do eter, recuado AINDA mais (rede fina
+        # em vez de blocos), e com o gradiente invertido -- claro no escuro,
+        # escuro na luz. A inversao tem de se ver de longe, porque a regra
+        # dele e literalmente a do eter ao contrario.
+        self._size_by_role[ROLE_COUNTER_ETHER] = 0.6
+        self._size_by_role[ROLE_PLATE] = 0.86
+        self._size_by_role[ROLE_SHARD] = 0.52
+        self._shape_by_role[ROLE_SHARD] = SHAPE_RING
         self._shape_by_role[ROLE_BEACON] = SHAPE_CIRCLE
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
         self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
@@ -252,6 +267,28 @@ class PresentationSystem(ISystem):
         np.clip(light, 0.0, 1.0, out=self._ramp)
         self._fill(self._mask, CRUST_UNLIT, CRUST_LIT)
         np.copyto(self._alpha, 255.0, where=self._mask)
+
+        # contra-eter: o espelho do eter, com o gradiente ao contrario
+        np.equal(role, ROLE_COUNTER_ETHER, out=self._mask)
+        np.logical_and(self._mask, np.logical_not(state.lit.reshape(-1)), out=self._mask_alt)
+        self._ramp_between(light, threshold, 0.0)
+        self._fill(self._mask_alt, ETHER_LIT_EDGE, ETHER_LIT_FULL)
+        np.copyto(self._alpha, 255.0, where=self._mask_alt)
+        np.logical_and(self._mask, state.lit.reshape(-1), out=self._mask_alt)
+        self._ramp_between(light, 1.0, threshold)
+        self._fill(self._mask_alt, ETHER_SHADOW_DEEP, ETHER_SHADOW_EDGE)
+        np.copyto(self._alpha, 255.0, where=self._mask_alt)
+
+        # placa de pressao: acende enquanto alguem esta em cima
+        np.equal(role, ROLE_PLATE, out=self._mask)
+        pressed = PLATE_PRESSED if state.door_open else PLATE_IDLE
+        self._fill(self._mask, pressed, pressed)
+        np.copyto(self._alpha, 235.0 if state.door_open else 130.0, where=self._mask)
+
+        # fragmento da fonte: some quando apanhado
+        np.equal(role, ROLE_SHARD, out=self._mask)
+        self._fill(self._mask, SHARD, SHARD)
+        np.copyto(self._alpha, 0.0 if state.shard_collected else (170.0 + 70.0 * pulse), where=self._mask)
 
         # farol: aceso como lampada, apagado como brasa
         np.equal(role, ROLE_BEACON, out=self._mask)
@@ -418,9 +455,11 @@ class PresentationSystem(ISystem):
                          UMBRA_RIM, 150.0 if absorb_on else 112.0,
                          transform_view, sprite_view)
 
+        # No duo nao existe "quem esta sob comando" -- os dois estao. O anel
+        # dourado desaparece em vez de mentir apontando um deles.
         active_x, active_y = (lumen_x, lumen_y) if state.active == LUMEN else (umbra_x, umbra_y)
         self._place_aura(2, active_x, active_y, (1.55 + 0.18 * pulse) * cell_size, SHAPE_RING,
-                         GOLD_BRIGHT, 205.0, transform_view, sprite_view)
+                         GOLD_BRIGHT, 0.0 if state.duo else 205.0, transform_view, sprite_view)
 
     def _place_aura(
         self, slot: int, x: float, y: float, diameter: float, shape: int,

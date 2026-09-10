@@ -23,15 +23,38 @@ class PolarityDoorSystem(ISystem):
     Roda depois do `LightFieldSystem` (le a luz deste frame) e antes dele
     no frame seguinte, quando as duas grades de colisao passam a nao
     considerar mais as celulas da porta como solidas.
+
+    Uma fase abre a porta de UM dos dois jeitos, nunca dos dois (o `Terrain`
+    recusa a combinacao): pelas **zonas de polaridade**, que exigem os dois
+    seres em posicao ao mesmo tempo e travam a porta aberta pra sempre, ou
+    por uma **placa de pressao**, que a mantem aberta so enquanto alguem
+    esta em cima. Os dois gatilhos abrem a mesma coisa com regras opostas, e
+    nada na tela diria qual esta valendo.
     """
 
     def __init__(self, terrain: Terrain, state: DualityState) -> None:
         self._terrain = terrain
         self._state = state
 
+    def _someone_on_plate(self) -> bool:
+        state, terrain = self._state, self._terrain
+        for side in (LUMEN, UMBRA):
+            col, row = int(state.cell[side, 0]), int(state.cell[side, 1])
+            if bool(terrain.plate[row, col]):
+                return True
+        return False
+
     def update(self, world: World, delta_time: float) -> None:
         del world, delta_time
         state, terrain = self._state, self._terrain
+
+        if terrain.has_plate:
+            # Placa: a porta fica aberta SO enquanto alguem esta em cima.
+            # Nao trava, e e essa a diferenca -- e o unico lugar do jogo onde
+            # o ser parado tem uma funcao em vez de so estar vulneravel.
+            state.door_open = self._someone_on_plate()
+            return
+
         if state.door_open:
             return
 
