@@ -1,0 +1,629 @@
+<title>Manual de Penumbra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Syne:wght@700;800&display=swap">
+
+<style>
+  /* ---------------------------------------------------------------
+     Duas paletas completas, e nao por convencao: o jogo inteiro e
+     sobre luz e sombra serem dois estados validos e opostos. O tema
+     claro e o chao da Lumen, o escuro e o da Umbra. Os neutros puxam
+     pro azul-violeta da rocha do jogo -- (52,54,66) -- em vez de um
+     cinza puro. O dourado e o unico acento, e e o mesmo tom que no
+     jogo significa "isto exige os dois".
+     --------------------------------------------------------------- */
+  :root {
+    --void:      #EDEEF2;
+    --surface:   #FFFFFF;
+    --surface-2: #E4E6EE;
+    --rule:      #CFD2DE;
+    --ink:       #171821;
+    --muted:     #5A5D70;
+    --faint:     #868AA0;
+    --gold:      #8A6113;
+    --gold-soft: #C79A3E;
+    --gold-wash: #F3E7CC;
+    --lumen:     #2E3350;
+    --umbra:     #6E6C8A;
+    --peril:     #A83A3A;
+    --shadow: 0 1px 2px rgba(23, 24, 33, .06), 0 8px 24px -12px rgba(23, 24, 33, .18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --void:      #0B0B12;
+      --surface:   #15161F;
+      --surface-2: #1E1F2B;
+      --rule:      #2B2A3A;
+      --ink:       #D6D8E6;
+      --muted:     #8C8EA4;
+      --faint:     #6B6D82;
+      --gold:      #E6B865;
+      --gold-soft: #A8823C;
+      --gold-wash: #241E12;
+      --lumen:     #F2F5FF;
+      --umbra:     #8E8CAC;
+      --peril:     #D66A6A;
+      --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 18px 40px -24px #000;
+    }
+  }
+  :root[data-theme="dark"] {
+    --void:      #0B0B12;
+    --surface:   #15161F;
+    --surface-2: #1E1F2B;
+    --rule:      #2B2A3A;
+    --ink:       #D6D8E6;
+    --muted:     #8C8EA4;
+    --faint:     #6B6D82;
+    --gold:      #E6B865;
+    --gold-soft: #A8823C;
+    --gold-wash: #241E12;
+    --lumen:     #F2F5FF;
+    --umbra:     #8E8CAC;
+    --peril:     #D66A6A;
+    --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 18px 40px -24px #000;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--void);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding-inline: 20px;
+    padding-block: 0 72px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .measure { max-width: 64ch; }
+
+  h1, h2, h3, .eyebrow, .num, .glyph, .datum {
+    font-family: Syne, "Trebuchet MS", sans-serif;
+  }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  /* ---- abertura ---- */
+  header.hero { padding-block: 72px 8px; }
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 22px;
+  }
+  h1 {
+    font-weight: 800; font-size: clamp(44px, 9vw, 78px);
+    line-height: .95; letter-spacing: -.03em;
+  }
+  .lede {
+    font-size: clamp(19px, 2.4vw, 22px); line-height: 1.5;
+    color: var(--muted); margin: 24px 0 0; max-width: 54ch;
+  }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- secoes ---- */
+  section { padding-block: 54px 0; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 14px;
+    font-size: 12px; font-weight: 700; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--gold);
+    margin: 0 0 8px;
+  }
+  .eyebrow::after {
+    content: ""; flex: 1; height: 1px; background: var(--rule);
+  }
+  h2 { font-weight: 800; font-size: clamp(26px, 4vw, 34px); letter-spacing: -.02em; }
+  h3 { font-weight: 700; font-size: 19px; letter-spacing: -.01em; margin-block: 32px 6px; }
+  p { margin: 14px 0 0; }
+  p + p { margin-top: 12px; }
+  section > p, section > .measure { max-width: 64ch; }
+
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  code {
+    font-size: .88em; background: var(--surface-2);
+    padding: .12em .38em; border-radius: 3px; color: var(--ink);
+  }
+  a { color: var(--gold); text-underline-offset: 3px; }
+
+  /* ---- painel-instrumento: quebra a medida da coluna ---- */
+  .panel {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 26px; margin-top: 26px;
+    box-shadow: var(--shadow);
+  }
+  .panel-title {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--faint); margin: 0 0 20px;
+  }
+
+  /* ---- a escala de luz: o objeto mais caracteristico do jogo ---- */
+  .scale { position: relative; }
+  .track {
+    height: 46px; border-radius: 3px; border: 1px solid var(--rule);
+    background: linear-gradient(90deg, #07070C 0%, #26283A 35%, #7E8296 62%, #F4F6FF 100%);
+  }
+  .ticks { position: relative; height: 96px; margin-top: 2px; }
+  .tick { position: absolute; top: 0; transform: translateX(-50%); text-align: center; width: 130px; }
+  .tick .stem { width: 1px; height: 12px; background: var(--gold-soft); margin: 0 auto 7px; }
+  .tick .val {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13px; font-weight: 600; color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+  .tick .what { font-size: 12px; line-height: 1.35; color: var(--muted); margin-top: 3px; }
+  .bands { display: grid; gap: 8px; margin-top: 4px; }
+  .band { position: relative; height: 30px; }
+  .band .fill {
+    position: absolute; top: 0; height: 100%; border-radius: 3px;
+    display: flex; align-items: center; padding-inline: 12px;
+    font-family: Syne, sans-serif; font-size: 12px; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .band.lumen .fill { background: var(--gold-wash); border: 1px solid var(--gold-soft); color: var(--gold); }
+  .band.umbra .fill { background: var(--surface-2); border: 1px solid var(--rule); color: var(--umbra); }
+  .axis {
+    display: flex; justify-content: space-between; margin-top: 10px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- tabelas ---- */
+  .tablewrap { overflow-x: auto; margin-top: 20px; }
+  table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 15px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-family: Syne, sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--faint);
+    border-bottom-color: var(--gold-soft);
+  }
+  td.n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ---- alfabeto do terreno ---- */
+  .legend { display: grid; gap: 2px; margin-top: 20px; }
+  .legend-row {
+    display: grid; grid-template-columns: 34px 150px 1fr; gap: 14px;
+    align-items: baseline; padding: 9px 10px; border-radius: 3px;
+  }
+  .legend-row:nth-child(odd) { background: var(--surface-2); }
+  .glyph {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 600; font-size: 17px; text-align: center;
+    border-radius: 3px; padding: 2px 0;
+  }
+  .legend-name { font-weight: 600; }
+  .legend-rule { color: var(--muted); font-size: 14.5px; }
+
+  /* ---- fases ---- */
+  .levels {
+    display: grid; gap: 14px; margin-top: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  }
+  .level {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 4px; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .level-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px 8px; }
+  .num {
+    font-weight: 800; font-size: 26px; line-height: 1;
+    color: var(--gold); font-variant-numeric: tabular-nums;
+  }
+  .level-name { font-family: Syne, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .level canvas { display: block; width: 100%; height: auto; background: #07070C; }
+  .level-teaches { padding: 12px 14px 14px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+  .level-teaches b { color: var(--ink); font-weight: 600; }
+
+  /* ---- pipeline numerado: a ordem E a informacao ---- */
+  ol.pipeline { list-style: none; counter-reset: step; padding: 0; margin: 20px 0 0; }
+  ol.pipeline li {
+    counter-increment: step; position: relative;
+    padding: 9px 0 9px 46px; border-bottom: 1px solid var(--rule);
+    font-size: 15px;
+  }
+  ol.pipeline li::before {
+    content: counter(step); position: absolute; left: 0; top: 9px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px;
+    font-weight: 600; color: var(--gold); width: 30px; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  ol.pipeline li:last-child { border-bottom: none; }
+  ol.pipeline .who { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13.5px; color: var(--ink); }
+  ol.pipeline .why { color: var(--muted); font-size: 14px; }
+  ol.pipeline li.ours .who { color: var(--gold); }
+
+  /* ---- notas ---- */
+  .note {
+    border-left: 2px solid var(--gold-soft); padding: 2px 0 2px 18px;
+    margin-top: 22px; color: var(--muted); font-size: 15.5px; max-width: 62ch;
+  }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  pre {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
+    padding: 16px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.6;
+    margin-top: 18px; color: var(--ink);
+  }
+
+  footer {
+    margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--rule);
+    color: var(--faint); font-size: 14px;
+  }
+
+  @media (max-width: 560px) {
+    .legend-row { grid-template-columns: 30px 1fr; }
+    .legend-row .legend-rule { grid-column: 1 / -1; }
+    .tick { width: 92px; }
+    .tick .what { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="kicker">Manual de campo · v0.4 · 12 fases</p>
+    <h1>Penumbra</h1>
+    <p class="lede">
+      Dois seres que não podem se tocar e não avançam separados. O mundo não tem
+      um chão: tem <strong>dois</strong>, e eles se excluem — cada célula de éter
+      é piso sólido para exatamente um deles, decidido pela luz <strong>naquele
+      instante</strong>.
+    </p>
+  </header>
+
+  <section id="luz">
+    <p class="eyebrow">A escala</p>
+    <h2>Tudo depende de um número por célula</h2>
+    <p class="measure">
+      O campo de luz vai de 0 a 1 em cada célula da grade. Três limiares o cortam,
+      e é da ordem deles que o jogo inteiro depende: entre <code>0.12</code> e
+      <code>0.60</code> existe uma <em>penumbra</em> onde os dois sobrevivem. Sem
+      essa faixa, toda célula mataria um deles e nenhuma fase teria solução — por
+      isso o carregador de dados recusa um arquivo que inverta essa ordem.
+    </p>
+
+    <div class="panel scale">
+      <p class="panel-title">Campo de luz — limiares reais de data/difficulties/penumbra/basic.json</p>
+      <div class="track"></div>
+      <div class="ticks">
+        <div class="tick" style="left:12%">
+          <div class="stem"></div>
+          <div class="val">0.12</div>
+          <div class="what">abaixo daqui a Lumen se apaga</div>
+        </div>
+        <div class="tick" style="left:35%">
+          <div class="stem"></div>
+          <div class="val">0.35</div>
+          <div class="what">o éter troca de dono</div>
+        </div>
+        <div class="tick" style="left:60%">
+          <div class="stem"></div>
+          <div class="val">0.60</div>
+          <div class="what">acima daqui a Umbra se dissolve</div>
+        </div>
+      </div>
+      <div class="bands">
+        <div class="band lumen">
+          <div class="fill" style="left:12%; right:0">Lumen sobrevive</div>
+        </div>
+        <div class="band umbra">
+          <div class="fill" style="left:0; right:40%">Umbra sobrevive</div>
+        </div>
+      </div>
+      <div class="axis"><span>0.0 — escuro total</span><span>1.0 — luz direta</span></div>
+    </div>
+
+    <p class="note">
+      <b>A morte nunca é instantânea.</b> Um medidor sobe enquanto o perigo dura e
+      desce quando passa — 1,3 s para a Lumen, 1,6 s para a Umbra. Atravessar
+      correndo uma nesga da polaridade errada é uma decisão possível, e é isso que
+      dá às habilidades a função de ferramenta em vez de interruptor.
+    </p>
+  </section>
+
+  <section id="seres">
+    <p class="eyebrow">Os dois seres</p>
+    <h2>Simétricos na estrutura, opostos no valor</h2>
+    <p class="measure">
+      Um único sistema comanda os dois. Toda a assimetria vive nos números do
+      arquivo de dados — se ela virasse dois sistemas duplicados, a próxima regra
+      nova precisaria ser escrita duas vezes e poderia divergir num dos lados sem
+      ninguém notar.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>&nbsp;</th><th>Lumen (luz)</th><th>Umbra (sombra)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>velocidade</td><td class="n">200 px/s</td><td class="n">142 px/s</td></tr>
+          <tr><td>salto</td><td class="n">480 px/s · sobe 3 degraus</td><td class="n">415 px/s · sobe 2 degraus</td></tr>
+          <tr><td>pisa em</td><td>rocha + éter <b>aceso</b></td><td>rocha + éter <b>apagado</b></td></tr>
+          <tr><td>morre</td><td>luz abaixo de <span class="mono">0.12</span> — <i>se apaga</i></td><td>luz acima de <span class="mono">0.60</span> — <i>se dissolve</i></td></tr>
+          <tr><td>medidor de perigo</td><td class="n">1,3 s</td><td class="n">1,6 s</td></tr>
+          <tr><td>habilidade (J)</td><td><b>Facho</b> — emite luz ao redor de si</td><td><b>Absorção</b> — abre um bolsão de escuridão</td></tr>
+          <tr><td>carga</td><td class="n">3,2 s · recompõe 0,42/s</td><td class="n">3,2 s · recompõe 0,42/s</td></tr>
+          <tr><td>só ela faz</td><td>—</td><td><b>rompe a crosta</b> em 0,55 s, sem volta</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>O que a altura do salto esconde</h3>
+    <p class="measure">
+      O que decide se um degrau é subível <b>não é alcançar a altura dele</b> — é
+      quanto tempo o ser fica lá em cima. Subir exige ao menos uma célula de
+      deslocamento horizontal, porque o topo do degrau nunca está na coluna que o
+      ser ocupa. A Umbra alcança 2,45 células de altura, mas a duas células ela
+      desloca apenas <b>1,43 coluna</b> — pouco mais que a única que subir exige,
+      e nem chega a três. A Lumen alcança 3,27 e ainda desloca 1,57 lá em cima.
+      É por isso que <code>penumbra/reachability.py</code> existe, e é isso que
+      um teste mede em cada fase.
+    </p>
+  </section>
+
+  <section id="terreno">
+    <p class="eyebrow">O alfabeto</p>
+    <h2>Sete terrenos, uma pergunta cada</h2>
+    <p class="measure">
+      Cada fase é um arquivo de texto de 28 × 17. O que muda entre os terrenos não
+      é o visual — é de quem é o chão, e sob que condição.
+    </p>
+
+    <div class="legend" id="legend"></div>
+
+    <p class="note">
+      A última linha da grade é <b>sempre vazia</b>: é o abismo. O motor trata
+      fora-dos-limites como sólido, então sem essa linha ninguém cairia de verdade
+      — o ser simplesmente pousaria na borda de baixo da tela.
+    </p>
+  </section>
+
+  <section id="fases">
+    <p class="eyebrow">As doze fases</p>
+    <h2>Cada uma ensina uma coisa e só uma</h2>
+    <p class="measure">
+      As miniaturas abaixo são desenhadas a partir do <b>ASCII real</b> de cada
+      fase, lido do mesmo arquivo que o jogo carrega — não são capturas de tela
+      que envelheceriam no primeiro ajuste de nível.
+    </p>
+    <div class="levels" id="levels"></div>
+  </section>
+
+  <section id="arquitetura">
+    <p class="eyebrow">Arquitetura</p>
+    <h2>Dois chãos na mesma simulação</h2>
+    <p class="measure">
+      É o ponto não-óbvio do projeto. O <code>TileCollisionSystem</code> da engine
+      resolve toda entidade com Transform + Velocity + Hitbox contra <b>uma</b>
+      grade — mas os nomes das três pools são parâmetros do construtor. Então
+      Penumbra cria uma segunda pool de hitbox e registra <b>dois</b>
+      <code>TileCollisionSystem</code>: um contra a grade da luz, olhando só quem
+      tem <code>hitbox</code>; outro contra a grade da sombra, olhando só quem tem
+      <code>hitbox_shadow</code>.
+    </p>
+    <p class="measure">
+      Nenhum dos dois sabe que o outro existe, e nenhum sistema genérico da engine
+      ganhou um ramo condicional. O campo de luz reescreve as duas grades a cada
+      frame — e é só isso que faz a ação de um ser desfazer o terreno do outro.
+    </p>
+
+    <div class="panel">
+      <p class="panel-title">Ordem dos sistemas por frame — e por que ela é essa</p>
+      <ol class="pipeline">
+        <li><span class="who">PhysicsSystem</span> <span class="why">— integra posição (engine)</span></li>
+        <li><span class="who">CollisionSystem</span> <span class="why">— ocioso aqui: só a Lumen tem <code>hitbox</code></span></li>
+        <li><span class="who">TileCollisionSystem</span> <span class="why">— Lumen contra a grade da luz</span></li>
+        <li class="ours"><span class="who">TileCollisionSystem</span> <span class="why">— Umbra contra a grade da sombra</span></li>
+        <li class="ours"><span class="who">GravitySystem</span> <span class="why">— fecha o contrato Physics → Tile* → Gravity</span></li>
+        <li class="ours"><span class="who">DualityControlSystem</span> <span class="why">— escreve <code>velocity</code> depois de tudo acima, a única posição válida para input</span></li>
+        <li class="ours"><span class="who">LightFieldSystem</span> <span class="why">— recalcula a luz e as duas grades</span></li>
+        <li class="ours"><span class="who">WorldClockSystem</span> <span class="why">— farol e eclipse: o que muda sozinho</span></li>
+        <li class="ours"><span class="who">CrustBreakSystem</span> <span class="why">— o verbo da Umbra; muta o terreno</span></li>
+        <li class="ours"><span class="who">PolarityDoorSystem</span> <span class="why">— lê a luz deste frame</span></li>
+        <li class="ours"><span class="who">OutcomeSystem</span> <span class="why">— lê posições já resolvidas</span></li>
+        <li class="ours"><span class="who">PresentationSystem</span> <span class="why">— só pixels; removível sem mudar o jogo</span></li>
+      </ol>
+    </div>
+
+    <p class="note">
+      <b>Não há sistema de "sair".</b> ESC é tratado nas cenas — recua uma tela por
+      vez e só encerra no título — porque um sistema só roda dentro de
+      <code>world.step()</code>, e o menu existe justamente enquanto o mundo está
+      parado.
+    </p>
+
+    <h3>Como a luz se propaga</h3>
+    <p class="measure">
+      Um flood geodésico de 8 vizinhos, relaxado 10 vezes por frame sobre a grade
+      28 × 17. Cada passe empurra a luz uma célula, perdendo <span class="mono">1/7</span>
+      de intensidade; as diagonais custam <span class="mono">√2</span> a mais. Uma
+      fonte de intensidade <span class="mono">I</span> deixa sólido tudo num raio
+      geodésico de <span class="mono">(I − 0.35) × 7</span> células, contornando
+      rocha. Na prática: uma lâmpada alcança <b>4,55 células</b>, a Lumen fica
+      segura até <b>6,16</b> dela, e a Umbra se dissolve dentro de <b>2,8</b>.
+    </p>
+    <p class="measure">
+      As diagonais não são cosméticas. Só com os 4 vizinhos ortogonais a distância
+      resultante é a de Manhattan, e uma lâmpada acende um <b>losango</b> — com
+      alcance diagonal a ~71% do horizontal. Nenhuma fase deste jogo teria sido
+      desenhável assim.
+    </p>
+  </section>
+
+  <section id="rodar">
+    <p class="eyebrow">Rodar</p>
+    <h2>A engine vive no repositório dela</h2>
+<pre>git clone https://github.com/EzioMilanoX/OuroborosEngine.git
+git clone https://github.com/EzioMilanoX/Penumbra.git
+
+pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
+cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
+
+pytest -q                      # 108 testes headless
+python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
+    <p class="measure">
+      <code>python -m</code> não é preferência de estilo: os imports são absolutos
+      e os caminhos de <code>config.json</code> são relativos à raiz, então
+      <code>python penumbra/main.py</code> falha.
+    </p>
+
+    <h3>Duas maneiras de uma fase ser insolúvel</h3>
+    <p class="measure">
+      Cada uma tem seu guardião, porque nenhuma das duas gera erro em runtime — a
+      fase carrega, o jogo abre, e ela simplesmente não pode ser terminada.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Falha</th><th>Sintoma</th><th>Guardião</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>Polaridade</b></td>
+            <td>o éter não acende onde precisa; o facho vaza até a zona de sombra e a porta nunca abre</td>
+            <td class="mono">test_shipped_levels.py</td>
+          </tr>
+          <tr>
+            <td><b>Geometria</b></td>
+            <td>o degrau é alto demais; há um bloco sobre a cabeça e o salto morre no teto; a descida é de mão única</td>
+            <td class="mono">test_reachability.py</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      Os testes rodam a <b>simulação real</b>: o mesmo <code>World</code>, os mesmos
+      sistemas, na mesma ordem que o jogo com janela — só sem renderer, input e
+      áudio concretos. Nenhum teste reimplementa uma regra para depois conferi-la
+      contra si mesma. Os mais fortes terminam fases <b>jogando</b>, com um
+      controlador rudimentar que segura as teclas na ordem certa.
+    </p>
+  </section>
+
+  <footer>
+    Penumbra · construído sobre a
+    <a href="https://github.com/EzioMilanoX/OuroborosEngine">OuroborosEngine</a> ·
+    código em <a href="https://github.com/EzioMilanoX/Penumbra">EzioMilanoX/Penumbra</a>
+  </footer>
+</div>
+
+<script id="penumbra-data" type="application/json">{"levels":[{"id":"01_duas_polaridades","name":"Duas Polaridades","hint":"TAB troca de ser. O mesmo eter: aceso e chao da Lumen, apagado e chao da Umbra.","rows":["............................","............................","............................","............................","............................","............................","............................","......A.*...*...X...+.......",".#########~~~~########......",".#########....########......","............................","............................","......B.........Y...........",".#########~~~~########......",".#########....########......",".#########....########......","............................"]},{"id":"02_a_crosta","name":"A Crosta","hint":"So a Umbra rompe a crosta: empurre contra ela com A/D. Nao tem volta -- e deixa a luz passar.","rows":["................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","..............%.#####.......","...............%#####.......","....*.A...B...*%....X...*...","#################~~###..####","#################...+....Y..","#################..#########","............................"]},{"id":"03_o_mesmo_chao","name":"O Mesmo Chao","hint":"J liga a habilidade. A lampada faz a ponte ser chao da Lumen; a absorcao da Umbra a devolve.","rows":[".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........###.####..*.X.+....",".........########.######....","....*.A.B...*............Y..","#########~~~~~~~~###########","#########........###########","#########........###########","............................"]},{"id":"04_eclipse","name":"Eclipse","hint":"A porta cede com Lumen numa zona acesa e Umbra numa apagada, no mesmo instante.","rows":["............................","............................","............................","............................",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............","..*.A...L....D........X.*.+.","###############~~~~~~#######",".............D..............",".............D..............","...B.S.......DY.............","################...#########","............................"]},{"id":"05_eclipse_partilhado","name":"Eclipse Partilhado","hint":"A ponte dourada aceita os DOIS -- mas colapsa depois do primeiro passo. Quem vai primeiro?","rows":["............................","............................","............................","............................","............................","............................","............................","............................","............................","............................",".............+.......*..X...","..........########..#######.","..*.A..B..................Y.","##########========##########","##########........##########","##########........##########","............................"]},{"id":"06_farol","name":"Farol","hint":"O farol acende e apaga sozinho. Aceso, a ponte e chao da Lumen; apagado, da Umbra.","rows":[".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........","....*....#########..........",".........#########...+*..X..",".........#########..########","...B..A......o.....Y........","#########~~~~~~~~~##########","#########.........##########","#########.........##########","............................"]},{"id":"07_contratempo","name":"Contratempo","hint":"Romper a crosta abre o caminho; o farol decide a hora. As duas coisas nao se negociam.","rows":["............########........","............########........","............########........","............########........","............########........","............########........","............########........","............########........","............########........",".........%..########........","..A..*...%..###.####....*.X.","########.%..########..######","....B....%.....o.....Y....+.","############~~~~~~~~########","############........########","############........########","............................"]},{"id":"08_fusao","name":"Fusao","hint":"A porta cede com os dois em posicao. Depois dela, a ponte dourada -- e ela aceita os dois uma vez so.","rows":["............................","............................","............................","............................",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............","..*.A...L....D..............","###########..#..............",".............D..............","...........#.D.........+*.X.",".............D........######","...B.S......#D.............Y","##############=======#######","............................"]},{"id":"09_contra_eter","name":"Contra-Eter","hint":"A ponte da direita obedece a regra ao contrario. O farol governa as duas, em sentidos opostos.","rows":[".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".......*.####.####..........",".........####.####...+*..X..",".........####.####..########","...B..A......o.....Y........","#########~~~~#;;;;##########","#########.........##########","#########.........##########","............................"]},{"id":"10_a_placa","name":"A Placa","hint":"A placa mantem a porta aberta so enquanto alguem esta em cima. Sao duas -- uma de cada lado.","rows":["............................","............................","............................","............................","............................","............................","............D...............","............D...............","............D...............","............D...............","............D....._.+.*.X...","............D...###########.","...B_...A*..D............Y..","############################","############################","............................","............................"]},{"id":"11_espelhos","name":"Espelhos","hint":"Tres pontes, duas delas ao contrario. Uma virada do farol troca o dono de todas de uma vez.","rows":["........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","......*.###.####.####.......","........###.####.####...*+X.","........###.####.####..#####","..B..A..........o.....Y.....","########;;;#~~~~#;;;;#######","########.............#######","########.............#######","............................"]},{"id":"12_a_fonte","name":"A Fonte","hint":"Um segura a porta, o outro atravessa a ponte dourada -- e ela tem prazo desde o primeiro passo.","rows":["............................","............................","............................","............................","............................","............................","............D...............","............D...............","............D........+...X*.","............D.....=======###","............D..._...........","............D.#############.","...B_..A*...D...........Y...","############################","############################","............................","............................"]}],"tuning":{"name":"basic","world":{"cell_size":32.0,"grid_cols":28,"grid_rows":17,"gravity_y":1100.0},"lumen":{"move_speed":200.0,"jump_velocity_y":-480.0,"half_width":10.0,"half_height":13.0,"ability_charge_seconds":3.2,"ability_refill_per_second":0.42,"peril_seconds":1.3,"peril_recovery_per_second":0.8},"umbra":{"move_speed":142.0,"jump_velocity_y":-415.0,"half_width":13.0,"half_height":14.0,"ability_charge_seconds":3.2,"ability_refill_per_second":0.42,"peril_seconds":1.6,"peril_recovery_per_second":0.8,"crust_break_seconds":0.55},"light":{"falloff_radius_cells":7.0,"solid_threshold":0.35,"lamp_intensity":1.0,"beam_intensity":1.0,"absorb_radius_cells":4.0,"extinguish_below":0.12,"dissolve_above":0.6,"relaxation_passes":10},"flow":{"overlay_seconds":2.0,"overlay_min_seconds":0.45,"beacon_on_seconds":2.6,"beacon_off_seconds":2.0,"eclipse_collapse_seconds":6.5}}}</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById("penumbra-data").textContent);
+
+  /* Mesmo mapa de cores do menu do jogo: claras de proposito. Numa
+     miniatura de poucos pixels por celula o contraste real do jogo
+     (rocha quase preta sobre fundo quase preto) desapareceria, e a
+     silhueta da fase e a unica coisa que a miniatura precisa entregar. */
+  var COLORS = {
+    "#": "#565A6A", "~": "#969CBE", ";": "#786CA0", "%": "#967E68",
+    "=": "#C49E52", "D": "#967A42", "_": "#967A42", "*": "#FFFAE8",
+    "o": "#DED6BE", "L": "#967A42", "S": "#967A42",
+    "X": "#F7D68A", "Y": "#F7D68A", "+": "#F7D68A"
+  };
+
+  var TERRAIN = [
+    ["#", "rocha", "#565A6A", "Sólida para os dois, sempre, e bloqueia luz. É o chão neutro — e é ela que torna as fases solúveis: alguém precisa ter onde esperar."],
+    ["~", "éter", "#969CBE", "De exatamente um, decidido pela luz agora. Aceso é chão da Lumen; apagado, da Umbra. O conflito central."],
+    [";", "contra-éter", "#786CA0", "A mesma regra, invertida: sólido para a Lumen no escuro e para a Umbra na luz. Acender o próprio caminho derruba a Lumen."],
+    ["%", "crosta", "#967E68", "Sólida para os dois e opaca. Só a Umbra rompe, empurrando — e romper não tem volta. O buraco deixa entrar a luz que a crosta barrava."],
+    ["=", "eclipse", "#C49E52", "A única célula que aceita os dois ao mesmo tempo. Mas com prazo: o primeiro passo de qualquer um inicia o colapso da zona inteira."],
+    ["*", "lâmpada", "#FFFAE8", "Fonte fixa de luz."],
+    ["o", "farol", "#DED6BE", "Acende e apaga sozinho. Aceso, a ponte é da Lumen; apagado, da Umbra — e ninguém escolhe a hora."],
+    ["D", "porta", "#967A42", "Parede até um gatilho cedê-la."],
+    ["L", "zona de luz", "#967A42", "Gatilho da Lumen: ela, acesa, numa dessas. Com a zona de sombra, trava a porta aberta para sempre."],
+    ["S", "zona de sombra", "#967A42", "Gatilho da Umbra: ela, apagada, numa dessas. As duas condições valem ao mesmo tempo ou nenhuma vale."],
+    ["_", "placa de pressão", "#967A42", "Mantém a porta aberta só enquanto alguém está em cima. O único lugar onde o ser parado tem função em vez de só estar vulnerável."],
+    ["+", "fragmento", "#F7D68A", "O colecionável. Opcional, sempre em desvio, e só conta se a fase for concluída com ele."]
+  ];
+
+  /* Os arquivos de fase guardam os nomes em ASCII -- a fonte do menu do jogo
+     e desenhada a mao. Aqui e um documento, entao acentuamos. */
+  var NAMES = [
+    "Duas Polaridades", "A Crosta", "O Mesmo Chão", "Eclipse",
+    "Eclipse Partilhado", "Farol", "Contratempo", "Fusão",
+    "Contra-Éter", "A Placa", "Espelhos", "A Fonte"
+  ];
+
+  var TEACHES = [
+    "<b>Alternância e leitura do terreno.</b> Duas pistas, o mesmo material de éter: acesa em cima, apagada embaixo. Vencível só andando.",
+    "<b>Os dois verbos da Umbra</b>, com um passo sem volta no meio. Romper acende o éter do outro lado — que era o chão dela.",
+    "<b>As duas habilidades em disputa.</b> A lâmpada faz a ponte ser da Lumen; a Umbra só a toma absorvendo, e absorver apaga a lâmpada.",
+    "<b>A porta de polaridade</b>, e a sombra projetada pela rocha: é a laje que impede o facho de vazar até a zona da Umbra.",
+    "<b>A ponte que aceita os dois</b> — e colapsa depois do primeiro passo. O prazo tem de cobrir as duas travessias.",
+    "<b>O mundo vira sozinho.</b> Aceso, a ponte é da Lumen; apagado, da Umbra. Ninguém escolhe quando.",
+    "<b>Farol e crosta juntos:</b> romper abre o caminho, o farol decide a hora. Uma coisa irreversível e uma periódica.",
+    "<b>Porta mais eclipse.</b> No fim os dois atravessam o mesmo chão — o único que aceita os dois, e por tempo contado.",
+    "<b>A regra ao contrário</b>, na mesma fase que ela. O farol governa as duas pontes em sentidos opostos; a ilha de rocha é onde se espera a virada.",
+    "<b>Duas placas</b>, uma de cada lado da porta: um segura para o outro passar, e quem passou segura de volta.",
+    "<b>Três pontes, duas invertidas.</b> Uma virada do farol troca o dono de todas de uma vez.",
+    "<b>Placa e eclipse:</b> segurar a porta custa exatamente o tempo que a ponte dourada não tem."
+  ];
+
+  var legend = document.getElementById("legend");
+  TERRAIN.forEach(function (entry) {
+    var row = document.createElement("div");
+    row.className = "legend-row";
+    var glyph = document.createElement("span");
+    glyph.className = "glyph";
+    glyph.textContent = entry[0];
+    glyph.style.background = entry[2];
+    glyph.style.color = "#0B0B12";
+    var name = document.createElement("span");
+    name.className = "legend-name";
+    name.textContent = entry[1];
+    var rule = document.createElement("span");
+    rule.className = "legend-rule";
+    rule.textContent = entry[3];
+    row.append(glyph, name, rule);
+    legend.appendChild(row);
+  });
+
+  var levels = document.getElementById("levels");
+  var CELL = 8;
+  data.levels.forEach(function (level, index) {
+    var card = document.createElement("article");
+    card.className = "level";
+
+    var head = document.createElement("div");
+    head.className = "level-head";
+    var num = document.createElement("span");
+    num.className = "num";
+    num.textContent = index + 1;
+    var name = document.createElement("span");
+    name.className = "level-name";
+    name.textContent = NAMES[index] || level.name;
+    head.append(num, name);
+
+    var cols = level.rows[0].length;
+    var rows = level.rows.length;
+    var canvas = document.createElement("canvas");
+    canvas.width = cols * CELL;
+    canvas.height = rows * CELL;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Miniatura da fase " + (NAMES[index] || level.name));
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#07070C";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var color = COLORS[level.rows[r][c]];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+      }
+    }
+
+    var teaches = document.createElement("p");
+    teaches.className = "level-teaches";
+    teaches.innerHTML = TEACHES[index] || level.hint;
+
+    card.append(head, canvas, teaches);
+    levels.appendChild(card);
+  });
+})();
+</script>

@@ -1,10 +1,13 @@
 # Penumbra — Luz e Sombra: Dualidade
 
-Puzzle-platformer de um jogador só sobre dois seres que não podem se tocar e
-não conseguem avançar separados. **Doze fases**, menu com seleção visual,
-colecionáveis e **multiplayer local**, construído sobre a
+Puzzle-platformer sobre dois seres que não podem se tocar e não conseguem
+avançar separados. **Doze fases**, menu com seleção visual, colecionáveis e
+**multiplayer local**, construído sobre a
 [OuroborosEngine](https://github.com/EzioMilanoX/OuroborosEngine) — a engine
 vive no repositório dela, não é vendorizada aqui.
+
+📖 **[Manual de campo](docs/index.html)** — a escala de luz, o alfabeto do
+terreno, as doze fases e como dois chãos convivem numa simulação só.
 
 ```bash
 git clone https://github.com/EzioMilanoX/OuroborosEngine.git
@@ -68,9 +71,10 @@ de interruptor.
 Sobre o salto: o que decide se um degrau é subível **não é a altura máxima**,
 é quanto tempo o ser fica naquela altura. Subir num degrau exige ao menos 1
 célula de deslocamento horizontal — o topo do degrau nunca está na coluna onde
-o ser está de pé. A Umbra alcança 2,06 células de altura mas só desloca 0,47
-lá em cima: na prática ela sobe **um** degrau. `penumbra/reachability.py`
-modela isso, e é o que impede uma fase de pedir dela o que ela não faz.
+o ser está de pé. A Umbra alcança 2,45 células de altura, mas a duas células
+ela desloca só **1,43 coluna** — pouco mais que a única que subir exige — e a
+três ela não chega. `penumbra/reachability.py` modela isso, e é o que impede
+uma fase de pedir dela o que ela não faz.
 
 ## Os quatro terrenos
 

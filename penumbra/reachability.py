@@ -39,9 +39,9 @@ class JumpModel:
     deslocamento horizontal -- o topo do degrau nunca esta na coluna onde o
     ser esta, porque essa coluna esta vazia (e onde ele esta de pe).
 
-    E por isso que a Umbra, que alcanca 2,06 celulas de altura, sobe apenas
-    degraus de UMA celula: a 2 celulas ela desloca 0,47 -- ela chega la e
-    nao tem pra onde ir.
+    E por isso que a Umbra, que alcanca 2,45 celulas de altura, para em
+    degraus de DUAS: a 2 celulas ela desloca 1,43 -- pouco mais que a unica
+    coluna que subir exige -- e a 3 ela simplesmente nao chega.
     """
 
     def __init__(self, world: WorldTuning, character: CharacterTuning) -> None:
