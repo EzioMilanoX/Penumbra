@@ -1,7 +1,8 @@
 # Penumbra — Luz e Sombra: Dualidade
 
 Puzzle-platformer sobre dois seres que não podem se tocar e não conseguem
-avançar separados. **Doze fases**, menu com seleção visual, colecionáveis e
+avançar separados. **Dezoito fases** em três atos, menu com seleção visual,
+colecionáveis e
 **multiplayer local**, construído sobre a
 [OuroborosEngine](https://github.com/EzioMilanoX/OuroborosEngine) — a engine
 vive no repositório dela, não é vendorizada aqui.
@@ -85,9 +86,11 @@ uma fase de pedir dela o que ela não faz.
 | **crosta** `%` | dos dois — até a Umbra rompê-la | opaca. Romper é irreversível, e abre caminho para a luz que ela barrava |
 | **eclipse** `=` | **dos dois ao mesmo tempo** — a única célula assim | mas com prazo: o primeiro passo de qualquer um inicia o colapso da zona inteira |
 | **contra-éter** `;` | de exatamente um, **pela regra invertida** | sólido para a Lumen no *escuro* e para a Umbra na *luz* |
+| **altar** `^` | não é chão — é onde se **larga a forma** | segure a habilidade em cima e ela fica ali *para sempre*; quem a deixou não a usa mais nesta fase |
 
-E duas fontes de luz: a **lâmpada** `*`, fixa, e o **farol** `o`, que acende e
-apaga sozinho.
+E três fontes de luz: a **lâmpada** `*`, fixa; o **farol** `o`, que acende e
+apaga sozinho; e a **lanterna errante**, uma lâmpada que percorre um trilho
+`>` de ponta a ponta e volta.
 
 Mais dois marcadores: a **placa de pressão** `_`, que mantém uma porta aberta
 só enquanto alguém está em cima dela, e o **fragmento da fonte** `+`, o
@@ -138,6 +141,20 @@ Disso saem as situações que as fases exploram:
   está apenas vulnerável: alguém tem de ficar em cima para a porta continuar
   aberta. Em um jogador você estaciona e troca; em dois, um segura para o
   outro passar — e é aí que a cooperação aparece de verdade.
+- **O altar troca poder por permanência, e cobra o poder.** As duas
+  habilidades são fortes pela mesma razão: elas **acompanham** o ser. Todo
+  problema do jogo é no fundo esse — a luz de que você precisa *ali* está
+  *aqui*. O altar é a única resposta possível, e custa tudo: a pedra fica com
+  a luz (ou com a escuridão) para sempre, e quem a deixou **não liga mais a
+  habilidade nesta fase**. A barra fica vazia e não enche nunca mais.
+  É a única coisa que abre uma ponte de contra-éter para a Umbra: ela precisa
+  de luz e não sabe fazer luz.
+- **A lanterna se atravessa acompanhando, não esperando.** O farol troca o
+  dono do éter sem sair do lugar, e o jogador *espera a virada*. A lanterna
+  leva o chão junto: a Lumen anda no passo dela, a Umbra anda sempre fora do
+  círculo. Numa ponte longa a Umbra não atravessa de uma vez — a janela acesa
+  volta por cima dela no meio do caminho — então toda ponte de lanterna tem
+  uma **ilha de rocha** onde se espera a passagem.
 - **A crosta não volta.** Todo o resto do terreno é interruptor — acender,
   apagar, acender de novo. A crosta, não: rompida, rompida para a fase
   inteira. É a única decisão do jogo que não dá para desfazer. E como ela é
@@ -161,6 +178,12 @@ Disso saem as situações que as fases exploram:
 | 10 | **A Placa** | Duas placas, uma de cada lado da porta: um segura para o outro passar, e quem passou segura de volta. |
 | 11 | **Espelhos** | Três pontes, duas delas invertidas. Uma virada do farol troca o dono de todas de uma vez. |
 | 12 | **A Fonte** | Placa e eclipse juntos: segurar a porta custa exatamente o tempo que a ponte dourada não tem. |
+| 13 | **A Renúncia** | A Lumen larga o facho numa pedra para que o contra-éter — que só é chão da Umbra sob *luz* — vire estrada dela. Depois disso a Lumen não acende mais nada, e quem a leva de volta é justamente a luz que ela deixou. |
+| 14 | **Pedra Fria** | O espelho. A Umbra larga a escuridão, a lâmpada se apaga e a ponte volta a ser da Lumen — que agora precisa **correr** nela, porque escuro é o que a mata. |
+| 15 | **A Lanterna** | A lâmpada anda. Onde ela está, a ponte é da Lumen; onde não está, é da Umbra. Os dois usam a mesma ponte em fases opostas do mesmo ciclo. |
+| 16 | **Contracorrente** | Metade éter, metade contra-éter, uma lanterna só: o mesmo círculo monta uma metade e desmonta a outra. Um segue a lanterna, o outro foge dela. |
+| 17 | **O Guardião** | Lanterna e placa: a placa só vale com alguém **em cima**, e a lanterna não espera quem está segurando. A primeira vez que ficar parado é a tarefa difícil. |
+| 18 | **A Fonte Partida** | Ponte dourada com prazo, lanterna que não para, e um altar no fim do caminho. A última luz da Lumen é o que abre a última ponte da Umbra. |
 
 Três princípios de desenho, todos aprendidos errando:
 
@@ -185,6 +208,7 @@ Três princípios de desenho, todos aprendidos errando:
 %  crosta (sólida, opaca, só a Umbra rompe)      X  portal da Lumen
 =  eclipse (sólida para os dois, com prazo)      Y  portal da Umbra
 ;  contra-éter (a regra invertida)               +  fragmento da fonte
+^  altar de forma (larga a habilidade ali)       >  trilho da lanterna
 *  lâmpada fixa                                  .  vazio
 o  farol pulsante
 D  porta         L/S  zonas de polaridade      _  placa de pressão
@@ -237,13 +261,14 @@ penumbra/
     light_field_system.py       a luz, e as duas grades de colisão
     crust_break_system.py       o verbo da Umbra; muta o terreno
     world_clock_system.py       farol e eclipse; o que muda sozinho
+    form_altar_system.py        a renúncia: poder trocado por permanência
     polarity_door_system.py     a porta que exige os dois ao mesmo tempo
     outcome_system.py           as quatro mortes e a única vitória
     presentation_system.py      estado -> pixels
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              108 testes headless
+tests/              126 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -313,7 +338,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 108 testes, ~9 s, headless
+pytest -q                      # 126 testes, ~22 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -353,8 +378,17 @@ casos, porque em ambos eles existem; o que muda é quem os comanda, e é isso
 que o desenho diz: num jogador, um `TAB` entre eles; em dois, um rótulo J1 e
 J2.
 
-A **seleção de fase** é uma grade de 4×3 cards, cada um com **numerão**, nome, dois selos (fase vencida,
-fragmento) e uma **prévia** da fase.
+A **seleção de fase** é uma grade de 3×2 cards por **ato**, cada um com
+**numerão**, nome, dois selos (fase vencida, fragmento) e uma **prévia** da
+fase.
+
+Dezoito fases não cabem numa grade só, e encolher o card até caberem
+transformaria a miniatura — a única coisa que faz o card valer mais que uma
+lista de nomes — em manchinha. Paginar também diz algo verdadeiro sobre o
+jogo: as mecânicas chegam em três levas, e cada ato é uma delas. O ato é uma
+**página, não uma tranca** — nada fica bloqueado, e a seta anda de ato como
+anda de card, virando pela borda da grade. Assim o menu inteiro continua em
+quatro teclas.
 
 A prévia é o **terreno real**, parseado pelo mesmo `Terrain` que o jogo usa —
 não uma imagem exportada à mão que envelheceria no primeiro ajuste de nível.

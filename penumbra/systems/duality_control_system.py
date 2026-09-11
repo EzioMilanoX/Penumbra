@@ -107,7 +107,13 @@ class DualityControlSystem(ISystem):
     # ------------------------------------------------------------------
 
     def _toggle_ability(self, side: int) -> None:
+        """Quem deixou a forma num altar nao liga mais nada: a troca foi
+        poder por permanencia, e recusar aqui e o que a torna uma troca em vez
+        de um bonus."""
         state = self._state
+        if state.form_spent[side]:
+            state.ability_on[side] = False
+            return
         if state.ability_on[side]:
             state.ability_on[side] = False
         elif state.charge[side] >= _MIN_CHARGE_TO_ENGAGE:
@@ -120,6 +126,11 @@ class DualityControlSystem(ISystem):
         jogador comanda a Umbra, e e por isso que ele custa)."""
         state = self._state
         for side in (LUMEN, UMBRA):
+            if state.form_spent[side]:
+                # Barra vazia que nunca mais enche: a lembranca permanente,
+                # no HUD, de uma decisao que o jogador tomou.
+                state.charge[side] = 0.0
+                continue
             tuning = self._sides[side]
             if state.ability_on[side]:
                 remaining = float(state.charge[side]) - delta_time / tuning.ability_charge_seconds

@@ -266,7 +266,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Manual de campo · v0.4 · 12 fases</p>
+    <p class="kicker">Manual de campo · v0.5 · 18 fases em três atos</p>
     <h1>Penumbra</h1>
     <p class="lede">
       Dois seres que não podem se tocar e não avançam separados. O mundo não tem
@@ -349,6 +349,7 @@
           <tr><td>habilidade (J)</td><td><b>Facho</b> — emite luz ao redor de si</td><td><b>Absorção</b> — abre um bolsão de escuridão</td></tr>
           <tr><td>carga</td><td class="n">3,2 s · recompõe 0,42/s</td><td class="n">3,2 s · recompõe 0,42/s</td></tr>
           <tr><td>só ela faz</td><td>—</td><td><b>rompe a crosta</b> em 0,55 s, sem volta</td></tr>
+          <tr><td>larga a forma</td><td>deixa <b>luz fixa</b> num altar</td><td>deixa <b>escuridão fixa</b> num altar</td></tr>
         </tbody>
       </table>
     </div>
@@ -368,7 +369,7 @@
 
   <section id="terreno">
     <p class="eyebrow">O alfabeto</p>
-    <h2>Sete terrenos, uma pergunta cada</h2>
+    <h2>Nove terrenos, uma pergunta cada</h2>
     <p class="measure">
       Cada fase é um arquivo de texto de 28 × 17. O que muda entre os terrenos não
       é o visual — é de quem é o chão, e sob que condição.
@@ -384,7 +385,7 @@
   </section>
 
   <section id="fases">
-    <p class="eyebrow">As doze fases</p>
+    <p class="eyebrow">As dezoito fases</p>
     <h2>Cada uma ensina uma coisa e só uma</h2>
     <p class="measure">
       As miniaturas abaixo são desenhadas a partir do <b>ASCII real</b> de cada
@@ -392,6 +393,56 @@
       que envelheceriam no primeiro ajuste de nível.
     </p>
     <div class="levels" id="levels"></div>
+  </section>
+
+  <section id="renuncia">
+    <p class="eyebrow">O ato III</p>
+    <h2>Duas respostas para o mesmo problema</h2>
+    <p class="measure">
+      As duas habilidades do jogo são fortes pela mesma razão: elas
+      <b>acompanham</b> o ser. O facho acende onde a Lumen está, o bolsão escurece
+      onde a Umbra está — e por isso nenhum dos dois consegue estar em dois lugares
+      ao mesmo tempo. Todo problema do jogo é, no fundo, esse: <i>a luz de que você
+      precisa ali está aqui</i>. O último ato dá duas respostas, e nenhuma é de graça.
+    </p>
+
+    <h3>O altar — trocar poder por permanência</h3>
+    <p class="measure">
+      Um ser em cima de um altar, com a habilidade ligada, derrama a forma na
+      pedra. Ao fim de <b>1,1 s</b> o altar fica com a luz (Lumen) ou com a
+      escuridão (Umbra) <b>para sempre</b> — e quem a deixou <b>não liga mais a
+      habilidade nesta fase</b>. A carga vai a zero e não recompõe; a barra vazia
+      no HUD é a lembrança permanente da decisão.
+    </p>
+    <p class="measure">
+      É a segunda coisa irreversível do jogo, e ela é irreversível de outro jeito
+      que a crosta: a crosta é irreversível no <b>terreno</b> e a pergunta é
+      "quebro ou não?"; o altar é irreversível no <b>ser</b> e a pergunta é
+      "<i>onde?</i>". Um altar mal escolhido não tranca a fase — deixa você com
+      metade do personagem e a luz no lugar errado.
+    </p>
+    <p class="note">
+      É também a única coisa que abre uma ponte de <b>contra-éter</b> para a
+      Umbra. O contra-éter só é chão dela sob luz, e ela não sabe fazer luz;
+      a Lumen sabe, mas não pode estar lá. Sem o altar, aquela ponte nunca seria
+      de ninguém.
+    </p>
+
+    <h3>A lanterna — o chão que anda</h3>
+    <p class="measure">
+      O farol pulsante troca o dono do éter <b>sem sair do lugar</b>, e o jogador
+      espera a virada. A lanterna percorre um trilho a <b>2,1 células/s</b> e leva
+      o chão junto: a Lumen anda no passo dela, a Umbra anda sempre fora do
+      círculo. É a única travessia do jogo que se faz <b>acompanhando</b> em vez
+      de escolhendo o instante.
+    </p>
+    <p class="note">
+      <b>Toda ponte de lanterna tem uma ilha de rocha.</b> Não é decoração: numa
+      ponte longa a Umbra entra na travessia e a janela acesa volta por cima dela
+      no meio do caminho — ela precisa de um lugar para esperar a passagem. A
+      primeira versão destas fases não tinha a ilha, e a Umbra simplesmente não
+      atravessava; nada no ASCII dizia isso, e nenhum número do audit também.
+    </p>
   </section>
 
   <section id="arquitetura">
@@ -422,8 +473,9 @@
         <li class="ours"><span class="who">GravitySystem</span> <span class="why">— fecha o contrato Physics → Tile* → Gravity</span></li>
         <li class="ours"><span class="who">DualityControlSystem</span> <span class="why">— escreve <code>velocity</code> depois de tudo acima, a única posição válida para input</span></li>
         <li class="ours"><span class="who">LightFieldSystem</span> <span class="why">— recalcula a luz e as duas grades</span></li>
-        <li class="ours"><span class="who">WorldClockSystem</span> <span class="why">— farol e eclipse: o que muda sozinho</span></li>
+        <li class="ours"><span class="who">WorldClockSystem</span> <span class="why">— farol, lanterna e eclipse: o que muda sozinho</span></li>
         <li class="ours"><span class="who">CrustBreakSystem</span> <span class="why">— o verbo da Umbra; muta o terreno</span></li>
+        <li class="ours"><span class="who">FormAltarSystem</span> <span class="why">— a renúncia; muta o <i>ser</i>, e também lê <code>state.cell</code></span></li>
         <li class="ours"><span class="who">PolarityDoorSystem</span> <span class="why">— lê a luz deste frame</span></li>
         <li class="ours"><span class="who">OutcomeSystem</span> <span class="why">— lê posições já resolvidas</span></li>
         <li class="ours"><span class="who">PresentationSystem</span> <span class="why">— só pixels; removível sem mudar o jogo</span></li>
@@ -440,7 +492,11 @@
     <h3>Como a luz se propaga</h3>
     <p class="measure">
       Um flood geodésico de 8 vizinhos, relaxado 10 vezes por frame sobre a grade
-      28 × 17. Cada passe empurra a luz uma célula, perdendo <span class="mono">1/7</span>
+      28 × 17. Quatro sementes o alimentam e nenhuma é um caso especial no
+      relaxamento: as lâmpadas fixas, o farol pulsante, a lanterna errante e a luz
+      que a Lumen deixou num altar. O flood da sombra recebe duas: o bolsão que a
+      Umbra carrega e o que ela deixou na pedra. <b>Somar sementes em vez de somar
+      regras</b> é o que mantém esse sistema do mesmo tamanho a cada mecânica nova. Cada passe empurra a luz uma célula, perdendo <span class="mono">1/7</span>
       de intensidade; as diagonais custam <span class="mono">√2</span> a mais. Uma
       fonte de intensidade <span class="mono">I</span> deixa sólido tudo num raio
       geodésico de <span class="mono">(I − 0.35) × 7</span> células, contornando
@@ -464,7 +520,7 @@ git clone https://github.com/EzioMilanoX/Penumbra.git
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 108 testes headless
+pytest -q                      # 126 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
       <code>python -m</code> não é preferência de estilo: os imports são absolutos
@@ -510,7 +566,7 @@ python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
   </footer>
 </div>
 
-<script id="penumbra-data" type="application/json">{"levels":[{"id":"01_duas_polaridades","name":"Duas Polaridades","hint":"TAB troca de ser. O mesmo eter: aceso e chao da Lumen, apagado e chao da Umbra.","rows":["............................","............................","............................","............................","............................","............................","............................","......A.*...*...X...+.......",".#########~~~~########......",".#########....########......","............................","............................","......B.........Y...........",".#########~~~~########......",".#########....########......",".#########....########......","............................"]},{"id":"02_a_crosta","name":"A Crosta","hint":"So a Umbra rompe a crosta: empurre contra ela com A/D. Nao tem volta -- e deixa a luz passar.","rows":["................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","..............%.#####.......","...............%#####.......","....*.A...B...*%....X...*...","#################~~###..####","#################...+....Y..","#################..#########","............................"]},{"id":"03_o_mesmo_chao","name":"O Mesmo Chao","hint":"J liga a habilidade. A lampada faz a ponte ser chao da Lumen; a absorcao da Umbra a devolve.","rows":[".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........###.####..*.X.+....",".........########.######....","....*.A.B...*............Y..","#########~~~~~~~~###########","#########........###########","#########........###########","............................"]},{"id":"04_eclipse","name":"Eclipse","hint":"A porta cede com Lumen numa zona acesa e Umbra numa apagada, no mesmo instante.","rows":["............................","............................","............................","............................",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............","..*.A...L....D........X.*.+.","###############~~~~~~#######",".............D..............",".............D..............","...B.S.......DY.............","################...#########","............................"]},{"id":"05_eclipse_partilhado","name":"Eclipse Partilhado","hint":"A ponte dourada aceita os DOIS -- mas colapsa depois do primeiro passo. Quem vai primeiro?","rows":["............................","............................","............................","............................","............................","............................","............................","............................","............................","............................",".............+.......*..X...","..........########..#######.","..*.A..B..................Y.","##########========##########","##########........##########","##########........##########","............................"]},{"id":"06_farol","name":"Farol","hint":"O farol acende e apaga sozinho. Aceso, a ponte e chao da Lumen; apagado, da Umbra.","rows":[".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........","....*....#########..........",".........#########...+*..X..",".........#########..########","...B..A......o.....Y........","#########~~~~~~~~~##########","#########.........##########","#########.........##########","............................"]},{"id":"07_contratempo","name":"Contratempo","hint":"Romper a crosta abre o caminho; o farol decide a hora. As duas coisas nao se negociam.","rows":["............########........","............########........","............########........","............########........","............########........","............########........","............########........","............########........","............########........",".........%..########........","..A..*...%..###.####....*.X.","########.%..########..######","....B....%.....o.....Y....+.","############~~~~~~~~########","############........########","############........########","............................"]},{"id":"08_fusao","name":"Fusao","hint":"A porta cede com os dois em posicao. Depois dela, a ponte dourada -- e ela aceita os dois uma vez so.","rows":["............................","............................","............................","............................",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............","..*.A...L....D..............","###########..#..............",".............D..............","...........#.D.........+*.X.",".............D........######","...B.S......#D.............Y","##############=======#######","............................"]},{"id":"09_contra_eter","name":"Contra-Eter","hint":"A ponte da direita obedece a regra ao contrario. O farol governa as duas, em sentidos opostos.","rows":[".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".......*.####.####..........",".........####.####...+*..X..",".........####.####..########","...B..A......o.....Y........","#########~~~~#;;;;##########","#########.........##########","#########.........##########","............................"]},{"id":"10_a_placa","name":"A Placa","hint":"A placa mantem a porta aberta so enquanto alguem esta em cima. Sao duas -- uma de cada lado.","rows":["............................","............................","............................","............................","............................","............................","............D...............","............D...............","............D...............","............D...............","............D....._.+.*.X...","............D...###########.","...B_...A*..D............Y..","############################","############################","............................","............................"]},{"id":"11_espelhos","name":"Espelhos","hint":"Tres pontes, duas delas ao contrario. Uma virada do farol troca o dono de todas de uma vez.","rows":["........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","......*.###.####.####.......","........###.####.####...*+X.","........###.####.####..#####","..B..A..........o.....Y.....","########;;;#~~~~#;;;;#######","########.............#######","########.............#######","............................"]},{"id":"12_a_fonte","name":"A Fonte","hint":"Um segura a porta, o outro atravessa a ponte dourada -- e ela tem prazo desde o primeiro passo.","rows":["............................","............................","............................","............................","............................","............................","............D...............","............D...............","............D........+...X*.","............D.....=======###","............D..._...........","............D.#############.","...B_..A*...D...........Y...","############################","############################","............................","............................"]}],"tuning":{"name":"basic","world":{"cell_size":32.0,"grid_cols":28,"grid_rows":17,"gravity_y":1100.0},"lumen":{"move_speed":200.0,"jump_velocity_y":-480.0,"half_width":10.0,"half_height":13.0,"ability_charge_seconds":3.2,"ability_refill_per_second":0.42,"peril_seconds":1.3,"peril_recovery_per_second":0.8},"umbra":{"move_speed":142.0,"jump_velocity_y":-415.0,"half_width":13.0,"half_height":14.0,"ability_charge_seconds":3.2,"ability_refill_per_second":0.42,"peril_seconds":1.6,"peril_recovery_per_second":0.8,"crust_break_seconds":0.55},"light":{"falloff_radius_cells":7.0,"solid_threshold":0.35,"lamp_intensity":1.0,"beam_intensity":1.0,"absorb_radius_cells":4.0,"extinguish_below":0.12,"dissolve_above":0.6,"relaxation_passes":10},"flow":{"overlay_seconds":2.0,"overlay_min_seconds":0.45,"beacon_on_seconds":2.6,"beacon_off_seconds":2.0,"eclipse_collapse_seconds":6.5}}}</script>
+<script id="penumbra-data" type="application/json">{"levels":[{"id":"01_duas_polaridades","name":"Duas Polaridades","hint":"TAB troca de ser. O mesmo eter: aceso e chao da Lumen, apagado e chao da Umbra.","rows":["............................","............................","............................","............................","............................","............................","............................","......A.*...*...X...+.......",".#########~~~~########......",".#########....########......","............................","............................","......B.........Y...........",".#########~~~~########......",".#########....########......",".#########....########......","............................"]},{"id":"02_a_crosta","name":"A Crosta","hint":"So a Umbra rompe a crosta: empurre contra ela com A/D. Nao tem volta -- e deixa a luz passar.","rows":["................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","................#####.......","..............%.#####.......","...............%#####.......","....*.A...B...*%....X...*...","#################~~###..####","#################...+....Y..","#################..#########","............................"]},{"id":"03_o_mesmo_chao","name":"O Mesmo Chao","hint":"J liga a habilidade. A lampada faz a ponte ser chao da Lumen; a absorcao da Umbra a devolve.","rows":[".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........########...........",".........###.####..*.X.+....",".........########.######....","....*.A.B...*............Y..","#########~~~~~~~~###########","#########........###########","#########........###########","............................"]},{"id":"04_eclipse","name":"Eclipse","hint":"A porta cede com Lumen numa zona acesa e Umbra numa apagada, no mesmo instante.","rows":["............................","............................","............................","............................",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............","..*.A...L....D........X.*.+.","###############~~~~~~#######",".............D..............",".............D..............","...B.S.......DY.............","################...#########","............................"]},{"id":"05_eclipse_partilhado","name":"Eclipse Partilhado","hint":"A ponte dourada aceita os DOIS -- mas colapsa depois do primeiro passo. Quem vai primeiro?","rows":["............................","............................","............................","............................","............................","............................","............................","............................","............................","............................",".............+.......*..X...","..........########..#######.","..*.A..B..................Y.","##########========##########","##########........##########","##########........##########","............................"]},{"id":"06_farol","name":"Farol","hint":"O farol acende e apaga sozinho. Aceso, a ponte e chao da Lumen; apagado, da Umbra.","rows":[".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........",".........#########..........","....*....#########..........",".........#########...+*..X..",".........#########..########","...B..A......o.....Y........","#########~~~~~~~~~##########","#########.........##########","#########.........##########","............................"]},{"id":"07_contratempo","name":"Contratempo","hint":"Romper a crosta abre o caminho; o farol decide a hora. As duas coisas nao se negociam.","rows":["............########........","............########........","............########........","............########........","............########........","............########........","............########........","............########........","............########........",".........%..########........","..A..*...%..###.####....*.X.","########.%..########..######","....B....%.....o.....Y....+.","############~~~~~~~~########","############........########","############........########","............................"]},{"id":"08_fusao","name":"Fusao","hint":"A porta cede com os dois em posicao. Depois dela, a ponte dourada -- e ela aceita os dois uma vez so.","rows":["............................","............................","............................","............................",".............D..............",".............D..............",".............D..............",".............D..............",".............D..............","..*.A...L....D..............","###########..#..............",".............D..............","...........#.D.........+*.X.",".............D........######","...B.S......#D.............Y","##############=======#######","............................"]},{"id":"09_contra_eter","name":"Contra-Eter","hint":"A ponte da direita obedece a regra ao contrario. O farol governa as duas, em sentidos opostos.","rows":[".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".........####.####..........",".......*.####.####..........",".........####.####...+*..X..",".........####.####..########","...B..A......o.....Y........","#########~~~~#;;;;##########","#########.........##########","#########.........##########","............................"]},{"id":"10_a_placa","name":"A Placa","hint":"A placa mantem a porta aberta so enquanto alguem esta em cima. Sao duas -- uma de cada lado.","rows":["............................","............................","............................","............................","............................","............................","............D...............","............D...............","............D...............","............D...............","............D....._.+.*.X...","............D...###########.","...B_...A*..D............Y..","############################","############################","............................","............................"]},{"id":"11_espelhos","name":"Espelhos","hint":"Tres pontes, duas delas ao contrario. Uma virada do farol troca o dono de todas de uma vez.","rows":["........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","........###.####.####.......","......*.###.####.####.......","........###.####.####...*+X.","........###.####.####..#####","..B..A..........o.....Y.....","########;;;#~~~~#;;;;#######","########.............#######","########.............#######","............................"]},{"id":"12_a_fonte","name":"A Fonte","hint":"Um segura a porta, o outro atravessa a ponte dourada -- e ela tem prazo desde o primeiro passo.","rows":["............................","............................","............................","............................","............................","............................","............D...............","............D...............","............D........+...X*.","............D.....=======###","............D..._...........","............D.#############.","...B_..A*...D...........Y...","############################","############################","............................","............................"]},{"id":"13_a_renuncia","name":"A Renuncia","hint":"O contra-eter so e chao da Umbra sob LUZ. Segure o facho na pedra: ela fica com ele, e voce nao.","rows":["..............#####.........","..............#####.........","..............#####.........","..............#####.........","..............#####.........","..............#####.........","..............#####.........","..............#####.........","..............#####.........","..*...........#####.........","..X...........#####.........","#####.........#####.........","...B..A......^......+.Y.....","##############;;;;##########","##############....##########","##############....##########","............................"]},{"id":"14_pedra_fria","name":"Pedra Fria","hint":"A escuridao tambem se deixa numa pedra. Apagada, a ponte volta a ser da Lumen -- que tem 1,3 s.","rows":[".............######.........",".............######.........",".............######.........",".............######.........",".............######.........",".............######.........",".............######.........",".............######.........",".............######.........",".........*...######.*.......","..Y...A......######.........","#####.##.......*............","....B........^......+.X.....","##############;;;;##########","##############....##########","##############....##########","............................"]},{"id":"15_a_lanterna","name":"A Lanterna","hint":"A lampada anda, e leva o chao junto. Onde ela esta a ponte e da Lumen; onde nao esta, e da Umbra.","rows":[".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........","...*.....###########....*...",".........###########...+.X..",".........>>>>>>>>>>>..######","...B..A.............Y.......","#########~~~~~#~~~~~########","#########...........########","#########...........########","............................"]},{"id":"16_contracorrente","name":"Contracorrente","hint":"Metade da ponte obedece a luz, metade a desobedece. Um segue a lanterna; o outro foge dela.","rows":[".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........","...*.....###########....*...",".........###########...+.X..",".........>>>>>>>>>>>..######","...B..A.............Y.......","#########~~~~~#;;;;;########","#########...........########","#########...........########","............................"]},{"id":"17_o_guardiao","name":"O Guardiao","hint":"A porta so cede com alguem em cima da placa. Um segura, o outro sobe -- e a lanterna nao espera.","rows":[".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########........",".........###########....D...",".........###########....D...",".........###########..*.D...","...*.....###########....D...",".........###########..+.D.X.",".........>>>>>>>>>>>..######","...B..A.................._.Y","#########~~~~~#~~~~~########","#########...........########","#########...........########","............................"]},{"id":"18_a_fonte_partida","name":"A Fonte Partida","hint":"Ponte dourada com prazo, lanterna que nao para, e uma pedra no fim. Escolham o que deixar.","rows":["...........#######..........","...........#######..........","...........#######..........","...........#######..........","...........#######..........","...........#######..........","...........#######..........","...........#######..........","...........#######..........",".....*.....#######.....X.+..","...........#######.#########","...........>>>>>>>>.........","..A.B.............^...Y.....","#######====~~~##~~#;;;;#####","#######................#####","#######................#####","............................"]}],"tuning":{"name":"basic","world":{"cell_size":32.0,"grid_cols":28,"grid_rows":17,"gravity_y":1100.0},"lumen":{"move_speed":200.0,"jump_velocity_y":-480.0,"half_width":10.0,"half_height":13.0,"ability_charge_seconds":3.2,"ability_refill_per_second":0.42,"peril_seconds":1.3,"peril_recovery_per_second":0.8},"umbra":{"move_speed":142.0,"jump_velocity_y":-415.0,"half_width":13.0,"half_height":14.0,"ability_charge_seconds":3.2,"ability_refill_per_second":0.42,"peril_seconds":1.6,"peril_recovery_per_second":0.8,"crust_break_seconds":0.55},"light":{"falloff_radius_cells":7.0,"solid_threshold":0.35,"lamp_intensity":1.0,"beam_intensity":1.0,"absorb_radius_cells":4.0,"extinguish_below":0.12,"dissolve_above":0.6,"relaxation_passes":10},"flow":{"overlay_seconds":2.0,"overlay_min_seconds":0.45,"beacon_on_seconds":2.6,"beacon_off_seconds":2.0,"eclipse_collapse_seconds":6.5,"wanderer_speed_cells":2.1,"form_sacrifice_seconds":1.1}}}</script>
 <script>
 (function () {
   var data = JSON.parse(document.getElementById("penumbra-data").textContent);
@@ -523,7 +579,8 @@ python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     "#": "#565A6A", "~": "#969CBE", ";": "#786CA0", "%": "#967E68",
     "=": "#C49E52", "D": "#967A42", "_": "#967A42", "*": "#FFFAE8",
     "o": "#DED6BE", "L": "#967A42", "S": "#967A42",
-    "X": "#F7D68A", "Y": "#F7D68A", "+": "#F7D68A"
+    "X": "#F7D68A", "Y": "#F7D68A", "+": "#F7D68A",
+    "^": "#AA9EC8", ">": "#807A9E"
   };
 
   var TERRAIN = [
@@ -538,7 +595,9 @@ python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     ["L", "zona de luz", "#967A42", "Gatilho da Lumen: ela, acesa, numa dessas. Com a zona de sombra, trava a porta aberta para sempre."],
     ["S", "zona de sombra", "#967A42", "Gatilho da Umbra: ela, apagada, numa dessas. As duas condições valem ao mesmo tempo ou nenhuma vale."],
     ["_", "placa de pressão", "#967A42", "Mantém a porta aberta só enquanto alguém está em cima. O único lugar onde o ser parado tem função em vez de só estar vulnerável."],
-    ["+", "fragmento", "#F7D68A", "O colecionável. Opcional, sempre em desvio, e só conta se a fase for concluída com ele."]
+    ["+", "fragmento", "#F7D68A", "O colecionável. Opcional, sempre em desvio, e só conta se a fase for concluída com ele."],
+    ["^", "altar de forma", "#AA9EC8", "Não é chão — é onde se larga a habilidade. Segure-a ligada em cima e a pedra fica com ela para sempre; quem a deixou não a usa mais nesta fase."],
+    [">", "trilho", "#807A9E", "O caminho da lanterna errante: uma lâmpada que percorre a linha de ponta a ponta e volta, levando o chão junto."]
   ];
 
   /* Os arquivos de fase guardam os nomes em ASCII -- a fonte do menu do jogo
@@ -546,7 +605,9 @@ python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
   var NAMES = [
     "Duas Polaridades", "A Crosta", "O Mesmo Chão", "Eclipse",
     "Eclipse Partilhado", "Farol", "Contratempo", "Fusão",
-    "Contra-Éter", "A Placa", "Espelhos", "A Fonte"
+    "Contra-Éter", "A Placa", "Espelhos", "A Fonte",
+    "A Renúncia", "Pedra Fria", "A Lanterna", "Contracorrente",
+    "O Guardião", "A Fonte Partida"
   ];
 
   var TEACHES = [
@@ -561,7 +622,13 @@ python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     "<b>A regra ao contrário</b>, na mesma fase que ela. O farol governa as duas pontes em sentidos opostos; a ilha de rocha é onde se espera a virada.",
     "<b>Duas placas</b>, uma de cada lado da porta: um segura para o outro passar, e quem passou segura de volta.",
     "<b>Três pontes, duas invertidas.</b> Uma virada do farol troca o dono de todas de uma vez.",
-    "<b>Placa e eclipse:</b> segurar a porta custa exatamente o tempo que a ponte dourada não tem."
+    "<b>Placa e eclipse:</b> segurar a porta custa exatamente o tempo que a ponte dourada não tem.",
+    "<b>A Lumen larga o facho numa pedra</b> para que o contra-éter vire estrada da Umbra. Depois disso ela não acende mais nada — e quem a leva de volta é a luz que ela deixou.",
+    "<b>O espelho.</b> A Umbra larga a escuridão, a lâmpada se apaga, e a ponte volta a ser da Lumen — que agora precisa correr nela, porque escuro é o que a mata.",
+    "<b>A lâmpada anda</b>, e leva o chão junto. Os dois usam a mesma ponte em fases opostas do mesmo ciclo, com uma ilha de rocha no meio para esperar.",
+    "<b>Metade éter, metade contra-éter</b>, uma lanterna só: o mesmo círculo monta uma metade e desmonta a outra. Um segue a lanterna, o outro foge dela.",
+    "<b>Lanterna e placa.</b> A placa só vale com alguém em cima, e a lanterna não espera quem está segurando — a primeira vez que ficar parado é a tarefa difícil.",
+    "<b>Ponte dourada com prazo</b>, lanterna que não para, e um altar no fim. A última luz da Lumen é o que abre a última ponte da Umbra."
   ];
 
   var legend = document.getElementById("legend");

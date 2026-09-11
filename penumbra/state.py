@@ -96,6 +96,29 @@ class DualityState:
         -- e o contato entre os dois continua aniquilando os dois, o que
         transforma a cooperacao em algo que da errado de verdade."""
 
+        # --- altares de forma (ver FormAltarSystem) ---
+        self.form_spent = np.zeros(2, dtype=bool)
+        """Este ser ja deixou a forma num altar nesta tentativa. Uma vez
+        verdadeiro, a habilidade dele nao liga mais e a carga nao recompoe:
+        a troca e poder por permanencia, e ela e definitiva."""
+        self.altar_progress = np.zeros(2, dtype=np.float32)
+        """0..1, quanto falta pro altar sob este ser ficar com a forma dele.
+        Sobe so enquanto ele esta em cima COM a habilidade ligada, e zera no
+        instante em que ele sai ou desliga -- como o medidor da crosta, e
+        pela mesma razao: nada irreversivel pode acontecer de raspao."""
+        self.altar_light = np.zeros(shape, dtype=np.float32)
+        """Luz fixa deixada pela Lumen num altar. Entra no campo como uma
+        lampada que nao existia no ASCII da fase -- e por isso ela mora aqui
+        e nao no `Terrain`: e estado de uma tentativa, nao terreno."""
+        self.altar_shadow = np.zeros(shape, dtype=np.float32)
+        """O espelho: escuridao fixa deixada pela Umbra."""
+
+        # --- lanterna errante ---
+        self.wander_col = 0.0
+        """Coluna da lanterna, em `float` -- ela anda continuamente e so e
+        arredondada na hora de semear o campo de luz."""
+        self.wander_dir = 1.0
+
         # --- crosta que a Umbra esta rompendo agora ---
         self.crust_target_col = -1
         self.crust_target_row = -1
@@ -241,6 +264,12 @@ class LevelRuntime:
         state.crust_target_col = -1
         state.crust_target_row = -1
         state.crust_progress = 0.0
+        state.form_spent[:] = False
+        state.altar_progress[:] = 0.0
+        state.altar_light[:] = 0.0
+        state.altar_shadow[:] = 0.0
+        state.wander_col = float(self._terrain.wander_min_col)
+        state.wander_dir = 1.0
         state.beacon_phase = 0.0
         state.beacon_on = True
         state.beacon_seconds_left = 0.0

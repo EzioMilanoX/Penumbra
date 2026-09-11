@@ -32,6 +32,22 @@ def _level_indices(simulation):
 
 
 class TestEveryLevelIsPlayable:
+    def test_a_dica_de_cada_fase_cabe_no_rodape(self, simulation):
+        """O rodape desenha a dica numa linha so, sem quebra: uma dica mais
+        larga que a janela nao estoura nada -- ela simplesmente some pela
+        direita, e a frase que explica a fase termina no meio.
+
+        O limite sai da propria janela (896 px), do recuo do HUD (14 de cada
+        lado) e da largura do glifo da fonte monoespacada de 12 px do
+        backend (~0,6 em). Nenhum numero aqui e chutado."""
+        max_chars = int((896.0 - 2 * 14.0) / (12.0 * 0.6))
+        for level_index in _level_indices(simulation):
+            level = simulation.catalog.at(level_index)
+            assert len(level.hint) <= max_chars, (
+                f"fase {level_index + 1} ({level.name}): dica de {len(level.hint)} "
+                f"caracteres, e so cabem {max_chars}"
+            )
+
     def test_ninguem_morre_parado_no_spawn(self, simulation, input_provider):
         """O ponto de partida de cada fase tem que estar dentro da faixa que
         os DOIS aguentam. Um spawn fora dela mataria o jogador antes de ele
@@ -470,16 +486,41 @@ class TestLevelFlow:
         assert simulation.state.level_index == 1, "A/D anda na grade, ESPACO entra"
 
     def test_a_grade_do_menu_anda_em_duas_dimensoes(self, flow, simulation, input_provider):
+        """Tres colunas: W/S pulam uma linha inteira (tres fases), A/D andam
+        de uma em uma. Sem isso, chegar a fase 6 custaria cinco toques."""
         flow.show_menu()
-        """Quatro colunas: W/S pulam uma linha inteira (quatro fases), A/D
-        andam de uma em uma. Sem isso, chegar a fase 8 custaria sete toques."""
         input_provider.set_action_held("menu_down", True)
         self._drive(flow, simulation, input_provider, frames=1)
-        assert flow.menu.selected == 4, "S desce uma linha da grade"
+        assert flow.menu.selected == 3, "S desce uma linha da grade"
         input_provider.set_action_held("menu_down", False)
         input_provider.set_action_held("move_right", True)
         self._drive(flow, simulation, input_provider, frames=1)
-        assert flow.menu.selected == 5
+        assert flow.menu.selected == 4
+
+    def test_a_borda_da_grade_vira_de_ato(self, flow, simulation, input_provider):
+        """Dezoito fases nao cabem numa grade so, entao o menu pagina em atos
+        de seis -- e virar pela BORDA mantem o menu inteiro em quatro teclas.
+        Sem isso a metade do jogo ficaria atras de uma tecla nao documentada."""
+        flow.show_menu()
+        grid = flow.menu._grid
+        assert grid.act_count == 3
+        grid.selected = 2               # ultima coluna do ato I
+        grid.move(1, 0)
+        assert grid.selected == 6, "a direita na ultima coluna abre o ato seguinte"
+        assert grid.act == 1
+        grid.move(-1, 0)
+        assert grid.selected == 2, "e a esquerda na primeira volta pro anterior"
+        assert grid.act == 0
+
+    def test_a_grade_nao_passa_do_primeiro_nem_do_ultimo_ato(self, flow):
+        flow.show_menu()
+        grid = flow.menu._grid
+        grid.selected = 0
+        grid.move(-1, 0)
+        assert grid.selected == 0, "nao existe ato antes do primeiro"
+        grid.selected = grid.count - 1
+        grid.move(1, 0)
+        assert grid.selected == grid.count - 1, "nem depois do ultimo"
 
     def test_o_hud_cala_a_boca_fora_da_fase(self, flow):
         """O HUD e um callback GLOBAL de `set_on_draw_ui` -- roda independente

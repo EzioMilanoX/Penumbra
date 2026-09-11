@@ -13,6 +13,11 @@ Os dois moram juntos porque sao a mesma ideia contada de dois jeitos:
   apaga, o eter sob a Lumen deixa de ser chao; quando acende, o da Umbra
   deixa de ser. Ate aqui os dois sentidos do conflito exigiam duas
   habilidades e duas decisoes; aqui vem de graca, e contra os dois.
+* **Lanterna errante** -- uma lampada que percorre um trilho de ponta a ponta
+  e volta. E a terceira forma de o mundo mexer no chao sem ser pedido, e a
+  unica que se atravessa ACOMPANHANDO em vez de esperando: o farol troca o
+  dono do eter sem sair do lugar, a lanterna leva o chao junto com ela. A
+  Lumen anda no passo da lanterna; a Umbra anda sempre fora do circulo dela.
 * **Zona de eclipse** -- a unica celula que aceita os DOIS, e a unica com
   prazo. Ao primeiro toque de qualquer um deles a zona inteira comeca a
   colapsar; no fim do prazo, desaparece. E a resposta a pergunta que o resto
@@ -51,10 +56,12 @@ class WorldClockSystem(ISystem):
         self._beacon_on_seconds = tuning.flow.beacon_on_seconds
         self._beacon_off_seconds = tuning.flow.beacon_off_seconds
         self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
+        self._wanderer_speed = tuning.flow.wanderer_speed_cells
 
     def update(self, world: World, delta_time: float) -> None:
         del world
         self._advance_beacon(delta_time)
+        self._advance_wanderer(delta_time)
         self._advance_eclipse(delta_time)
 
     # ------------------------------------------------------------------
@@ -79,6 +86,35 @@ class WorldClockSystem(ISystem):
         else:
             state.beacon_on = False
             state.beacon_seconds_left = period - state.beacon_phase
+
+    def _advance_wanderer(self, delta_time: float) -> None:
+        """Vai e volta entre as duas pontas do trilho, refletindo nas
+        bordas.
+
+        A reflexao espelha a sobra em vez de so grudar no extremo: grudar
+        faria a lanterna parar um frame na ponta a cada virada, e com a
+        velocidade baixa que o jogo usa essa pausa e visivel -- e uma pausa
+        que o jogador leria como 'ela para aqui', planejaria em cima disso,
+        e seria mentira."""
+        state, terrain = self._state, self._terrain
+        if not terrain.has_wanderer:
+            return
+
+        low = float(terrain.wander_min_col)
+        high = float(terrain.wander_max_col)
+        position = state.wander_col + state.wander_dir * self._wanderer_speed * delta_time
+        span = high - low
+        while position < low or position > high:
+            if position < low:
+                position = low + (low - position)
+                state.wander_dir = 1.0
+            if position > high:
+                position = high - (position - high)
+                state.wander_dir = -1.0
+            if span <= 0.0:
+                position = low
+                break
+        state.wander_col = position
 
     def _advance_eclipse(self, delta_time: float) -> None:
         """O prazo comeca no primeiro toque de QUALQUER um dos dois -- nao no

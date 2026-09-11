@@ -42,6 +42,14 @@ class LightFieldSystem(ISystem):
     celulas), e a sombra da Umbra obedece a mesma geometria da luz (o mesmo
     flood roda duas vezes, com sementes diferentes).
 
+    Quatro sementes de luz alimentam o mesmo flood, e nenhuma delas e um caso
+    especial no relaxamento: as lampadas fixas do ASCII, o farol pulsante, a
+    lanterna errante (uma lampada cuja coluna o `WorldClockSystem` move) e a
+    luz que a Lumen deixou num altar. O flood da sombra recebe duas: o bolsao
+    que a Umbra carrega e o que ela deixou na pedra. Somar sementes em vez de
+    somar regras e o que mantem este sistema do mesmo tamanho a cada mecanica
+    nova.
+
     Ordem de escrita, que importa: a sombra e resolvida ANTES da luz, pois
     o bolsao de escuridao da Umbra apaga fontes luminosas dentro dele
     ("absorve luz ao redor") -- entao ele precisa existir antes de a luz
@@ -116,10 +124,10 @@ class LightFieldSystem(ISystem):
         np.copyto(self._open_solid, self._mask_b)
 
         # --- sombra da Umbra (antes da luz: ela apaga as fontes) ---
-        self._seed[:] = 0.0
+        np.copyto(self._seed, state.altar_shadow)
         if state.ability_on[UMBRA]:
             col, row = int(state.cell[UMBRA, 0]), int(state.cell[UMBRA, 1])
-            self._seed[row, col] = self._absorb_seed
+            self._seed[row, col] = max(float(self._seed[row, col]), self._absorb_seed)
         self._relax(self._shadow, self._open_solid)
         np.greater_equal(self._shadow, light_tuning.solid_threshold, out=state.absorbed)
 
@@ -128,6 +136,16 @@ class LightFieldSystem(ISystem):
         np.multiply(self._open_solid, self._mask_a, out=self._open_light)
 
         np.multiply(terrain.lamp, light_tuning.lamp_intensity, out=self._seed)
+        np.maximum(self._seed, state.altar_light, out=self._seed)
+        if terrain.has_wanderer:
+            # Uma unica celula, arredondada da coluna continua: a lanterna
+            # anda em `float` pra o movimento ser suave, mas o campo de luz e
+            # uma grade e a semente tem de cair num indice inteiro.
+            col = int(round(state.wander_col))
+            col = max(terrain.wander_min_col, min(terrain.wander_max_col, col))
+            self._seed[terrain.wander_row, col] = max(
+                float(self._seed[terrain.wander_row, col]), light_tuning.lamp_intensity
+            )
         if state.beacon_on:
             np.multiply(terrain.beacon, light_tuning.lamp_intensity, out=self._mask_b_float)
             np.maximum(self._seed, self._mask_b_float, out=self._seed)

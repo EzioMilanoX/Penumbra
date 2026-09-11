@@ -40,6 +40,8 @@ from penumbra.terrain import (
     ROLE_UMBRA_GOAL,
     ROLE_ZONE_LIGHT,
     ROLE_ZONE_SHADOW,
+    ROLE_ALTAR,
+    ROLE_WANDER,
     Terrain,
 )
 from penumbra.tuning import DualityTuning
@@ -104,7 +106,21 @@ UMBRA_BODY = (32, 30, 44)
 UMBRA_DISSOLVING = (164, 154, 196)
 UMBRA_RIM = (138, 136, 162)
 
-_ROLE_COUNT = 15
+ALTAR_EMPTY = (96, 92, 120)
+ALTAR_CHARGING = (206, 186, 134)
+ALTAR_LUMEN = (250, 246, 226)
+ALTAR_UMBRA = (58, 50, 84)
+"""Um altar vazio e pedra fria; carregando, esquenta; e depois fica com a cor
+do que guarda -- branco se a Lumen deixou a luz, quase-preto se a Umbra deixou
+a escuridao. A cor final nao e enfeite: e o unico jeito de o jogador olhar a
+tela e lembrar QUAL das duas formas ele ja gastou."""
+
+RAIL = (52, 50, 68)
+"""O trilho da lanterna, apagado. Ele so precisa dizer 'a luz passa por aqui e
+volta' -- se competisse em brilho com a propria lanterna, a unica coisa que
+importa (onde ela esta AGORA) ficaria mais dificil de achar."""
+
+_ROLE_COUNT = 17
 _CELL_SPRITE_UNIT = 8.0
 """`PygameRenderer.draw_batch` converte `transform.scale` em pixels
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
@@ -184,6 +200,12 @@ class PresentationSystem(ISystem):
         self._size_by_role[ROLE_SHARD] = 0.52
         self._shape_by_role[ROLE_SHARD] = SHAPE_RING
         self._shape_by_role[ROLE_BEACON] = SHAPE_CIRCLE
+        # Altar: anel de pedra, do tamanho de uma placa. Anel e nao retangulo
+        # porque ele e um RECIPIENTE -- a leitura tem de ser 'cabe algo aqui'.
+        self._shape_by_role[ROLE_ALTAR] = SHAPE_RING
+        self._size_by_role[ROLE_ALTAR] = 0.78
+        # Trilho: fita fina no meio da celula, pra nao parecer chao.
+        self._size_by_role[ROLE_WANDER] = 0.3
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
         self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
 
@@ -299,6 +321,15 @@ class PresentationSystem(ISystem):
             self._fill(self._mask, BEACON_OFF, BEACON_OFF)
             np.copyto(self._alpha, 190.0, where=self._mask)
 
+        # trilho da lanterna (a lanterna em si e escrita no flush)
+        np.equal(role, ROLE_WANDER, out=self._mask)
+        self._fill(self._mask, RAIL, RAIL)
+        np.copyto(self._alpha, 150.0, where=self._mask)
+
+        # altar: pedra fria, esquentando enquanto recebe, e depois a forma
+        np.equal(role, ROLE_ALTAR, out=self._mask)
+        self._paint_altars(pulse)
+
         # zona de eclipse: dourada, clareando conforme o prazo se esgota
         np.equal(role, ROLE_ECLIPSE, out=self._mask)
         urgency = self._eclipse_urgency(pulse)
@@ -325,6 +356,38 @@ class PresentationSystem(ISystem):
         self._paint_goal(role, ROLE_UMBRA_GOAL, UMBRA, pulse)
 
         self._flush_cells(role, pulse)
+
+    def _paint_altars(self, pulse: float) -> None:
+        """Tres estados num unico papel de celula: vazio, recebendo, cheio.
+
+        `self._mask` ja chega marcada com os altares. O estado 'recebendo'
+        vale so para o altar sob o ser que esta depositando AGORA -- um por
+        ser, no maximo -- entao ele e escrito celula a celula (duas
+        escalares) em vez de com mais uma mascara de 476 posicoes."""
+        state = self._state
+        altars = self._mask
+        self._fill(altars, ALTAR_EMPTY, ALTAR_EMPTY)
+        np.copyto(self._alpha, 120.0 + 50.0 * pulse, where=altars)
+
+        light_flat = state.altar_light.reshape(-1)
+        shadow_flat = state.altar_shadow.reshape(-1)
+        np.logical_and(altars, light_flat > 0.0, out=self._mask_alt)
+        self._fill(self._mask_alt, ALTAR_LUMEN, ALTAR_LUMEN)
+        np.copyto(self._alpha, 255.0, where=self._mask_alt)
+        np.logical_and(altars, shadow_flat > 0.0, out=self._mask_alt)
+        self._fill(self._mask_alt, ALTAR_UMBRA, ALTAR_UMBRA)
+        np.copyto(self._alpha, 255.0, where=self._mask_alt)
+
+        cols = self._terrain.cols
+        for side in (LUMEN, UMBRA):
+            progress = float(state.altar_progress[side])
+            if progress <= 0.0:
+                continue
+            slot = int(state.cell[side, 1]) * cols + int(state.cell[side, 0])
+            self._red[slot] = _mix(ALTAR_EMPTY[0], ALTAR_CHARGING[0], progress)
+            self._green[slot] = _mix(ALTAR_EMPTY[1], ALTAR_CHARGING[1], progress)
+            self._blue[slot] = _mix(ALTAR_EMPTY[2], ALTAR_CHARGING[2], progress)
+            self._alpha[slot] = 255.0
 
     def _eclipse_urgency(self, pulse: float) -> float:
         """0 antes de alguem pisar, subindo ate 1 no fim do prazo -- com um
@@ -382,6 +445,22 @@ class PresentationSystem(ISystem):
         # sobe: e o unico aviso de que uma acao IRREVERSIVEL esta em curso,
         # e o que a torna deliberada em vez de acidental.
         state = self._state
+        terrain = self._terrain
+        if terrain.has_wanderer:
+            # A lanterna nao tem papel de celula proprio: ela e UMA celula do
+            # trilho repintada aqui. Um papel novo exigiria reescrever `role`
+            # a cada frame -- 476 posicoes por causa de uma celula que mudou
+            # -- e `role` e do terreno, nao do relogio.
+            col = int(round(state.wander_col))
+            col = max(terrain.wander_min_col, min(terrain.wander_max_col, col))
+            slot = terrain.wander_row * terrain.cols + col
+            self._channel[slot] = self._cell_scale * 0.62
+            sprite_view["texture_id"][rows[slot]] = SHAPE_CIRCLE
+            sprite_view["tint_r"][rows[slot]] = LAMP_ON[0]
+            sprite_view["tint_g"][rows[slot]] = LAMP_ON[1]
+            sprite_view["tint_b"][rows[slot]] = LAMP_ON[2]
+            sprite_view["tint_a"][rows[slot]] = 255.0
+
         if state.crust_target_col >= 0:
             slot = state.crust_target_row * self._terrain.cols + state.crust_target_col
             shrink = 1.0 - 0.72 * min(1.0, max(0.0, state.crust_progress))

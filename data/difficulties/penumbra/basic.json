@@ -51,6 +51,10 @@
     "beacon_on_seconds": 2.6,
     "beacon_off_seconds": 2.0,
     "_nota_eclipse": "Prazo da zona de eclipse, contado do PRIMEIRO toque. Precisa caber duas travessias -- a da Umbra, mais lenta, e a da Lumen.",
-    "eclipse_collapse_seconds": 6.5
+    "eclipse_collapse_seconds": 6.5,
+    "_nota_lanterna": "Velocidade da lanterna errante, em celulas/s. Abaixo da Umbra (142 px/s = 4,4 cel/s) de proposito: os dois precisam conseguir andar com ela e tambem fugir dela, e a mais lenta dos dois e quem define o teto.",
+    "wanderer_speed_cells": 2.1,
+    "_nota_altar": "Quanto tempo a habilidade fica ligada em cima do altar ate a forma ficar la. Como o da crosta, existe pra que nada irreversivel aconteca de raspao -- e um pouco maior que ele porque o custo aqui e maior.",
+    "form_sacrifice_seconds": 1.1
   }
 }

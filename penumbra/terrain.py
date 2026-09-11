@@ -26,6 +26,8 @@ ECLIPSE_CHAR = "="
 BEACON_CHAR = "o"
 COUNTER_ETHER_CHAR = ";"
 PLATE_CHAR = "_"
+ALTAR_CHAR = "^"
+WANDER_CHAR = ">"
 SHARD_CHAR = "+"
 LAMP_CHAR = "*"
 DOOR_CHAR = "D"
@@ -55,6 +57,8 @@ ROLE_BEACON = 11
 ROLE_COUNTER_ETHER = 12
 ROLE_PLATE = 13
 ROLE_SHARD = 14
+ROLE_ALTAR = 15
+ROLE_WANDER = 16
 
 _MARKER_CHARS = frozenset(
     {LUMEN_SPAWN_CHAR, UMBRA_SPAWN_CHAR, LUMEN_GOAL_CHAR, UMBRA_GOAL_CHAR}
@@ -97,6 +101,20 @@ class Terrain:
     uma funcao em vez de so estar vulneravel; no modo de dois jogadores, e
     onde um segura pro outro passar.
 
+    `altar` e o altar de forma: a celula onde um ser pode DEIXAR a propria
+    habilidade pra sempre. Segurando a habilidade ligada em cima dele, a
+    Lumen deixa ali uma luz fixa e a Umbra um bolsao de escuridao fixo -- e
+    quem deixou nunca mais usa a habilidade nesta fase. E a unica troca do
+    jogo entre poder e permanencia: o facho e forte porque acompanha ela, e
+    o altar cobra exatamente isso.
+
+    `wander` e o trilho da lanterna errante: uma lampada que percorre a
+    linha de ponta a ponta e volta. O farol pulsante troca o dono do eter
+    sem sair do lugar, e o jogador ESPERA; a lanterna leva o chao consigo, e
+    o jogador ANDA JUNTO -- a Lumen no passo dela, a Umbra sempre fora do
+    circulo. E a unica coisa do jogo que se atravessa acompanhando, e nao
+    escolhendo o instante.
+
     `crust` e a crosta: solida para os dois e opaca como a rocha, mas a
     Umbra a rompe empurrando-a. Romper e IRREVERSIVEL dentro da fase, e a
     consequencia interessante nao e a passagem -- e a luz. Como a crosta
@@ -127,6 +145,8 @@ class Terrain:
         self.eclipse = np.zeros(shape, dtype=bool)
         self.counter_ether = np.zeros(shape, dtype=bool)
         self.plate = np.zeros(shape, dtype=bool)
+        self.altar = np.zeros(shape, dtype=bool)
+        self.wander = np.zeros(shape, dtype=bool)
         self.ether = np.zeros(shape, dtype=bool)
         self.door = np.zeros(shape, dtype=bool)
         self.zone_light = np.zeros(shape, dtype=bool)
@@ -152,6 +172,11 @@ class Terrain:
         self.has_plate = False
         self.shard_cell = None
         self.has_beacon = False
+        self.has_altar = False
+        self.has_wanderer = False
+        self.wander_row = -1
+        self.wander_min_col = -1
+        self.wander_max_col = -1
 
     @property
     def cols(self) -> int:
@@ -191,6 +216,8 @@ class Terrain:
         self.eclipse[:] = False
         self.counter_ether[:] = False
         self.plate[:] = False
+        self.altar[:] = False
+        self.wander[:] = False
         self.ether[:] = False
         self.door[:] = False
         self.zone_light[:] = False
@@ -217,6 +244,12 @@ class Terrain:
                 elif char == PLATE_CHAR:
                     self.plate[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_PLATE
+                elif char == ALTAR_CHAR:
+                    self.altar[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_ALTAR
+                elif char == WANDER_CHAR:
+                    self.wander[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_WANDER
                 elif char == SHARD_CHAR:
                     if self.shard_cell is not None:
                         raise TerrainDefinitionError("uma fase tem no maximo um fragmento ('+')")
@@ -268,6 +301,8 @@ class Terrain:
         self.has_eclipse = bool(self.eclipse.any())
         self.has_beacon = bool(self.beacon.any())
         self.has_plate = bool(self.plate.any())
+        self.has_altar = bool(self.altar.any())
+        self._resolve_rail()
 
         has_zones = bool(self.zone_light.any() and self.zone_shadow.any())
         if self.has_door and not (has_zones or self.has_plate):
@@ -279,12 +314,54 @@ class Terrain:
             raise TerrainDefinitionError("fase com zona 'L'/'S' mas sem nenhuma celula de porta ('D')")
         if self.has_plate and not self.has_door:
             raise TerrainDefinitionError("fase com placa de pressao ('_') mas sem nenhuma porta ('D')")
+        if self.altar.any() and int(self.altar.sum()) > 3:
+            raise TerrainDefinitionError(
+                "no maximo tres altares por fase -- so existem duas formas pra deixar, e uma "
+                "parede deles viraria ruido em vez de escolha"
+            )
         if self.has_plate and has_zones:
             raise TerrainDefinitionError(
                 "fase com placa E zonas de polaridade: os dois gatilhos abrem a MESMA porta com "
                 "regras opostas (a placa exige alguem em cima, as zonas travam aberta), e nada na "
                 "tela diria qual esta valendo"
             )
+
+    def _resolve_rail(self) -> None:
+        """Resolve os limites do trilho da lanterna errante.
+
+        O trilho e uma unica corrida HORIZONTAL e contigua de `>` -- as tres
+        condicoes sao validadas aqui, e nao sao burocracia: a lanterna anda
+        num `float` de coluna entre dois extremos, entao um trilho partido
+        em dois pedacos a faria atravessar o buraco do meio como se nada
+        houvesse, e um trilho em L nao teria sequer um 'entre dois extremos'
+        pra percorrer."""
+        self.has_wanderer = bool(self.wander.any())
+        self.wander_row = -1
+        self.wander_min_col = -1
+        self.wander_max_col = -1
+        if not self.has_wanderer:
+            return
+
+        rows, cols = np.nonzero(self.wander)
+        if rows.min() != rows.max():
+            raise TerrainDefinitionError(
+                "o trilho da lanterna ('>') precisa ficar todo numa unica linha -- "
+                f"encontrado nas linhas {sorted(set(int(r) for r in rows))}"
+            )
+        row = int(rows[0])
+        low, high = int(cols.min()), int(cols.max())
+        if len(cols) != high - low + 1:
+            raise TerrainDefinitionError(
+                f"o trilho da lanterna na linha {row} tem buracos -- ele precisa ser contiguo"
+            )
+        if high - low < 1:
+            raise TerrainDefinitionError(
+                "o trilho da lanterna precisa de ao menos duas celulas -- "
+                "com uma so ela nao anda, e ai e uma lampada comum ('*')"
+            )
+        self.wander_row = row
+        self.wander_min_col = low
+        self.wander_max_col = high
 
     def collapse_eclipse(self) -> int:
         """Faz TODAS as celulas de eclipse desaparecerem de uma vez, e devolve
@@ -296,8 +373,6 @@ class Terrain:
         if count:
             self.role[self.eclipse] = ROLE_EMPTY
             self.eclipse[:] = False
-        self.counter_ether[:] = False
-        self.plate[:] = False
         return count
 
     def break_crust(self, col: int, row: int) -> bool:

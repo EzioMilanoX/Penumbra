@@ -157,25 +157,39 @@ def _report_markers(terrain, state, light, light_tuning) -> None:
 
 
 def _report_ether(terrain, state, light, light_tuning) -> None:
-    rows, cols = np.nonzero(terrain.ether)
-    if rows.size == 0:
+    """Os dois materiais que trocam de dono, cada um com a sua regra.
+
+    O contra-eter entra aqui, e nao num relatorio a parte, porque a pergunta
+    e a mesma -- "de quem e este chao agora?" -- e ve-los lado a lado e o
+    unico jeito de notar que uma mudanca de luz serve um e atrapalha o outro
+    no mesmo instante."""
+    if not (terrain.ether.any() or terrain.counter_ether.any()):
         print("\n  eter: nenhum nesta fase")
         return
-    print("\n  eter (so lampadas estaticas):")
-    for row in sorted(set(rows.tolist())):
-        row_cols = sorted(cols[rows == row].tolist())
-        lit = [c for c in row_cols if float(light[row, c]) >= light_tuning.solid_threshold]
-        dark = [c for c in row_cols if c not in lit]
-        print(f"    row {row:2d}  cols {_ranges(row_cols)}")
-        print(f"              aceso (chao da Lumen): {_ranges(lit) or '-'}")
-        print(f"              apagado (chao da Umbra): {_ranges(dark) or '-'}")
+    for mask, title, lit_owner, dark_owner in (
+        (terrain.ether, "eter (so lampadas estaticas)", "Lumen", "Umbra"),
+        (terrain.counter_ether, "contra-eter (a regra invertida)", "Umbra", "Lumen"),
+    ):
+        rows, cols = np.nonzero(mask)
+        if rows.size == 0:
+            continue
+        print(f"\n  {title}:")
+        for row in sorted(set(rows.tolist())):
+            row_cols = sorted(cols[rows == row].tolist())
+            lit = [c for c in row_cols
+                   if float(light[row, c]) >= light_tuning.solid_threshold]
+            dark = [c for c in row_cols if c not in lit]
+            print(f"    row {row:2d}  cols {_ranges(row_cols)}")
+            print(f"              aceso (chao da {lit_owner}): {_ranges(lit) or '-'}")
+            print(f"              apagado (chao da {dark_owner}): {_ranges(dark) or '-'}")
 
 
 def _report_standing(terrain, light, light_tuning) -> None:
     """Toda celula vazia com chao solido logo abaixo -- onde um ser pode
     de fato ficar de pe -- classificada pelas faixas dos dois."""
     print("\n  onde da pe ficar de pe:")
-    solid = terrain.rock | terrain.ether | terrain.door
+    solid = (terrain.rock | terrain.ether | terrain.counter_ether
+             | terrain.crust | terrain.eclipse | terrain.door)
     for row in range(terrain.rows - 1):
         standable = [
             col for col in range(terrain.cols)
@@ -276,7 +290,11 @@ def _report_reachability(simulation) -> None:
             f"    {who}: sobe {model.max_climb} celula(s) | "
             f"{len(reachable)} celulas alcancaveis | portal={'OK' if goal in reachable else 'INALCANCAVEL'}"
         )
-        if terrain.has_door:
+        # So faz sentido com porta de ZONAS. Numa porta de PLACA o gatilho
+        # e "alguem em cima agora", nao "voltar a um lugar" -- e a checagem
+        # de mao unica dizia que as fases de placa travavam todas, porque
+        # procurava uma zona que elas nao tem.
+        if terrain.has_door and zones.any():
             closed_graph = TraversalGraph(solid_mask(terrain, door_open=False), model)
             closed_reachable = closed_graph.reachable_from(spawn)
             zone_cells = [(int(col), int(row)) for row, col in zip(*np.nonzero(zones))]

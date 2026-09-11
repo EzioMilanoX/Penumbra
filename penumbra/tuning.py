@@ -101,6 +101,8 @@ class FlowTuning:
     beacon_on_seconds: float = 2.6
     beacon_off_seconds: float = 2.0
     eclipse_collapse_seconds: float = 6.5
+    wanderer_speed_cells: float = 2.1
+    form_sacrifice_seconds: float = 1.1
 
 
 @dataclass(frozen=True)
@@ -181,6 +183,13 @@ def _validate(tuning: DualityTuning, path: str) -> None:
         raise TuningDefinitionError(f"{path}: 'flow' precisa de um ciclo de farol com as duas metades positivas")
     if flow.eclipse_collapse_seconds <= 0.0:
         raise TuningDefinitionError(f"{path}: 'flow.eclipse_collapse_seconds' precisa ser positivo")
+    if flow.wanderer_speed_cells <= 0.0:
+        raise TuningDefinitionError(f"{path}: 'flow.wanderer_speed_cells' precisa ser positivo")
+    if flow.form_sacrifice_seconds <= 0.0:
+        raise TuningDefinitionError(
+            f"{path}: 'flow.form_sacrifice_seconds' precisa ser positivo -- deixar a forma e "
+            f"irreversivel, entao nao pode acontecer num frame"
+        )
     for who, character in (("lumen", tuning.lumen), ("umbra", tuning.umbra)):
         if character.half_width > world.half_cell or character.half_height > world.half_cell:
             raise TuningDefinitionError(

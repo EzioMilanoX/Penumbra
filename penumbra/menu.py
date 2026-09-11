@@ -35,6 +35,8 @@ from penumbra.terrain import (
     ROLE_UMBRA_GOAL,
     ROLE_ZONE_LIGHT,
     ROLE_ZONE_SHADOW,
+    ROLE_ALTAR,
+    ROLE_WANDER,
     Terrain,
 )
 
@@ -64,22 +66,36 @@ _PREVIEW_COLORS = {
     ROLE_LUMEN_GOAL: (247, 214, 138, 255),
     ROLE_UMBRA_GOAL: (247, 214, 138, 255),
     ROLE_SHARD: (247, 214, 138, 255),
+    ROLE_ALTAR: (170, 158, 200, 255),
+    ROLE_WANDER: (128, 122, 158, 255),
 }
 """Cor de cada papel na miniatura. Deliberadamente mais CLARAS que no jogo:
 numa miniatura de 3 px por celula o contraste real do jogo (rocha quase preta
 sobre fundo quase preto) desapareceria, e a silhueta da fase e a unica coisa
 que o card precisa entregar."""
 
-_COLUMNS = 4
-_CARD_WIDTH = 196.0
-_CARD_HEIGHT = 130.0
-_CARD_GAP_X = 20.0
-_CARD_GAP_Y = 13.0
-_GRID_TOP = 102.0
-"""Doze fases em 4x3. As medidas sao apertadas de proposito: com cards de 148
-de altura a terceira fileira invadia o rodape, e o texto de controles
-aparecia por tras dos cards -- numa grade de tres fileiras a altura do card
-nao e escolha estetica, e o que decide se a ultima fileira caibe."""
+_COLUMNS = 3
+_ROWS = 2
+_PER_ACT = _COLUMNS * _ROWS
+_CARD_WIDTH = 250.0
+_CARD_HEIGHT = 180.0
+_CARD_GAP_X = 22.0
+_CARD_GAP_Y = 18.0
+_GRID_TOP = 136.0
+_ACT_TAB_Y = 104.0
+"""Seis cards por ato, em 3x2. Dezoito fases numa grade so nao cabem na
+janela, e encolher o card ate caberem transformaria a miniatura -- que e a
+unica coisa que faz o card valer mais que uma lista de nomes -- em manchinha.
+
+Paginar tambem diz algo verdadeiro sobre o jogo: as mecanicas chegam em tres
+levas, e cada ato e uma delas. O ato e uma pagina, nao uma tranca: nada e
+bloqueado, e a seta anda de ato como anda de card."""
+
+_ACTS = (
+    ("ATO I", "ALTERNANCIA", "andar, acender, apagar"),
+    ("ATO II", "CONSEQUENCIA", "o que nao volta atras"),
+    ("ATO III", "RENUNCIA", "o que se deixa pra tras"),
+)
 
 
 class LevelPreview:
@@ -88,7 +104,7 @@ class LevelPreview:
 
     Guarda uma lista de `(coluna, linha, cor)` ja filtrada -- so as celulas
     que de fato desenham algo. Numa grade 28x17 isso costuma cortar mais da
-    metade, e o menu desenha 8 cards por frame: sem o filtro seriam 3808
+    metade, e o menu desenha seis cards por frame: sem o filtro seriam 2856
     retangulos por frame pra mostrar sobretudo vazio.
     """
 
@@ -118,13 +134,19 @@ class LevelPreview:
 
 class LevelCardGrid:
     """
-    Grade de cards navegavel com W/A/S/D.
+    Grade de cards navegavel com W/A/S/D, paginada em atos.
 
     Cada card tem numerao, nome, a miniatura da fase e dois selos: um de
     fase vencida e um do fragmento. O fragmento fica dourado quando apanhado
     e um contorno vazio quando nao -- o mesmo dourado que no jogo significa
     "isto exige os dois", que e exatamente o que o desvio do fragmento
     costuma exigir.
+
+    Andar pra esquerda na primeira coluna vira a pagina pro ato anterior (e
+    pra direita na ultima, pro seguinte). Virar pela BORDA, e nao por uma
+    tecla propria, mantem o menu inteiro em quatro teclas -- e e como todo
+    seletor de fase de celular funciona, que e a referencia que o jogador
+    traz pra ca.
     """
 
     def __init__(self, catalog: LevelCatalog, preview_terrain: Terrain) -> None:
@@ -133,28 +155,59 @@ class LevelCardGrid:
             LevelPreview(catalog.at(index), preview_terrain) for index in range(catalog.count)
         ]
         self.selected = 0
+        self._viewport_width = 896.0
 
     @property
     def count(self) -> int:
         return self._catalog.count
 
-    def move(self, columns: int, rows: int) -> None:
-        """Anda na grade sem sair dela. Nao circula de proposito: numa grade
-        2D o wrap salta o cursor pra um canto oposto e o jogador perde de
-        vista onde estava."""
-        column = self.selected % _COLUMNS
-        row = self.selected // _COLUMNS
-        last_row = (self.count - 1) // _COLUMNS
+    @property
+    def act(self) -> int:
+        return self.selected // _PER_ACT
 
-        column = max(0, min(_COLUMNS - 1, column + columns))
-        row = max(0, min(last_row, row + rows))
-        target = row * _COLUMNS + column
+    @property
+    def act_count(self) -> int:
+        return (self.count + _PER_ACT - 1) // _PER_ACT
+
+    def move(self, columns: int, rows: int) -> None:
+        """Anda na grade; na borda lateral, vira de ato.
+
+        Nao circula em cima/embaixo nem no ultimo ato de proposito: num
+        seletor 2D o wrap salta o cursor pra um canto oposto e o jogador
+        perde de vista onde estava.
+        """
+        act = self.act
+        local = self.selected - act * _PER_ACT
+        column = local % _COLUMNS
+        row = local // _COLUMNS
+
+        if columns < 0 and column == 0:
+            if act == 0:
+                return
+            act -= 1
+            column = _COLUMNS - 1
+        elif columns > 0 and column == _COLUMNS - 1:
+            if act >= self.act_count - 1:
+                return
+            act += 1
+            column = 0
+        else:
+            column = max(0, min(_COLUMNS - 1, column + columns))
+
+        row = max(0, min(_ROWS - 1, row + rows))
+        target = act * _PER_ACT + row * _COLUMNS + column
+        # O ultimo ato pode estar incompleto: cai pro card existente mais
+        # proximo em vez de recusar o movimento, que ao jogador pareceria
+        # a tecla ter falhado.
+        while target >= self.count and target > act * _PER_ACT:
+            target -= 1
         if target < self.count:
             self.selected = target
 
     def card_rect(self, index: int) -> Tuple[float, float, float, float]:
-        column = index % _COLUMNS
-        row = index // _COLUMNS
+        local = index % _PER_ACT
+        column = local % _COLUMNS
+        row = local // _COLUMNS
         total_width = _COLUMNS * _CARD_WIDTH + (_COLUMNS - 1) * _CARD_GAP_X
         left = (self._viewport_width - total_width) / 2.0
         return (
@@ -171,8 +224,37 @@ class LevelCardGrid:
         shards: List[bool],
     ) -> None:
         self._viewport_width, _ = renderer.get_viewport_size()
-        for index in range(self.count):
+        self._draw_act_tabs(renderer, completed)
+        first = self.act * _PER_ACT
+        for index in range(first, min(first + _PER_ACT, self.count)):
             self._draw_card(renderer, index, completed[index], shards[index])
+
+    def _draw_act_tabs(self, renderer: IRenderer, completed: List[bool]) -> None:
+        """Os tres atos numa linha, com o progresso de cada um.
+
+        O ato corrente leva o nome por extenso e a legenda; os outros, so o
+        numeral. E o suficiente pra dizer 'ha mais de um lado' sem competir
+        com os cards, que sao o que o jogador veio ver."""
+        center = self._viewport_width / 2.0
+        total = self.act_count
+        slot = 190.0
+        left = center - (total * slot) / 2.0
+        for index in range(total):
+            numeral, title, subtitle = _ACTS[index] if index < len(_ACTS) else (f"ATO {index + 1}", "", "")
+            x = left + index * slot + slot / 2.0
+            current = index == self.act
+            done = sum(1 for i in range(index * _PER_ACT, min((index + 1) * _PER_ACT, self.count))
+                       if completed[i])
+            size = min(_PER_ACT, self.count - index * _PER_ACT)
+            if current:
+                renderer.draw_text(x, _ACT_TAB_Y - 16.0, f"{numeral}  {title}", 15, _GOLD,
+                                   anchor="center")
+                renderer.draw_text(x, _ACT_TAB_Y + 4.0, subtitle, 11, _TEXT_DIM, anchor="center")
+                renderer.draw_ui_rect(x - 84.0, _ACT_TAB_Y + 22.0, 168.0, 2.0, _GOLD)
+            else:
+                renderer.draw_text(x, _ACT_TAB_Y - 16.0, numeral, 13, _TEXT_FAINT, anchor="center")
+                renderer.draw_text(x, _ACT_TAB_Y + 4.0, f"{done}/{size}", 11, _TEXT_FAINT,
+                                   anchor="center")
 
     def _draw_card(self, renderer: IRenderer, index: int, done: bool, shard: bool) -> None:
         x, y, width, height = self.card_rect(index)
@@ -184,24 +266,24 @@ class LevelCardGrid:
             renderer.draw_ui_rect(x, y, width, 2.0, _GOLD)
             renderer.draw_ui_rect(x, y + height - 2.0, width, 2.0, _GOLD)
 
-        # numerao: o jeito mais rapido de achar a fase 6 numa grade de oito
-        renderer.draw_text(x + 13.0, y + 6.0, str(index + 1), 32, _GOLD if selected else _NUMBER_IDLE)
+        # numerao: o jeito mais rapido de achar a fase 15 numa grade de seis
+        renderer.draw_text(x + 14.0, y + 8.0, str(index + 1), 36, _GOLD if selected else _NUMBER_IDLE)
 
         # miniatura do terreno real da fase
-        preview_x = x + 56.0
-        preview_y = y + 12.0
-        preview_w = width - 68.0
-        preview_h = height - 52.0
+        preview_x = x + 66.0
+        preview_y = y + 14.0
+        preview_w = width - 80.0
+        preview_h = height - 60.0
         renderer.draw_ui_rect(preview_x - 2.0, preview_y - 2.0, preview_w + 4.0, preview_h + 4.0, _VOID)
         self.previews[index].draw(renderer, preview_x, preview_y, preview_w, preview_h)
 
-        renderer.draw_text(x + 13.0, y + height - 34.0, level.name, 14, _TEXT if selected else _TEXT_DIM)
+        renderer.draw_text(x + 14.0, y + height - 38.0, level.name, 15, _TEXT if selected else _TEXT_DIM)
 
         # selos: fase vencida e fragmento
-        seal_y = y + height - 16.0
-        renderer.draw_text(x + 13.0, seal_y, "vencida" if done else "aberta", 11,
+        seal_y = y + height - 18.0
+        renderer.draw_text(x + 14.0, seal_y, "vencida" if done else "aberta", 11,
                            _GOLD if done else _TEXT_FAINT)
-        renderer.draw_text(x + width - 13.0, seal_y,
+        renderer.draw_text(x + width - 14.0, seal_y,
                            "fragmento" if shard else "fragmento?", 11,
                            _GOLD if shard else _GOLD_DIM, anchor="topright")
 
