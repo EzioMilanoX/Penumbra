@@ -28,7 +28,7 @@ from ouroboros.interfaces.input_provider import IInputProvider
 from ouroboros.interfaces.renderer import IRenderer
 
 from penumbra.levels import LevelCatalog
-from penumbra.menu import LevelCardGrid, MenuChrome
+from penumbra.menu import LevelCardGrid, MenuChrome, TitleScreen
 from penumbra.terrain import Terrain
 from penumbra.state import DualityState, LevelRuntime, OUTCOME_COMPLETE, OUTCOME_PLAYING
 from penumbra.tuning import DualityTuning
@@ -71,19 +71,36 @@ class PenumbraFlow:
         self._catalog = catalog
         self.completed: List[bool] = [False] * catalog.count
         self.shards: List[bool] = [False] * catalog.count
-        self.duo = False
+        self.title = TitleScene(self, input_provider)
         self.menu = MenuScene(self, catalog, preview_terrain, input_provider)
         self.gameplay = PenumbraScene(self, runtime, state, tuning, input_provider)
+
+    def show_title(self) -> None:
+        self._game_loop.reset_scenes(self.title)
 
     def show_menu(self, message: str = "") -> None:
         self.menu.message = message
         self._game_loop.reset_scenes(self.menu)
 
+    @property
+    def duo(self) -> bool:
+        """Um ou dois jogadores. Mora na tela de titulo -- e a primeira
+        decisao da sessao, e a tela que a apresenta e a dona dela. Nao vive
+        no `DualityState` porque e escolha de SESSAO, nao de partida: trocar
+        de fase nao devia devolver o jogador ao modo solo."""
+        return self.title.duo
+
     def toggle_duo(self) -> None:
-        """Um ou dois jogadores. Vive no fluxo e nao no `DualityState` porque
-        e escolha de sessao, nao de partida -- trocar de fase nao devia
-        devolver o jogador ao modo solo."""
-        self.duo = not self.duo
+        self.title.duo = not self.title.duo
+
+    @property
+    def progress(self):
+        """(fases vencidas, fragmentos apanhados, total) -- a tela de titulo
+        mostra isso pra que voltar ao jogo depois de um tempo diga, de cara,
+        onde voce parou."""
+        return (sum(1 for done in self.completed if done),
+                sum(1 for got in self.shards if got),
+                len(self.completed))
 
     def start_level(self, level_index: int) -> None:
         self._runtime.load(level_index)
@@ -115,6 +132,47 @@ class PenumbraFlow:
         boca -- senao desenha a faixa de rodape e os medidores dos seres por
         cima do menu."""
         return self._game_loop.current_scene is self.gameplay
+
+
+class TitleScene(IScene):
+    """
+    Abertura: escolher entre um e dois jogadores, com dois botoes grandes.
+
+    Antes o modo era um atalho de TAB no canto do menu de fases -- quem nunca
+    leu o rodape jamais descobriria que o jogo tem multiplayer local. Aqui
+    ele e a primeira pergunta que o jogo faz.
+    """
+
+    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+        self._flow = flow
+        self._input = input_provider
+        self._screen = TitleScreen()
+
+    @property
+    def duo(self) -> bool:
+        return self._screen.duo
+
+    @duo.setter
+    def duo(self, value: bool) -> None:
+        self._screen.duo = value
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world, delta_time
+        if self._input.is_action_pressed("move_left"):
+            self._screen.move(-1)
+        if self._input.is_action_pressed("move_right"):
+            self._screen.move(1)
+        if self._input.is_action_pressed("switch"):
+            self._flow.toggle_duo()
+        if self._input.is_action_pressed("jump"):
+            self._flow.show_menu()
+        elif self._input.is_action_pressed("quit"):
+            self._flow.quit()
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        del world
+        completed, shards, total = self._flow.progress
+        self._screen.draw(renderer, completed, shards, total)
 
 
 class MenuScene(IScene):
@@ -167,7 +225,7 @@ class MenuScene(IScene):
         if self._input.is_action_pressed("jump"):
             self._flow.start_level(self._grid.selected)
         elif self._input.is_action_pressed("quit"):
-            self._flow.quit()
+            self._flow.show_title()
 
     def render(self, world: World, renderer: IRenderer) -> None:
         del world

@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from penumbra.scenes import MenuScene, PenumbraFlow
+from penumbra.scenes import MenuScene, PenumbraFlow, TitleScene
 from penumbra.state import (
     LUMEN,
     OUTCOME_COMPLETE,
@@ -396,7 +396,7 @@ class TestLevelFlow:
             simulation.catalog, simulation.tuning, input_provider,
             preview_terrain=Terrain(GRID_COLS, GRID_ROWS, CELL_SIZE),
         )
-        flow.show_menu()
+        flow.show_title()
         return flow
 
     def _drive(self, flow, simulation, input_provider, frames):
@@ -406,10 +406,50 @@ class TestLevelFlow:
 
     # ---------------- menu ----------------
 
-    def test_o_jogo_abre_no_menu(self, flow):
+    def test_o_jogo_abre_na_tela_de_titulo(self, flow):
+        """A primeira pergunta do jogo e quantos jogadores -- nao qual fase.
+        Antes o modo era um atalho de TAB no canto do menu de fases: quem
+        nunca leu o rodape nunca descobriria que ha multiplayer local."""
+        assert isinstance(flow._game_loop.current_scene, TitleScene)
+
+    def test_o_titulo_escolhe_o_modo_com_as_setas(self, flow, simulation, input_provider):
+        assert not flow.duo
+        input_provider.set_action_held("move_right", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert flow.duo, "D seleciona DOIS JOGADORES"
+
+        input_provider.set_action_held("move_right", False)
+        input_provider.set_action_held("move_left", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert not flow.duo, "A volta para UM JOGADOR"
+
+    def test_confirmar_no_titulo_leva_a_selecao_de_fase(self, flow, simulation, input_provider):
+        input_provider.set_action_held("jump", True)
+        self._drive(flow, simulation, input_provider, frames=1)
         assert isinstance(flow._game_loop.current_scene, MenuScene)
 
+    def test_o_modo_escolhido_no_titulo_chega_na_fase(self, flow, simulation):
+        """A escolha da tela de abertura tem de atravessar duas cenas ate o
+        `DualityState` -- se parar no caminho, o botao e decorativo."""
+        flow.title.duo = True
+        flow.show_menu()
+        flow.start_level(0)
+        assert simulation.state.duo, "o modo do titulo governa a partida"
+
+    def test_esc_na_selecao_de_fase_volta_ao_titulo(self, flow, simulation, input_provider):
+        flow.show_menu()
+        input_provider.set_action_held("quit", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert isinstance(flow._game_loop.current_scene, TitleScene)
+        assert not flow._game_loop.stopped, "ESC recua uma tela; so o titulo encerra"
+
+    def test_esc_no_titulo_encerra_o_jogo(self, flow, simulation, input_provider):
+        input_provider.set_action_held("quit", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert flow._game_loop.stopped
+
     def test_o_menu_lista_todas_as_fases_e_nenhuma_esta_trancada(self, flow, simulation):
+        flow.show_menu()
         """Com oito fases curtas, poder repetir a que ensinou uma mecanica
         vale mais que a cerimonia de desbloquear."""
         assert len(flow.completed) == simulation.catalog.count
@@ -419,6 +459,7 @@ class TestLevelFlow:
             assert simulation.state.level_index == index
 
     def test_escolher_no_menu_e_confirmar_comeca_a_fase(self, flow, simulation, input_provider):
+        flow.show_menu()
         input_provider.set_action_held("move_right", True)
         self._drive(flow, simulation, input_provider, frames=1)
         input_provider.set_action_held("move_right", False)
@@ -429,6 +470,7 @@ class TestLevelFlow:
         assert simulation.state.level_index == 1, "A/D anda na grade, ESPACO entra"
 
     def test_a_grade_do_menu_anda_em_duas_dimensoes(self, flow, simulation, input_provider):
+        flow.show_menu()
         """Quatro colunas: W/S pulam uma linha inteira (quatro fases), A/D
         andam de uma em uma. Sem isso, chegar a fase 8 custaria sete toques."""
         input_provider.set_action_held("menu_down", True)
@@ -439,12 +481,7 @@ class TestLevelFlow:
         self._drive(flow, simulation, input_provider, frames=1)
         assert flow.menu.selected == 5
 
-    def test_esc_no_menu_encerra_o_jogo(self, flow, simulation, input_provider):
-        input_provider.set_action_held("quit", True)
-        self._drive(flow, simulation, input_provider, frames=1)
-        assert flow._game_loop.stopped
-
-    def test_o_hud_cala_a_boca_no_menu(self, flow):
+    def test_o_hud_cala_a_boca_fora_da_fase(self, flow):
         """O HUD e um callback GLOBAL de `set_on_draw_ui` -- roda independente
         da cena no topo. Sem consultar o fluxo ele desenharia a faixa de
         rodape e os medidores dos seres por cima do menu."""

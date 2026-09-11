@@ -18,8 +18,15 @@ cd Penumbra && python -m penumbra.main  # rodar SEMPRE da raiz, como módulo
 (`from penumbra...`) e os caminhos de `config.json` são relativos à raiz do
 projeto, então rodar `python penumbra/main.py` falha.
 
-**Menu**: W/A/S/D escolher na grade · ESPAÇO jogar · TAB alternar um/dois
-jogadores · ESC sair.
+O jogo abre numa **tela de título** que pergunta primeiro quantos jogadores —
+dois botões grandes, **1 JOGADOR** e **2 JOGADORES**, com os controles de cada
+modo escritos embaixo. A/D escolhe, ESPAÇO confirma.
+
+**Título** → **seleção de fase** → **fase**. ESC recua uma tela por vez; só no
+título ele encerra.
+
+**Seleção de fase**: W/A/S/D escolher na grade · ESPAÇO jogar · ESC voltar ao
+título.
 
 **Um jogador**: A/D mover · ESPAÇO pular · J habilidade · TAB trocar de ser ·
 R reiniciar · ESC voltar ao menu.
@@ -218,8 +225,8 @@ penumbra/
   levels.py          catálogo de data/levels/*.json
   reachability.py    modelo de salto + grafo de alcance (auditoria de geometria)
   state.py           estado compartilhado + troca de fase
-  scenes.py          fluxo menu -> fase -> menu, e quando o mundo congela
-  menu.py            grade de cards, prévia do terreno, selos
+  scenes.py          fluxo título -> fases -> jogo, e quando o mundo congela
+  menu.py            tela de título, grade de cards, prévia do terreno
   hud.py             HUD e avisos de fim de fase
   systems/
     duality_control_system.py   input -> velocity dos dois seres
@@ -232,7 +239,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              104 testes headless
+tests/              108 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -302,7 +309,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 104 testes, ~9 s, headless
+pytest -q                      # 108 testes, ~9 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -334,7 +341,15 @@ e não tinha como voltar à zona de luz —, corrigido com dois degraus de rocha
 
 ## O menu
 
-Grade de 4×3 cards, cada um com **numerão**, nome, dois selos (fase vencida,
+Duas telas. A **de título** existe porque o modo era, antes, um atalho de TAB
+no canto da seleção de fase: quem nunca leu o rodapé jamais descobriria que o
+jogo tem multiplayer local. Modo é a primeira decisão da sessão — merece uma
+tela, não uma legenda. Os dois botões mostram os **dois seres** em ambos os
+casos, porque em ambos eles existem; o que muda é quem os comanda, e é isso
+que o desenho diz: num jogador, um `TAB` entre eles; em dois, um rótulo J1 e
+J2.
+
+A **seleção de fase** é uma grade de 4×3 cards, cada um com **numerão**, nome, dois selos (fase vencida,
 fragmento) e uma **prévia** da fase.
 
 A prévia é o **terreno real**, parseado pelo mesmo `Terrain` que o jogo usa —

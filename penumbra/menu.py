@@ -206,6 +206,138 @@ class LevelCardGrid:
                            _GOLD if shard else _GOLD_DIM, anchor="topright")
 
 
+_BUTTON_WIDTH = 268.0
+_BUTTON_HEIGHT = 180.0
+_BUTTON_GAP = 40.0
+
+
+_BLOB_BANDS = (0.52, 0.86, 1.0, 0.86, 0.52)
+"""Largura relativa de cada faixa horizontal da Lumen, de cima pra baixo.
+Cinco faixas bastam: o que o botao precisa dizer e "esta e redonda, aquela e
+quadrada", e mais faixas so custam retangulos."""
+
+
+def _blob(renderer: IRenderer, center_x: float, center_y: float, size: float, color) -> None:
+    """Desenha a Lumen: um circulo aproximado por faixas. `draw_ui_rect` so
+    faz retangulo, e a diferenca entre ela (redonda) e a Umbra (quadrada) e a
+    unica coisa que identifica cada ser nos botoes."""
+    band_height = size / len(_BLOB_BANDS)
+    top = center_y - size / 2.0
+    for index, width_ratio in enumerate(_BLOB_BANDS):
+        band_width = size * width_ratio
+        renderer.draw_ui_rect(
+            center_x - band_width / 2.0,
+            top + index * band_height,
+            band_width,
+            band_height + 1.0,   # +1: sem isso o arredondamento abre fendas
+            color,
+        )
+
+
+def _block(renderer: IRenderer, center_x: float, center_y: float, size: float, fill, rim) -> None:
+    """A Umbra: bloco escuro com orla. Sem a orla ela some no fundo -- a mesma
+    razao de ela ter orla no jogo."""
+    half = size / 2.0
+    renderer.draw_ui_rect(center_x - half - 2.0, center_y - half - 2.0, size + 4.0, size + 4.0, rim)
+    renderer.draw_ui_rect(center_x - half, center_y - half, size, size, fill)
+
+
+class TitleScreen:
+    """
+    Tela de abertura com a escolha de modo em dois botoes grandes.
+
+    Existe porque a versao anterior escondia o modo num atalho de TAB no
+    canto do menu de fases: quem nunca leu o rodape jamais descobriria que o
+    jogo tem dois jogadores. Modo e a primeira decisao da sessao -- ela
+    merece uma tela, nao uma legenda.
+
+    Os botoes mostram os DOIS seres nos dois casos, porque em ambos os modos
+    eles existem; o que muda e quem os comanda, e e isso que o desenho diz:
+    num jogador, uma seta de TAB entre eles; em dois, um rotulo J1 e J2.
+    """
+
+    def __init__(self) -> None:
+        self.duo = False
+
+    def move(self, step: int) -> None:
+        if step:
+            self.duo = step > 0
+
+    def draw(self, renderer: IRenderer, completed: int, shards: int, total: int) -> None:
+        width, height = renderer.get_viewport_size()
+        renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
+        center = width / 2.0
+
+        renderer.draw_text(center, 54.0, "PENUMBRA", 56, _TEXT, anchor="center")
+        renderer.draw_text(center, 122.0, "Luz e Sombra: Dualidade", 16, _GOLD, anchor="center")
+        renderer.draw_ui_rect(center - 210.0, 156.0, 420.0, 1.0, _RULE)
+
+        top = 196.0
+        total_width = 2 * _BUTTON_WIDTH + _BUTTON_GAP
+        left = (width - total_width) / 2.0
+        self._draw_button(renderer, left, top, duo=False)
+        self._draw_button(renderer, left + _BUTTON_WIDTH + _BUTTON_GAP, top, duo=True)
+
+        progress_y = top + _BUTTON_HEIGHT + 34.0
+        renderer.draw_text(center, progress_y, f"{completed}/{total} fases    {shards}/{total} fragmentos",
+                           14, _TEXT_DIM, anchor="center")
+
+        # Os controles do modo ESCOLHIDO, na propria tela de escolha: e a
+        # unica hora em que o jogador ainda pode mudar de ideia sabendo o que
+        # cada modo exige das maos dele.
+        renderer.draw_ui_rect(center - 210.0, progress_y + 40.0, 420.0, 1.0, _RULE)
+        controls_y = progress_y + 58.0
+        if self.duo:
+            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPACO pular   J habilidade",
+                               13, _TEXT_DIM, anchor="center")
+            renderer.draw_text(center, controls_y + 22.0, "JOGADOR 2   setas mover   CIMA pular   BAIXO habilidade",
+                               13, _TEXT_DIM, anchor="center")
+        else:
+            renderer.draw_text(center, controls_y, "A/D mover   ESPACO pular   J habilidade",
+                               13, _TEXT_DIM, anchor="center")
+            renderer.draw_text(center, controls_y + 22.0, "TAB alterna entre os dois seres   R reinicia a fase",
+                               13, _TEXT_DIM, anchor="center")
+
+        renderer.draw_text(center, height - 40.0, "A/D escolher      ESPACO confirmar      ESC sair",
+                           13, _TEXT_FAINT, anchor="center")
+
+    def _draw_button(self, renderer: IRenderer, x: float, y: float, duo: bool) -> None:
+        selected = duo == self.duo
+        renderer.draw_ui_rect(x, y, _BUTTON_WIDTH, _BUTTON_HEIGHT,
+                              _CARD_SELECTED if selected else _CARD)
+        if selected:
+            for edge in (0.0, _BUTTON_HEIGHT - 3.0):
+                renderer.draw_ui_rect(x, y + edge, _BUTTON_WIDTH, 3.0, _GOLD)
+            for edge in (0.0, _BUTTON_WIDTH - 3.0):
+                renderer.draw_ui_rect(x + edge, y, 3.0, _BUTTON_HEIGHT, _GOLD)
+
+        center_x = x + _BUTTON_WIDTH / 2.0
+        label = "2 JOGADORES" if duo else "1 JOGADOR"
+        renderer.draw_text(center_x, y + 22.0, label, 26,
+                           _GOLD if selected else _TEXT_DIM, anchor="center")
+
+        figures_y = y + 96.0
+        tone = 255 if selected else 150
+        lumen = (tone, tone, min(255, tone + 5), 255)
+        umbra_fill = (46, 44, 60, 255)
+        umbra_rim = (tone - 60, tone - 62, tone - 40, 255)
+        _blob(renderer, center_x - 46.0, figures_y, 38.0, lumen)
+        _block(renderer, center_x + 46.0, figures_y, 38.0, umbra_fill, umbra_rim)
+
+        if duo:
+            renderer.draw_text(center_x - 46.0, figures_y + 34.0, "J1", 13,
+                               _GOLD if selected else _TEXT_FAINT, anchor="center")
+            renderer.draw_text(center_x + 46.0, figures_y + 34.0, "J2", 13,
+                               _GOLD if selected else _TEXT_FAINT, anchor="center")
+            hint = "cada um no seu"
+        else:
+            renderer.draw_text(center_x, figures_y, "TAB", 13,
+                               _GOLD if selected else _TEXT_FAINT, anchor="center")
+            hint = "um por vez, TAB alterna"
+        renderer.draw_text(center_x, y + _BUTTON_HEIGHT - 28.0, hint, 12,
+                           _TEXT_DIM if selected else _TEXT_FAINT, anchor="center")
+
+
 class MenuChrome:
     """Titulo, rodape e o seletor de modo -- tudo que nao e card."""
 
