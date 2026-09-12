@@ -10,7 +10,7 @@ sao relativos a raiz do projeto.
 
     python -m penumbra.main
 
-Controles: A/D mover, ESPACO pular, J habilidade (facho da Lumen / absorcao
+Controles: A/D mover, ESPACO pular, S habilidade (facho da Lumen / absorcao
 da Umbra), TAB trocar de ser, R reiniciar a fase, ESC sair.
 """
 from __future__ import annotations

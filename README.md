@@ -31,10 +31,12 @@ título ele encerra.
 **Seleção de fase**: W/A/S/D escolher na grade · ESPAÇO jogar · ESC voltar ao
 título.
 
-**Um jogador**: A/D mover · ESPAÇO pular · J habilidade · TAB trocar de ser ·
+**Um jogador**: A/D mover · ESPAÇO pular · S habilidade · TAB trocar de ser ·
 R reiniciar · ESC voltar ao menu.
 
-**Dois jogadores** (mesmo teclado): J1 = A/D, ESPAÇO, J · J2 = setas ←→, ↑, ↓.
+**Dois jogadores** (mesmo teclado): J1 = A/D, ESPAÇO, S · J2 = setas ←→, ↑, ↓.
+Os dois lados têm o mesmo formato: mover nos lados, pular pra cima,
+habilidade pra baixo.
 Ninguém espera, e o contato entre os dois continua aniquilando os dois — o que
 num jogador era uma armadilha ocasional, em dois é a fonte principal de
 desastre.
@@ -60,7 +62,7 @@ outro.
 | movimento | 200 px/s, sobe degraus de até **3** células | 142 px/s, sobe degraus de **2** células |
 | pisa em | rocha + éter **aceso** | rocha + éter **apagado** |
 | morre | onde a luz cai abaixo de `0.12` (**se apaga**) | onde a luz passa de `0.60` (**se dissolve**) |
-| habilidade (**J**) | **Facho** — emite luz ao redor de si, solidificando éter escuro | **Absorção** — abre um bolsão de escuridão, apagando lâmpadas dentro dele |
+| habilidade (**S**) | **Facho** — emite luz ao redor de si, solidificando éter escuro | **Absorção** — abre um bolsão de escuridão, apagando lâmpadas dentro dele |
 | só ela faz | — | **rompe a crosta**, empurrando com A/D. Irreversível. |
 
 Nenhuma das duas mortes é instantânea: um medidor sobe enquanto o perigo dura
@@ -295,7 +297,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              139 testes headless
+tests/              149 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -365,7 +367,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 139 testes, ~21 s, headless
+pytest -q                      # 149 testes, ~7 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -435,6 +437,28 @@ um terreno novo aparece no menu de graça. As cores da miniatura são
 deliberadamente mais claras que no jogo: a 4 px por célula, o contraste real
 (rocha quase preta sobre fundo quase preto) desapareceria, e a silhueta da
 fase é a única coisa que o card precisa entregar.
+
+## O que os testes não estavam olhando
+
+Três falhas chegaram por alguém **jogando**, com a suíte inteira verde. Cada
+uma virou um teste, e as três são do mesmo tipo: o jogo abre, a fase carrega,
+e nada avisa.
+
+- **Escolta impossível no solo.** A carga do facho drena também com o ser
+  parado — e é de propósito, o facho custa mesmo estando parado. No duo a
+  travessia sob o vidro cabia numa carga; no solo, com as trocas de TAB,
+  nunca cabia (medido: a Umbra chegava à coluna 9 de 16 e caía). A correção
+  não foi mexer na regra, foi no **desenho**: lâmpadas fixas acendem quase
+  todo o contra-éter e sobra um vão curto, do tamanho exato da mancha que o
+  facho projeta. A escolta virou um momento, não a fase inteira.
+- **Crosta morta no duo.** `CrustBreakSystem` exigia `state.active == UMBRA` e
+  lia as teclas do jogador 1 — e no duo não existe "ativo". As fases 2, 7 e 14
+  eram invencíveis a dois. Todo teste de crosta rodava em solo.
+- **Um comentário no JSON de bindings derrubou o jogo na abertura.** O
+  carregador de dificuldade descarta chaves começadas por `_`; o de bindings,
+  não. Os testes usam o provider nulo, que ignora o arquivo — agora um deles
+  carrega o arquivo pelo **carregador real**, e outro confere que toda ação
+  lida pelo código está lá.
 
 ## Escopo
 

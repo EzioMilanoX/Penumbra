@@ -377,12 +377,12 @@ class TitleScreen:
         renderer.draw_ui_rect(center - 210.0, progress_y + 40.0, 420.0, 1.0, _RULE)
         controls_y = progress_y + 58.0
         if self.duo:
-            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPACO pular   J habilidade",
+            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPACO pular   S habilidade",
                                13, _TEXT_DIM, anchor="center")
             renderer.draw_text(center, controls_y + 22.0, "JOGADOR 2   setas mover   CIMA pular   BAIXO habilidade",
                                13, _TEXT_DIM, anchor="center")
         else:
-            renderer.draw_text(center, controls_y, "A/D mover   ESPACO pular   J habilidade",
+            renderer.draw_text(center, controls_y, "A/D mover   ESPACO pular   S habilidade",
                                13, _TEXT_DIM, anchor="center")
             renderer.draw_text(center, controls_y + 22.0, "TAB alterna entre os dois seres   R reinicia a fase",
                                13, _TEXT_DIM, anchor="center")
@@ -455,9 +455,9 @@ class MenuChrome:
         renderer.draw_text(center, footer_y, "W/A/S/D escolher      ESPACO jogar      ESC sair",
                            12, _TEXT_DIM, anchor="center")
         controls = (
-            "J1: A/D  ESPACO  J          J2: setas  cima  baixo"
+            "J1: A/D  ESPACO  S          J2: setas  cima  baixo"
             if duo
-            else "A/D mover   ESPACO pular   J habilidade   TAB trocar de ser"
+            else "A/D mover   ESPACO pular   S habilidade   TAB trocar de ser"
         )
         renderer.draw_text(center, footer_y + 20.0, controls, 11, _TEXT_FAINT, anchor="center")
 

@@ -131,17 +131,22 @@ class PenumbraHud:
             f"{state.level_index + 1}/{self._runtime.count}  {level.name}",
             14, _TEXT,
         )
+        # No duo nao existe "quem esta sob comando": os dois estao. Dizer
+        # "comando: LUMEN" ali seria mentira, e e a unica linha do rodape que
+        # o jogador consulta pra saber de quem sao as teclas.
         renderer.draw_text(
             self._width - 14.0, top + _LINE_1,
-            f"comando: {state.active_name.upper()}", 14, _GOLD, anchor="topright",
+            "J1 LUMEN   J2 UMBRA" if state.duo else f"comando: {state.active_name.upper()}",
+            14, _GOLD, anchor="topright",
         )
         renderer.draw_text(14.0, top + _LINE_2, level.hint, 12, _TEXT_DIM)
         self._draw_world_clock(renderer, top)
-        renderer.draw_text(
-            14.0, top + _LINE_3,
-            "A/D mover   ESPACO pular   J habilidade   TAB trocar   R reiniciar   ESC sair",
-            11, _TEXT_FAINT,
+        controls = (
+            "J1: A/D  ESPACO  S       J2: setas  CIMA  BAIXO       R reiniciar   ESC sair"
+            if state.duo else
+            "A/D mover   ESPACO pular   S habilidade   TAB trocar   R reiniciar   ESC sair"
         )
+        renderer.draw_text(14.0, top + _LINE_3, controls, 11, _TEXT_FAINT)
 
     def _draw_world_clock(self, renderer: IRenderer, top: float) -> None:
         """Os dois relogios do mundo, quando a fase tem um deles. O farol e o

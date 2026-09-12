@@ -29,6 +29,12 @@ from ouroboros.core.world import World
 from ouroboros.interfaces.input_provider import IInputProvider
 
 from penumbra.state import DualityState, UMBRA
+
+_PLAYER_TWO_PREFIX = "p2_"
+"""No modo duo a Umbra e sempre o jogador 2, como em
+`DualityControlSystem`. Sem este prefixo o sistema lia as teclas do jogador
+1 e exigia `state.active == UMBRA` -- e no duo nao existe 'ativo', entao a
+crosta nunca cedia e as fases 2, 7 e 14 eram invenciveis a dois."""
 from penumbra.terrain import Terrain
 
 
@@ -45,6 +51,11 @@ class CrustBreakSystem(ISystem):
     So a Umbra rompe. A Lumen encosta na crosta e para, como faria numa
     rocha -- e essa e a assimetria toda: existe terreno que so ela nao
     resolve.
+
+    Nos dois modos, e pela mesma razao que `DualityControlSystem`: no solo o
+    verbo pertence ao ser ATIVO, no duo ao jogador 2. A primeira versao so
+    olhava `state.active`, que no duo nunca sai da Lumen -- entao a crosta
+    simplesmente nao cedia, e nada na tela dizia por que.
     """
 
     def __init__(
@@ -99,11 +110,15 @@ class CrustBreakSystem(ISystem):
         ja encostou o corpo dela na crosta e zerou a velocidade, entao a
         posicao ja e a de contato."""
         state = self._state
-        if state.active != UMBRA:
+        if state.duo:
+            prefix = _PLAYER_TWO_PREFIX
+        elif state.active == UMBRA:
+            prefix = ""
+        else:
             return None
 
-        moving_left = self._input.is_action_held("move_left")
-        moving_right = self._input.is_action_held("move_right")
+        moving_left = self._input.is_action_held(f"{prefix}move_left")
+        moving_right = self._input.is_action_held(f"{prefix}move_right")
         if moving_left == moving_right:
             return None
         step = 1 if moving_right else -1
