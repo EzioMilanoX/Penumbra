@@ -1,7 +1,8 @@
 {
-  "id": "15_a_lanterna",
-  "name": "A Lanterna",
-  "hint": "A lampada anda, e leva o chao junto. Onde ela esta a ponte e da Lumen; onde nao esta, e da Umbra.",
+  "id": "24_contrapeso",
+  "name": "Contrapeso",
+  "hint": "Meia ponte obedece a luz, meia a desobedece -- e a alavanca espelha a fase. Nao da pra agradar aos dois.",
+  "chapter": 2,
   "rows": [
     ".........###########........",
     ".........###########........",
@@ -15,8 +16,8 @@
     "...*.....###########....*...",
     ".........###########...+.X..",
     ".........>>>>>>>>>>>..######",
-    "...B..A.............Y.......",
-    "#########~~~~~#~~~~~########",
+    ".!.B..A.............Y!......",
+    "#########~~~~~#;;;;;########",
     "#########...........########",
     "#########...........########",
     "............................"

@@ -1,7 +1,8 @@
 {
-  "id": "17_o_guardiao",
+  "id": "23_o_guardiao",
   "name": "O Guardiao",
   "hint": "A porta so cede com alguem em cima da placa. Um segura, o outro sobe -- e a lanterna nao espera.",
+  "chapter": 2,
   "rows": [
     ".........###########........",
     ".........###########........",

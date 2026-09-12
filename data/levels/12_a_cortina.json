@@ -1,7 +1,9 @@
 {
-  "id": "19_a_cortina",
+  "id": "12_a_cortina",
   "name": "A Cortina",
   "hint": "O veu atravessa-se a pe, nunca com luz. Do lado de la ha sombra sem parede -- e la dentro o facho nao existe.",
+  "chapter": 1,
+  "teaches": "veu",
   "rows": [
     "..............:.............",
     "..............:.............",

@@ -31,6 +31,8 @@ WANDER_CHAR = ">"
 VEIL_CHAR = ":"
 GLASS_CHAR = "-"
 SOURCE_CHAR = "@"
+SOURCE_ALT_CHAR = "&"
+LEVER_CHAR = "!"
 SHARD_CHAR = "+"
 LAMP_CHAR = "*"
 DOOR_CHAR = "D"
@@ -65,6 +67,8 @@ ROLE_WANDER = 16
 ROLE_VEIL = 17
 ROLE_GLASS = 18
 ROLE_SOURCE = 19
+ROLE_SOURCE_ALT = 20
+ROLE_LEVER = 21
 
 _MARKER_CHARS = frozenset(
     {LUMEN_SPAWN_CHAR, UMBRA_SPAWN_CHAR, LUMEN_GOAL_CHAR, UMBRA_GOAL_CHAR}
@@ -121,6 +125,16 @@ class Terrain:
     circulo. E a unica coisa do jogo que se atravessa acompanhando, e nao
     escolhendo o instante.
 
+    `lever` e a alavanca de polaridade: pisar nela troca eter por
+    contra-eter no mapa INTEIRO. Todas as outras reviravoltas do jogo mudam
+    quem esta aceso; esta muda de quem e o aceso -- e e a unica que um ser
+    aciona pensando no OUTRO, porque quem puxa costuma perder o proprio
+    chao no mesmo instante.
+
+    `source_alt` e a segunda fonte, em contratempo: mesma respiracao
+    deslocada de meio periodo. Com duas assim a sala tem duas bordas de chao
+    inchando em oposicao, e a faixa segura entre elas vai e vem sozinha.
+
     `veil` e o veu e `glass` e o vidro. Ate aqui toda celula solida barrava
     luz e toda celula vazada a deixava passar -- "chao" e "quem faz sombra"
     eram a mesma coisa, e por isso nenhuma fase tinha mais de um andar. Os
@@ -176,6 +190,8 @@ class Terrain:
         self.veil = np.zeros(shape, dtype=bool)
         self.glass = np.zeros(shape, dtype=bool)
         self.source = np.zeros(shape, dtype=np.float32)
+        self.source_alt = np.zeros(shape, dtype=np.float32)
+        self.lever = np.zeros(shape, dtype=bool)
         self.ether = np.zeros(shape, dtype=bool)
         self.door = np.zeros(shape, dtype=bool)
         self.zone_light = np.zeros(shape, dtype=bool)
@@ -204,6 +220,7 @@ class Terrain:
         self.has_altar = False
         self.has_wanderer = False
         self.has_source = False
+        self.has_lever = False
         self.wander_row = -1
         self.wander_min_col = -1
         self.wander_max_col = -1
@@ -251,6 +268,8 @@ class Terrain:
         self.veil[:] = False
         self.glass[:] = False
         self.source[:] = 0.0
+        self.source_alt[:] = 0.0
+        self.lever[:] = False
         self.ether[:] = False
         self.door[:] = False
         self.zone_light[:] = False
@@ -292,6 +311,12 @@ class Terrain:
                 elif char == SOURCE_CHAR:
                     self.source[row_index, col_index] = 1.0
                     self.role[row_index, col_index] = ROLE_SOURCE
+                elif char == SOURCE_ALT_CHAR:
+                    self.source_alt[row_index, col_index] = 1.0
+                    self.role[row_index, col_index] = ROLE_SOURCE_ALT
+                elif char == LEVER_CHAR:
+                    self.lever[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_LEVER
                 elif char == SHARD_CHAR:
                     if self.shard_cell is not None:
                         raise TerrainDefinitionError("uma fase tem no maximo um fragmento ('+')")
@@ -344,7 +369,8 @@ class Terrain:
         self.has_beacon = bool(self.beacon.any())
         self.has_plate = bool(self.plate.any())
         self.has_altar = bool(self.altar.any())
-        self.has_source = bool(self.source.any())
+        self.has_source = bool(self.source.any() or self.source_alt.any())
+        self.has_lever = bool(self.lever.any())
         self._resolve_rail()
 
         has_zones = bool(self.zone_light.any() and self.zone_shadow.any())
@@ -405,6 +431,20 @@ class Terrain:
         self.wander_row = row
         self.wander_min_col = low
         self.wander_max_col = high
+
+    def swap_polarity(self) -> None:
+        """Troca eter por contra-eter no mapa inteiro, de uma vez.
+
+        E a unica coisa do jogo que muda o TERRENO sem mudar a luz: toda
+        outra reviravolta ate aqui reescrevia quem estava aceso, esta
+        reescreve de quem e o aceso. Reversivel de proposito -- puxar a
+        alavanca de novo desfaz -- porque um interruptor global irreversivel
+        trancaria a fase na primeira curiosidade do jogador."""
+        self.ether, self.counter_ether = self.counter_ether, self.ether
+        was_ether = self.role == ROLE_ETHER
+        was_counter = self.role == ROLE_COUNTER_ETHER
+        self.role[was_ether] = ROLE_COUNTER_ETHER
+        self.role[was_counter] = ROLE_ETHER
 
     def collapse_eclipse(self) -> int:
         """Faz TODAS as celulas de eclipse desaparecerem de uma vez, e devolve

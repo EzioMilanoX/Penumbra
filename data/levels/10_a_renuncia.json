@@ -1,7 +1,9 @@
 {
-  "id": "13_a_renuncia",
+  "id": "10_a_renuncia",
   "name": "A Renuncia",
   "hint": "O contra-eter so e chao da Umbra sob LUZ. Segure o facho na pedra: ela fica com ele, e voce nao.",
+  "chapter": 1,
+  "teaches": "altar",
   "rows": [
     "..............#####.........",
     "..............#####.........",

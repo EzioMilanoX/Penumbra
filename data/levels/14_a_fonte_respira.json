@@ -1,7 +1,9 @@
 {
-  "id": "22_mare",
-  "name": "Mare",
-  "hint": "Meia ponte obedece a luz, meia a desobedece -- e a mesma respiracao monta uma e desmonta a outra.",
+  "id": "14_a_fonte_respira",
+  "name": "A Fonte Respira",
+  "hint": "Ela nao anda: incha. O chao aceso dilata e contrai, e quem estava seguro deixa de estar sem dar um passo.",
+  "chapter": 1,
+  "teaches": "fonte",
   "rows": [
     ".........###########........",
     ".........###########........",
@@ -16,7 +18,7 @@
     ".........###########...+.X..",
     "......................######",
     "...B..A.......@.....Y.......",
-    "##########;;;;#~~~~#########",
+    "##########~~~~#~~~~#########",
     "#########...........########",
     "#########...........########",
     "............................"

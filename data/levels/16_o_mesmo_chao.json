@@ -1,7 +1,8 @@
 {
-  "id": "03_o_mesmo_chao",
+  "id": "16_o_mesmo_chao",
   "name": "O Mesmo Chao",
   "hint": "J liga a habilidade. A lampada faz a ponte ser chao da Lumen; a absorcao da Umbra a devolve.",
+  "chapter": 2,
   "rows": [
     ".........########...........",
     ".........########...........",

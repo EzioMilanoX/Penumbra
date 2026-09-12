@@ -1,7 +1,9 @@
 {
-  "id": "21_a_fonte_respira",
-  "name": "A Fonte Respira",
-  "hint": "Ela nao anda: incha. O chao aceso dilata e contrai, e quem estava seguro deixa de estar sem dar um passo.",
+  "id": "11_a_lanterna",
+  "name": "A Lanterna",
+  "hint": "A lampada anda, e leva o chao junto. Onde ela esta a ponte e da Lumen; onde nao esta, e da Umbra.",
+  "chapter": 1,
+  "teaches": "lanterna",
   "rows": [
     ".........###########........",
     ".........###########........",
@@ -14,9 +16,9 @@
     ".........###########........",
     "...*.....###########....*...",
     ".........###########...+.X..",
-    "......................######",
-    "...B..A.......@.....Y.......",
-    "##########~~~~#~~~~#########",
+    ".........>>>>>>>>>>>..######",
+    "...B..A.............Y.......",
+    "#########~~~~~#~~~~~########",
     "#########...........########",
     "#########...........########",
     "............................"

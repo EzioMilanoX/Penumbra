@@ -116,9 +116,22 @@ class DualityState:
         # --- a fonte que respira ---
         self.source_phase = 0.0
         self.source_intensity = 0.0
+        self.source_alt_intensity = 0.0
+        """A segunda fonte, meio periodo atras: as duas juntas fazem a
+        faixa segura ir e vir entre elas."""
         """Intensidade da fonte neste frame. O raio aceso sai dela --
         `(I - solid_threshold) * falloff_radius_cells` -- entao o chao dilata e
         contrai sem que nada se mova."""
+
+        # --- alavanca de polaridade ---
+        self.polarity_swapped = False
+        """O mapa esta com eter e contra-eter trocados. Vive aqui e nao no
+        `Terrain` porque e estado de uma TENTATIVA -- `reset()` recarrega o
+        ASCII e o mundo volta ao que era."""
+        self.on_lever = np.zeros(2, dtype=bool)
+        """Este ser esta em cima de uma alavanca AGORA. A troca dispara na
+        borda de entrada: sem isso, parar em cima dela inverteria o mundo
+        sessenta vezes por segundo."""
 
         # --- lanterna errante ---
         self.wander_col = 0.0
@@ -279,6 +292,9 @@ class LevelRuntime:
         state.wander_dir = 1.0
         state.source_phase = 0.0
         state.source_intensity = 0.0
+        state.source_alt_intensity = 0.0
+        state.polarity_swapped = False
+        state.on_lever[:] = False
         state.beacon_phase = 0.0
         state.beacon_on = True
         state.beacon_seconds_left = 0.0

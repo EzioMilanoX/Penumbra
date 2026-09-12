@@ -1,7 +1,7 @@
 # Penumbra — Luz e Sombra: Dualidade
 
 Puzzle-platformer sobre dois seres que não podem se tocar e não conseguem
-avançar separados. **Vinte e quatro fases** em quatro atos, menu com seleção
+avançar separados. **Trinta fases** em três capítulos, menu com seleção
 visual, colecionáveis e **multiplayer local**, construído sobre a
 [OuroborosEngine](https://github.com/EzioMilanoX/OuroborosEngine) — a engine
 vive no repositório dela, não é vendorizada aqui.
@@ -90,10 +90,13 @@ uma fase de pedir dela o que ela não faz.
 | **altar** `^` | não é chão — é onde se **larga a forma** | segure a habilidade em cima e ela fica ali *para sempre*; quem a deixou não a usa mais nesta fase |
 | **véu** `:` | de ninguém — **atravessa-se a pé** | mas não se atravessa com luz. Do lado de lá há sombra sem parede, e lá dentro o facho **não existe** |
 | **vidro** `-` | dos dois, sempre — e **a luz passa** | é o que torna possível empilhar dois andares: uma luz em cima acende o chão de baixo |
+| **alavanca** `!` | de ninguém — pisar nela **troca o mundo** | éter vira contra-éter no mapa inteiro. Nenhuma célula muda de brilho, e cada ponte passa ao outro ser |
 
 E três fontes de luz: a **lâmpada** `*`, fixa; o **farol** `o`, que acende e
 apaga sozinho; a **lanterna errante**, uma lâmpada que percorre um trilho `>`
-de ponta a ponta e volta; e a **fonte** `@`, que não anda — **incha**.
+de ponta a ponta e volta; e a **fonte** `@`, que não anda — **incha**. A fonte
+tem uma irmã `&` que respira meio período atrás dela: com as duas, a metade
+acesa da sala vai e vem sozinha.
 
 Mais dois marcadores: a **placa de pressão** `_`, que mantém uma porta aberta
 só enquanto alguém está em cima dela, e o **fragmento da fonte** `+`, o
@@ -176,6 +179,12 @@ Disso saem as situações que as fases exploram:
   que o mundo faz sozinho pedem três leituras diferentes: do farol se
   **espera**, a lanterna se **acompanha**, e da fonte se **recua** — ela vem
   buscar você onde você estava parado.
+- **A alavanca muda a outra metade da pergunta.** Todo o resto do jogo
+  responde *onde há luz agora?* — o facho acende, a absorção apaga, o farol
+  pulsa, a lanterna anda, a fonte incha. A alavanca muda **de quem é o
+  aceso**: a mesma ponte, a mesma luz, e o chão passa pro outro. É o único
+  verbo que um ser aciona pensando no **outro** — e quem puxa costuma perder
+  o próprio chão no mesmo instante.
 - **A crosta não volta.** Todo o resto do terreno é interruptor — acender,
   apagar, acender de novo. A crosta, não: rompida, rompida para a fase
   inteira. É a única decisão do jogo que não dá para desfazer. E como ela é
@@ -183,34 +192,65 @@ Disso saem as situações que as fases exploram:
   barrava — e é a Umbra quem se dissolve na luz. Até aqui toda destruição de
   terreno ia da Lumen para a Umbra; esta vai da Umbra para ela mesma.
 
-## As quatro fases
+## Os três capítulos
 
-| # | Nome | O que ela ensina |
+As fases não são agrupadas por tema, e sim por **função**. O jogo tem trinta,
+e o que muda de um capítulo para o outro é o que ele pede de você.
+
+### Capítulo I — **Aprender** (15 fases)
+
+Uma mecânica por fase, e nenhuma se repete. Cada fase declara no próprio JSON
+o que apresenta (`teaches`), e um teste confere que são quinze coisas
+distintas — e que **nada estreia depois daqui**. Uma mecânica que aparecesse
+primeiro numa fase de mistura chegaria sem nome e sem lugar onde praticar.
+
+| # | Nome | Apresenta |
 |---|---|---|
-| 1 | **Duas Polaridades** | Alternância (TAB) e leitura do terreno. Duas pistas, o mesmo material de éter: acesa em cima, apagada embaixo. Vencível **só andando** — nenhuma habilidade. |
-| 2 | **A Crosta** | Os **dois** verbos da Umbra, com um passo sem volta no meio. Ela rompe a crosta para passar — e o buraco deixa a lâmpada acender o éter do outro lado, que era o chão *dela*. Rompeu e se trancou fora da própria ponte: agora precisa absorver para devolvê-la ao escuro, atravessar, e desligar depois, para que a Lumen a encontre acesa. |
-| 3 | **O Mesmo Chão** | As duas habilidades em disputa. A lâmpada sobre a ponte faz dela chão da Lumen; a Umbra só a toma absorvendo — e absorver apaga a lâmpada, então os dois nunca podem estar na ponte ao mesmo tempo. |
-| 4 | **Eclipse** | A porta de polaridade, e a **sombra projetada pela rocha**: a zona de luz fica em cima de uma laje e a de sombra exatamente embaixo, então é a própria laje que impede o facho da Lumen de vazar até a zona da Umbra e cancelar a condição. |
-| 5 | **Eclipse Partilhado** | A ponte que aceita os **dois** — e colapsa depois do primeiro passo. A Umbra atravessa primeiro por ser a lenta; o prazo tem de cobrir as duas travessias. |
-| 6 | **Farol** | A mesma ponte serve aos dois, em turnos que não são deles. Aceso, é chão da Lumen; apagado, da Umbra. Ninguém escolhe quando. |
-| 7 | **Contratempo** | Farol e crosta juntos: romper abre o caminho, o farol decide a hora. Uma coisa irreversível e uma periódica na mesma fase. |
-| 8 | **Fusão** | A porta de polaridade destranca a ponte de eclipse. No fim, os dois atravessam o mesmo chão — o único que aceita os dois, e por tempo contado. |
-| 9 | **Contra-Éter** | A regra ao contrário, na mesma fase que ela. O farol governa as duas pontes ao mesmo tempo e em sentidos opostos; a ilha de rocha no meio é onde se espera a virada. |
-| 10 | **A Placa** | Duas placas, uma de cada lado da porta: um segura para o outro passar, e quem passou segura de volta. |
-| 11 | **Espelhos** | Três pontes, duas delas invertidas. Uma virada do farol troca o dono de todas de uma vez. |
-| 12 | **A Fonte** | Placa e eclipse juntos: segurar a porta custa exatamente o tempo que a ponte dourada não tem. |
-| 13 | **A Renúncia** | A Lumen larga o facho numa pedra para que o contra-éter — que só é chão da Umbra sob *luz* — vire estrada dela. Depois disso a Lumen não acende mais nada, e quem a leva de volta é justamente a luz que ela deixou. |
-| 14 | **Pedra Fria** | O espelho. A Umbra larga a escuridão, a lâmpada se apaga e a ponte volta a ser da Lumen — que agora precisa **correr** nela, porque escuro é o que a mata. |
-| 15 | **A Lanterna** | A lâmpada anda. Onde ela está, a ponte é da Lumen; onde não está, é da Umbra. Os dois usam a mesma ponte em fases opostas do mesmo ciclo. |
-| 16 | **Contracorrente** | Metade éter, metade contra-éter, uma lanterna só: o mesmo círculo monta uma metade e desmonta a outra. Um segue a lanterna, o outro foge dela. |
-| 17 | **O Guardião** | Lanterna e placa: a placa só vale com alguém **em cima**, e a lanterna não espera quem está segurando. A primeira vez que ficar parado é a tarefa difícil. |
-| 18 | **A Fonte Partida** | Ponte dourada com prazo, lanterna que não para, e um altar no fim do caminho. A última luz da Lumen é o que abre a última ponte da Umbra. |
-| 19 | **A Cortina** | O véu: sombra sem parede. Atravessa-se a pé, nunca com luz — e lá dentro o facho não existe. |
-| 20 | **Sob o Vidro** | A Lumen caminha na passarela e o facho desce pelo vidro, acendendo o chão da Umbra quatro linhas abaixo. Andam juntos, sem poder se tocar — é a imagem do jogo inteiro numa tela. |
-| 21 | **A Fonte Respira** | Ela não anda: incha. O chão aceso dilata e contrai, e quem estava seguro deixa de estar sem ter dado um passo. |
-| 22 | **Maré** | Meia ponte obedece à luz, meia a desobedece — e a mesma respiração monta uma e desmonta a outra, no mesmo instante. |
-| 23 | **Abrigos** | No auge, a fonte dissolve a Umbra a três células. Só dentro do véu a luz não chega: ela atravessa de abrigo em abrigo, e cada travessia tem de caber numa expiração. |
-| 24 | **A Fonte Aberta** | A escolta sob o vidro, e depois a Lumen **desce** ao chão dela para deixar a última luz numa pedra — para que a Umbra termine sozinha. |
+| 1 | **Duas Polaridades** | ler a polaridade: o mesmo éter é chão de um e abismo do outro. Vencível **só andando** |
+| 2 | **O Facho** | a habilidade da Lumen, sozinha. A ponte está apagada — dela só existe enquanto o facho estiver ligado |
+| 3 | **A Absorção** | a habilidade da Umbra, sozinha. Agora a ponte está acesa, e ela só a toma apagando |
+| 4 | **A Crosta** | o segundo verbo da Umbra, e o primeiro passo sem volta do jogo |
+| 5 | **A Porta** | a porta de polaridade, e a sombra projetada pela rocha |
+| 6 | **A Placa** | o gatilho que só vale com alguém **em cima** — o único lugar onde o ser parado tem função |
+| 7 | **O Eclipse** | a única célula que aceita os dois, e a única com prazo |
+| 8 | **Farol** | o mundo vira sozinho: aceso, a ponte é da Lumen; apagado, da Umbra |
+| 9 | **Contra-Éter** | a regra invertida — sólido para a Lumen no escuro e para a Umbra na luz |
+| 10 | **A Renúncia** | o altar: largar a habilidade numa pedra, para sempre |
+| 11 | **A Lanterna** | a luz que anda, e leva o chão junto |
+| 12 | **A Cortina** | o véu: sombra sem parede, e o único lugar onde o facho **não existe** |
+| 13 | **Sob o Vidro** | a luz de um serve ao outro: ela caminha em cima, o facho desce, o chão da Umbra acende |
+| 14 | **A Fonte Respira** | a fonte não anda: **incha**. O chão aceso dilata e contrai |
+| 15 | **A Alavanca** | trocar éter por contra-éter no mapa inteiro, com um passo |
+
+### Capítulo II — **Misturar** (9 fases)
+
+Duas ou mais ao mesmo tempo. Nada de novo aqui — só combinações, e cada uma
+existe porque as duas peças **brigam**.
+
+| # | Nome | A mistura |
+|---|---|---|
+| 16 | **O Mesmo Chão** | facho × absorção: a lâmpada faz a ponte ser da Lumen, e absorver apaga a lâmpada |
+| 17 | **Contratempo** | farol + crosta: uma coisa irreversível e uma periódica |
+| 18 | **Fusão** | porta + eclipse: a porta destranca a ponte que tem prazo |
+| 19 | **Espelhos** | contra-éter + farol: três pontes, duas invertidas, uma virada troca todas |
+| 20 | **A Fonte** | placa + eclipse: segurar a porta custa o tempo que a ponte dourada não tem |
+| 21 | **Pedra Fria** | o altar da Umbra: apagar a lâmpada devolve a ponte à Lumen — que agora precisa **correr** no escuro |
+| 22 | **Contracorrente** | lanterna + contra-éter: um segue a luz, o outro foge dela |
+| 23 | **O Guardião** | lanterna + placa: a lanterna não espera quem está segurando a porta |
+| 24 | **Contrapeso** | alavanca + lanterna: a alavanca espelha a fase, e não dá para agradar aos dois |
+
+### Capítulo III — **Especiais** (6 fases)
+
+As que quebram a própria regra.
+
+| # | Nome | O que ela quebra |
+|---|---|---|
+| 25 | **Maré** | a mesma respiração monta uma metade e desmonta a outra, no mesmo instante |
+| 26 | **Abrigos** | no auge a fonte dissolve a Umbra a três células; só dentro do véu a luz não chega |
+| 27 | **Sem Rocha** | **nenhum chão neutro entre as margens.** A mesma lanterna: em cima é o chão da Lumen, embaixo é o buraco da Umbra — uma a segue, a outra foge |
+| 28 | **A Fonte Desperta** | duas fontes em contratempo: a metade acesa da sala vai e vem sozinha |
+| 29 | **A Fonte Partida** | ponte dourada com prazo, lanterna que não para, e um altar no fim |
+| 30 | **A Fonte Aberta** | a escolta sob o vidro, e a Lumen **desce** ao chão dela para deixar a última luz numa pedra |
 
 Três princípios de desenho, todos aprendidos errando:
 
@@ -237,7 +277,8 @@ Três princípios de desenho, todos aprendidos errando:
 ;  contra-éter (a regra invertida)               +  fragmento da fonte
 ^  altar de forma (larga a habilidade ali)       >  trilho da lanterna
 :  véu (passa o pé, não passa a luz)            -  vidro (chão, e a luz passa)
-@  fonte que respira (o raio dilata e contrai)
+@  fonte que respira (o raio dilata e contrai)   &  a irmã dela, em contratempo
+!  alavanca (troca éter por contra-éter)
 *  lâmpada fixa                                  .  vazio
 o  farol pulsante
 D  porta         L/S  zonas de polaridade      _  placa de pressão
@@ -297,7 +338,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              149 testes headless
+tests/              163 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -367,7 +408,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 149 testes, ~7 s, headless
+pytest -q                      # 163 testes, ~11 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -399,7 +440,7 @@ e não tinha como voltar à zona de luz —, corrigido com dois degraus de rocha
 
 ## O fim
 
-Depois da fase 24 o jogo faz a pergunta que passou 24 fases fazendo sem dizer
+Depois da fase 30 o jogo faz a pergunta que passou 24 fases fazendo sem dizer
 em voz alta: **fundir os dois, ou segui-los separados.**
 
 Nenhum dos dois é recompensado, e é de propósito. Fundir resolve o problema do
@@ -418,14 +459,18 @@ casos, porque em ambos eles existem; o que muda é quem os comanda, e é isso
 que o desenho diz: num jogador, um `TAB` entre eles; em dois, um rótulo J1 e
 J2.
 
-A **seleção de fase** é uma grade de 3×2 cards por **ato** (são quatro), cada um com
+A **seleção de fase** é uma grade de 5×3 cards por **capítulo** (são três), cada um com
 **numerão**, nome, dois selos (fase vencida, fragmento) e uma **prévia** da
 fase.
 
-Vinte e quatro fases não cabem numa grade só, e encolher o card até caberem
+Trinta fases não cabem numa grade só, e encolher o card até caberem
 transformaria a miniatura — a única coisa que faz o card valer mais que uma
 lista de nomes — em manchinha. Paginar também diz algo verdadeiro sobre o
-jogo: as mecânicas chegam em levas, e cada ato é uma delas. O ato é uma
+jogo — mas a página é o **capítulo**, e não um bloco de N fases, porque os
+três não têm o mesmo tamanho nem deveriam ter: aprender uma mecânica de cada
+vez custa uma fase por mecânica, misturar custa menos, e as especiais são
+poucas de propósito. Um capítulo mais curto deixa a grade pela metade, e isso
+é uma informação verdadeira — não um buraco. O capítulo é uma
 **página, não uma tranca** — nada fica bloqueado, e a seta anda de ato como
 anda de card, virando pela borda da grade. Assim o menu inteiro continua em
 quatro teclas.

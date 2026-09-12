@@ -45,6 +45,8 @@ from penumbra.terrain import (
     ROLE_VEIL,
     ROLE_GLASS,
     ROLE_SOURCE,
+    ROLE_SOURCE_ALT,
+    ROLE_LEVER,
     Terrain,
 )
 from penumbra.tuning import DualityTuning
@@ -139,7 +141,14 @@ das duas coisas."""
 SOURCE_CALM = (120, 104, 150)
 SOURCE_FULL = (255, 246, 226)
 
-_ROLE_COUNT = 20
+LEVER_IDLE = (116, 106, 150)
+LEVER_THROWN = (214, 176, 240)
+"""A alavanca e o unico objeto do jogo cujo estado nao se le no terreno ao
+redor: eter e contra-eter trocados continuam sendo eter e contra-eter. Ela
+mesma tem de dizer de que lado esta, e por isso muda de cor em vez de so
+pulsar."""
+
+_ROLE_COUNT = 22
 _CELL_SPRITE_UNIT = 8.0
 """`PygameRenderer.draw_batch` converte `transform.scale` em pixels
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
@@ -230,6 +239,9 @@ class PresentationSystem(ISystem):
         self._size_by_role[ROLE_GLASS] = 0.44
         self._shape_by_role[ROLE_SOURCE] = SHAPE_CIRCLE
         self._size_by_role[ROLE_SOURCE] = 0.74
+        self._shape_by_role[ROLE_SOURCE_ALT] = SHAPE_CIRCLE
+        self._size_by_role[ROLE_SOURCE_ALT] = 0.74
+        self._size_by_role[ROLE_LEVER] = 0.7
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
         self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
         self._source_min = tuning.flow.source_min_intensity
@@ -358,11 +370,22 @@ class PresentationSystem(ISystem):
         self._fill(self._mask, GLASS, GLASS)
         np.copyto(self._alpha, 210.0, where=self._mask)
 
-        # a fonte que respira: clareia e incha junto com o proprio raio
+        # as duas fontes: cada uma clareia e incha junto com o proprio raio
         np.equal(role, ROLE_SOURCE, out=self._mask)
-        self._ramp[:] = self._source_breath()
+        self._ramp[:] = self._source_breath(state.source_intensity)
         self._fill(self._mask, SOURCE_CALM, SOURCE_FULL)
         np.copyto(self._alpha, 255.0, where=self._mask)
+
+        np.equal(role, ROLE_SOURCE_ALT, out=self._mask)
+        self._ramp[:] = self._source_breath(state.source_alt_intensity)
+        self._fill(self._mask, SOURCE_CALM, SOURCE_FULL)
+        np.copyto(self._alpha, 255.0, where=self._mask)
+
+        # alavanca: a cor diz de que lado o mundo esta
+        np.equal(role, ROLE_LEVER, out=self._mask)
+        thrown = LEVER_THROWN if state.polarity_swapped else LEVER_IDLE
+        self._fill(self._mask, thrown, thrown)
+        np.copyto(self._alpha, 190.0 + 60.0 * pulse, where=self._mask)
 
         # trilho da lanterna (a lanterna em si e escrita no flush)
         np.equal(role, ROLE_WANDER, out=self._mask)
@@ -400,15 +423,16 @@ class PresentationSystem(ISystem):
 
         self._flush_cells(role, pulse)
 
-    def _source_breath(self) -> float:
-        """0..1 entre as duas intensidades da fonte. O corpo dela clareia e
-        incha junto com o raio que ela projeta -- sem isso o jogador leria a
+    def _source_breath(self, intensity: float) -> float:
+        """0..1 entre as duas intensidades de uma fonte. O corpo dela clareia
+        e incha junto com o raio que projeta -- sem isso o jogador leria a
         borda do chao aceso mexendo e nao teria onde olhar pra prever o
-        proximo instante."""
+        proximo instante. Com duas fontes em contratempo isso deixa de ser
+        conforto e passa a ser a unica leitura possivel da sala."""
         low, high = self._source_min, self._source_max
         if high <= low:
             return 1.0
-        return min(1.0, max(0.0, (self._state.source_intensity - low) / (high - low)))
+        return min(1.0, max(0.0, (intensity - low) / (high - low)))
 
     def _paint_altars(self, pulse: float) -> None:
         """Tres estados num unico papel de celula: vazio, recebendo, cheio.
@@ -500,10 +524,12 @@ class PresentationSystem(ISystem):
         state = self._state
         terrain = self._terrain
         if terrain.has_source:
-            breath = self._source_breath()
-            np.equal(role, ROLE_SOURCE, out=self._mask)
-            np.multiply(self._channel, 0.7 + 0.5 * breath, out=self._ramp)
-            np.copyto(self._channel, self._ramp, where=self._mask)
+            for role_id, intensity in ((ROLE_SOURCE, state.source_intensity),
+                                       (ROLE_SOURCE_ALT, state.source_alt_intensity)):
+                np.equal(role, role_id, out=self._mask)
+                np.multiply(self._channel, 0.7 + 0.5 * self._source_breath(intensity),
+                            out=self._ramp)
+                np.copyto(self._channel, self._ramp, where=self._mask)
 
         if terrain.has_wanderer:
             # A lanterna nao tem papel de celula proprio: ela e UMA celula do

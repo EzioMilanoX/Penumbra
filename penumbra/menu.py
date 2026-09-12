@@ -40,6 +40,8 @@ from penumbra.terrain import (
     ROLE_VEIL,
     ROLE_GLASS,
     ROLE_SOURCE,
+    ROLE_SOURCE_ALT,
+    ROLE_LEVER,
     Terrain,
 )
 
@@ -74,35 +76,33 @@ _PREVIEW_COLORS = {
     ROLE_VEIL: (74, 66, 106, 255),
     ROLE_GLASS: (166, 188, 216, 255),
     ROLE_SOURCE: (255, 246, 226, 255),
+    ROLE_SOURCE_ALT: (214, 200, 255, 255),
+    ROLE_LEVER: (170, 150, 220, 255),
 }
 """Cor de cada papel na miniatura. Deliberadamente mais CLARAS que no jogo:
 numa miniatura de 3 px por celula o contraste real do jogo (rocha quase preta
 sobre fundo quase preto) desapareceria, e a silhueta da fase e a unica coisa
 que o card precisa entregar."""
 
-_COLUMNS = 3
-_ROWS = 2
-_PER_ACT = _COLUMNS * _ROWS
-_CARD_WIDTH = 250.0
-_CARD_HEIGHT = 180.0
-_CARD_GAP_X = 22.0
-_CARD_GAP_Y = 18.0
+_COLUMNS = 5
+_ROWS = 3
+_CARD_WIDTH = 160.0
+_CARD_HEIGHT = 126.0
+_CARD_GAP_X = 14.0
+_CARD_GAP_Y = 13.0
 _GRID_TOP = 136.0
-_ACT_TAB_Y = 104.0
-"""Seis cards por ato, em 3x2. Dezoito fases numa grade so nao cabem na
-janela, e encolher o card ate caberem transformaria a miniatura -- que e a
-unica coisa que faz o card valer mais que uma lista de nomes -- em manchinha.
+_CHAPTER_TAB_Y = 104.0
+"""Quinze slots por pagina, em 5x3 -- o tamanho do maior capitulo.
 
-Paginar tambem diz algo verdadeiro sobre o jogo: as mecanicas chegam em tres
-levas, e cada ato e uma delas. O ato e uma pagina, nao uma tranca: nada e
-bloqueado, e a seta anda de ato como anda de card."""
+A pagina e o CAPITULO, e nao um bloco de N fases, porque os tres nao tem o
+mesmo tamanho nem deveriam ter: aprender uma mecanica de cada vez custa uma
+fase por mecanica, misturar custa menos, e as especiais sao poucas de
+proposito. Um capitulo mais curto deixa a grade pela metade, e isso e uma
+informacao verdadeira -- nao um buraco.
 
-_ACTS = (
-    ("ATO I", "ALTERNANCIA", "andar, acender, apagar"),
-    ("ATO II", "CONSEQUENCIA", "o que nao volta atras"),
-    ("ATO III", "RENUNCIA", "o que se deixa pra tras"),
-    ("ATO IV", "A FONTE", "a luz de um serve ao outro"),
-)
+O capitulo e pagina, nao tranca: nada fica bloqueado, e a seta anda de
+capitulo como anda de card, virando pela borda da grade. Assim o menu
+inteiro continua em quatro teclas."""
 
 
 class LevelPreview:
@@ -111,8 +111,8 @@ class LevelPreview:
 
     Guarda uma lista de `(coluna, linha, cor)` ja filtrada -- so as celulas
     que de fato desenham algo. Numa grade 28x17 isso costuma cortar mais da
-    metade, e o menu desenha seis cards por frame: sem o filtro seriam 2856
-    retangulos por frame pra mostrar sobretudo vazio.
+    metade, e o menu desenha ate quinze cards por frame: sem o filtro seriam
+    7140 retangulos por frame pra mostrar sobretudo vazio.
     """
 
     def __init__(self, level: LevelDefinition, terrain: Terrain) -> None:
@@ -141,7 +141,7 @@ class LevelPreview:
 
 class LevelCardGrid:
     """
-    Grade de cards navegavel com W/A/S/D, paginada em atos.
+    Grade de cards navegavel com W/A/S/D, paginada por CAPITULO.
 
     Cada card tem numerao, nome, a miniatura da fase e dois selos: um de
     fase vencida e um do fragmento. O fragmento fica dourado quando apanhado
@@ -149,8 +149,8 @@ class LevelCardGrid:
     "isto exige os dois", que e exatamente o que o desvio do fragmento
     costuma exigir.
 
-    Andar pra esquerda na primeira coluna vira a pagina pro ato anterior (e
-    pra direita na ultima, pro seguinte). Virar pela BORDA, e nao por uma
+    Andar pra esquerda na primeira coluna vira a pagina pro capitulo anterior
+    (e pra direita na ultima, pro seguinte). Virar pela BORDA, e nao por uma
     tecla propria, mantem o menu inteiro em quatro teclas -- e e como todo
     seletor de fase de celular funciona, que e a referencia que o jogador
     traz pra ca.
@@ -169,50 +169,52 @@ class LevelCardGrid:
         return self._catalog.count
 
     @property
-    def act(self) -> int:
-        return self.selected // _PER_ACT
+    def chapter(self):
+        return self._catalog.chapter_of(self.selected)
 
     @property
-    def act_count(self) -> int:
-        return (self.count + _PER_ACT - 1) // _PER_ACT
+    def chapters(self):
+        return self._catalog.chapters
 
     def move(self, columns: int, rows: int) -> None:
-        """Anda na grade; na borda lateral, vira de ato.
+        """Anda na grade; na borda lateral, vira de capitulo.
 
-        Nao circula em cima/embaixo nem no ultimo ato de proposito: num
-        seletor 2D o wrap salta o cursor pra um canto oposto e o jogador
-        perde de vista onde estava.
+        Nao circula em cima/embaixo nem depois do ultimo capitulo de
+        proposito: num seletor 2D o wrap salta o cursor pra um canto oposto e
+        o jogador perde de vista onde estava.
         """
-        act = self.act
-        local = self.selected - act * _PER_ACT
+        chapters = self._catalog.chapters
+        chapter = self.chapter
+        position = chapters.index(chapter)
+        local = self.selected - chapter.first
         column = local % _COLUMNS
         row = local // _COLUMNS
 
         if columns < 0 and column == 0:
-            if act == 0:
+            if position == 0:
                 return
-            act -= 1
+            chapter = chapters[position - 1]
             column = _COLUMNS - 1
         elif columns > 0 and column == _COLUMNS - 1:
-            if act >= self.act_count - 1:
+            if position >= len(chapters) - 1:
                 return
-            act += 1
+            chapter = chapters[position + 1]
             column = 0
         else:
             column = max(0, min(_COLUMNS - 1, column + columns))
 
-        row = max(0, min(_ROWS - 1, row + rows))
-        target = act * _PER_ACT + row * _COLUMNS + column
-        # O ultimo ato pode estar incompleto: cai pro card existente mais
-        # proximo em vez de recusar o movimento, que ao jogador pareceria
-        # a tecla ter falhado.
-        while target >= self.count and target > act * _PER_ACT:
+        last_row = max(0, (chapter.count - 1) // _COLUMNS)
+        row = max(0, min(min(_ROWS - 1, last_row), row + rows))
+        target = chapter.first + row * _COLUMNS + column
+        # Um capitulo pode nao encher a fileira: cai pro card existente mais
+        # proximo em vez de recusar o movimento, que ao jogador pareceria a
+        # tecla ter falhado.
+        while target > chapter.last and target > chapter.first:
             target -= 1
-        if target < self.count:
-            self.selected = target
+        self.selected = max(chapter.first, min(chapter.last, target))
 
     def card_rect(self, index: int) -> Tuple[float, float, float, float]:
-        local = index % _PER_ACT
+        local = index - self._catalog.chapter_of(index).first
         column = local % _COLUMNS
         row = local // _COLUMNS
         total_width = _COLUMNS * _CARD_WIDTH + (_COLUMNS - 1) * _CARD_GAP_X
@@ -231,37 +233,38 @@ class LevelCardGrid:
         shards: List[bool],
     ) -> None:
         self._viewport_width, _ = renderer.get_viewport_size()
-        self._draw_act_tabs(renderer, completed)
-        first = self.act * _PER_ACT
-        for index in range(first, min(first + _PER_ACT, self.count)):
+        self._draw_chapter_tabs(renderer, completed)
+        chapter = self.chapter
+        for index in range(chapter.first, chapter.last + 1):
             self._draw_card(renderer, index, completed[index], shards[index])
 
-    def _draw_act_tabs(self, renderer: IRenderer, completed: List[bool]) -> None:
-        """Os tres atos numa linha, com o progresso de cada um.
+    def _draw_chapter_tabs(self, renderer: IRenderer, completed: List[bool]) -> None:
+        """Os capitulos numa linha, com o progresso de cada um.
 
-        O ato corrente leva o nome por extenso e a legenda; os outros, so o
-        numeral. E o suficiente pra dizer 'ha mais de um lado' sem competir
-        com os cards, que sao o que o jogador veio ver."""
+        O capitulo corrente leva o nome por extenso e a legenda; os outros, so
+        o numeral e a contagem. E o suficiente pra dizer "ha mais de um lado"
+        sem competir com os cards, que sao o que o jogador veio ver."""
+        chapters = self._catalog.chapters
         center = self._viewport_width / 2.0
-        total = self.act_count
-        slot = min(190.0, (self._viewport_width - 40.0) / max(1, total))
-        left = center - (total * slot) / 2.0
-        for index in range(total):
-            numeral, title, subtitle = _ACTS[index] if index < len(_ACTS) else (f"ATO {index + 1}", "", "")
-            x = left + index * slot + slot / 2.0
-            current = index == self.act
-            done = sum(1 for i in range(index * _PER_ACT, min((index + 1) * _PER_ACT, self.count))
-                       if completed[i])
-            size = min(_PER_ACT, self.count - index * _PER_ACT)
+        slot = min(220.0, (self._viewport_width - 40.0) / max(1, len(chapters)))
+        left = center - (len(chapters) * slot) / 2.0
+        for position, chapter in enumerate(chapters):
+            x = left + position * slot + slot / 2.0
+            current = chapter is self.chapter
+            done = sum(1 for i in range(chapter.first, chapter.last + 1) if completed[i])
             if current:
-                renderer.draw_text(x, _ACT_TAB_Y - 16.0, f"{numeral}  {title}", 15, _GOLD,
+                renderer.draw_text(x, _CHAPTER_TAB_Y - 16.0, chapter.title, 15, _GOLD,
                                    anchor="center")
-                renderer.draw_text(x, _ACT_TAB_Y + 4.0, subtitle, 11, _TEXT_DIM, anchor="center")
-                renderer.draw_ui_rect(x - 84.0, _ACT_TAB_Y + 22.0, 168.0, 2.0, _GOLD)
+                renderer.draw_text(x, _CHAPTER_TAB_Y + 4.0,
+                                   f"{chapter.subtitle}    {done}/{chapter.count}",
+                                   11, _TEXT_DIM, anchor="center")
+                renderer.draw_ui_rect(x - slot / 2.0 + 16.0, _CHAPTER_TAB_Y + 22.0,
+                                      slot - 32.0, 2.0, _GOLD)
             else:
-                renderer.draw_text(x, _ACT_TAB_Y - 16.0, numeral, 13, _TEXT_FAINT, anchor="center")
-                renderer.draw_text(x, _ACT_TAB_Y + 4.0, f"{done}/{size}", 11, _TEXT_FAINT,
+                renderer.draw_text(x, _CHAPTER_TAB_Y - 16.0, chapter.title, 13, _TEXT_FAINT,
                                    anchor="center")
+                renderer.draw_text(x, _CHAPTER_TAB_Y + 4.0, f"{done}/{chapter.count}", 11,
+                                   _TEXT_FAINT, anchor="center")
 
     def _draw_card(self, renderer: IRenderer, index: int, done: bool, shard: bool) -> None:
         x, y, width, height = self.card_rect(index)
@@ -273,25 +276,26 @@ class LevelCardGrid:
             renderer.draw_ui_rect(x, y, width, 2.0, _GOLD)
             renderer.draw_ui_rect(x, y + height - 2.0, width, 2.0, _GOLD)
 
-        # numerao: o jeito mais rapido de achar a fase 15 numa grade de seis
-        renderer.draw_text(x + 14.0, y + 8.0, str(index + 1), 36, _GOLD if selected else _NUMBER_IDLE)
+        # numerao: o jeito mais rapido de achar a fase 15 numa grade de quinze
+        renderer.draw_text(x + 9.0, y + 5.0, str(index + 1), 26,
+                           _GOLD if selected else _NUMBER_IDLE)
 
         # miniatura do terreno real da fase
-        preview_x = x + 66.0
-        preview_y = y + 14.0
-        preview_w = width - 80.0
-        preview_h = height - 60.0
+        preview_x = x + 44.0
+        preview_y = y + 9.0
+        preview_w = width - 53.0
+        preview_h = height - 46.0
         renderer.draw_ui_rect(preview_x - 2.0, preview_y - 2.0, preview_w + 4.0, preview_h + 4.0, _VOID)
         self.previews[index].draw(renderer, preview_x, preview_y, preview_w, preview_h)
 
-        renderer.draw_text(x + 14.0, y + height - 38.0, level.name, 15, _TEXT if selected else _TEXT_DIM)
+        renderer.draw_text(x + 9.0, y + height - 32.0, level.name, 12,
+                           _TEXT if selected else _TEXT_DIM)
 
         # selos: fase vencida e fragmento
-        seal_y = y + height - 18.0
-        renderer.draw_text(x + 14.0, seal_y, "vencida" if done else "aberta", 11,
+        seal_y = y + height - 15.0
+        renderer.draw_text(x + 9.0, seal_y, "vencida" if done else "aberta", 10,
                            _GOLD if done else _TEXT_FAINT)
-        renderer.draw_text(x + width - 14.0, seal_y,
-                           "fragmento" if shard else "fragmento?", 11,
+        renderer.draw_text(x + width - 9.0, seal_y, "frag" if shard else "frag?", 10,
                            _GOLD if shard else _GOLD_DIM, anchor="topright")
 
 

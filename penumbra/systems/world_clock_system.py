@@ -138,11 +138,16 @@ class WorldClockSystem(ISystem):
         state, terrain = self._state, self._terrain
         if not terrain.has_source:
             state.source_intensity = 0.0
+            state.source_alt_intensity = 0.0
             return
 
         state.source_phase = (state.source_phase + delta_time) % self._source_period
+        span = self._source_max - self._source_min
         breath = 0.5 - 0.5 * math.cos(math.tau * state.source_phase / self._source_period)
-        state.source_intensity = self._source_min + (self._source_max - self._source_min) * breath
+        state.source_intensity = self._source_min + span * breath
+        # A segunda fonte respira meio periodo atras: quando uma incha, a
+        # outra esvazia, e a faixa segura entre as duas vai e vem sozinha.
+        state.source_alt_intensity = self._source_min + span * (1.0 - breath)
 
     def _advance_eclipse(self, delta_time: float) -> None:
         """O prazo comeca no primeiro toque de QUALQUER um dos dois -- nao no

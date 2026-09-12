@@ -31,6 +31,19 @@ def _level_indices(simulation):
     return list(range(simulation.catalog.count))
 
 
+def level(simulation, level_id: str) -> int:
+    """Indice da fase com este `id`.
+
+    Os testes de percurso enderecavam a fase pelo NUMERO dela, e a
+    reorganizacao em capitulos renumerou tudo -- cada rota passou a testar
+    uma fase diferente da que o nome do teste prometia. O id nao muda quando
+    a ordem muda, e e o unico endereco estavel que uma fase tem."""
+    for index in range(simulation.catalog.count):
+        if simulation.catalog.at(index).level_id == level_id:
+            return index
+    raise AssertionError(f"fase {level_id!r} nao esta no catalogo")
+
+
 class TestEveryLevelIsPlayable:
     def test_a_dica_de_cada_fase_cabe_no_rodape(self, simulation):
         """O rodape desenha a dica numa linha so, sem quebra: uma dica mais
@@ -263,7 +276,7 @@ class TestPlaythrough:
         material e chao de um e abismo do outro, e precisa ser vencivel sem
         nenhuma habilidade -- so TAB e as setas. Se algum dia ela exigir o
         facho, o jogo perdeu sua porta de entrada."""
-        simulation.runtime.load(0)
+        simulation.runtime.load(level(simulation, "01_duas_polaridades"))
         terrain = simulation.terrain
         assert simulation.state.active == LUMEN
 
@@ -288,7 +301,7 @@ class TestPlaythrough:
         propria ponte. Precisa entao absorver pra devolve-la ao escuro,
         atravessar, e desligar depois, pra que a Lumen encontre a ponte acesa.
         """
-        simulation.runtime.load(1)
+        simulation.runtime.load(level(simulation, "04_a_crosta"))
         state, terrain = simulation.state, simulation.terrain
         assert terrain.crust.any(), "a fase 2 precisa ter crosta"
 
@@ -318,7 +331,7 @@ class TestPlaythrough:
         """'O Mesmo Chao': a lampada sobre a ponte faz dela chao da Lumen. A
         Umbra so a toma absorvendo -- e absorver apaga a lampada, entao os
         dois nunca podem estar na ponte ao mesmo tempo."""
-        simulation.runtime.load(2)
+        simulation.runtime.load(level(simulation, "16_o_mesmo_chao"))
         state, terrain = simulation.state, simulation.terrain
 
         self._press(simulation, input_provider, "switch")
@@ -348,7 +361,7 @@ class TestPlaythrough:
         na zona, a Lumen sobrevive sem ele) pra que a carga se recomponha
         antes da travessia do eter.
         """
-        simulation.runtime.load(3)
+        simulation.runtime.load(level(simulation, "05_a_porta"))
         state, terrain = simulation.state, simulation.terrain
         light_col = int(np.nonzero(terrain.zone_light)[1][0])
         shadow_col = int(np.nonzero(terrain.zone_shadow)[1][0])
@@ -500,41 +513,59 @@ class TestLevelFlow:
         assert simulation.state.level_index == 1, "A/D anda na grade, ESPACO entra"
 
     def test_a_grade_do_menu_anda_em_duas_dimensoes(self, flow, simulation, input_provider):
-        """Tres colunas: W/S pulam uma linha inteira (tres fases), A/D andam
-        de uma em uma. Sem isso, chegar a fase 6 custaria cinco toques."""
+        """Cinco colunas: W/S pulam uma fileira inteira (cinco fases), A/D
+        andam de uma em uma. Sem isso, chegar a fase 11 custaria dez toques."""
         flow.show_menu()
         input_provider.set_action_held("menu_down", True)
         self._drive(flow, simulation, input_provider, frames=1)
-        assert flow.menu.selected == 3, "S desce uma linha da grade"
+        assert flow.menu.selected == 5, "S desce uma fileira da grade"
         input_provider.set_action_held("menu_down", False)
         input_provider.set_action_held("move_right", True)
         self._drive(flow, simulation, input_provider, frames=1)
-        assert flow.menu.selected == 4
+        assert flow.menu.selected == 6
 
-    def test_a_borda_da_grade_vira_de_ato(self, flow, simulation, input_provider):
-        """Dezoito fases nao cabem numa grade so, entao o menu pagina em atos
-        de seis -- e virar pela BORDA mantem o menu inteiro em quatro teclas.
-        Sem isso a metade do jogo ficaria atras de uma tecla nao documentada."""
+    def test_a_borda_da_grade_vira_de_capitulo(self, flow, simulation, input_provider):
+        """Trinta fases nao cabem numa grade so, e os tres capitulos nao tem o
+        mesmo tamanho -- entao o menu pagina por CAPITULO, nao por um bloco de
+        N fases. Virar pela borda mantem o menu inteiro em quatro teclas."""
         flow.show_menu()
         grid = flow.menu._grid
-        assert grid.act_count >= 2, "a paginacao so faz sentido com mais de um ato"
-        grid.selected = 2               # ultima coluna do ato I
-        grid.move(1, 0)
-        assert grid.selected == 6, "a direita na ultima coluna abre o ato seguinte"
-        assert grid.act == 1
-        grid.move(-1, 0)
-        assert grid.selected == 2, "e a esquerda na primeira volta pro anterior"
-        assert grid.act == 0
+        chapters = grid.chapters
+        assert len(chapters) >= 2, "a paginacao so faz sentido com mais de um capitulo"
 
-    def test_a_grade_nao_passa_do_primeiro_nem_do_ultimo_ato(self, flow):
+        first, second = chapters[0], chapters[1]
+        grid.selected = first.first + 4          # ultima coluna do capitulo 1
+        grid.move(1, 0)
+        assert grid.chapter is second, "a direita na ultima coluna abre o capitulo seguinte"
+        assert second.first <= grid.selected <= second.last
+
+        grid.move(-1, 0)
+        assert grid.chapter is first, "e a esquerda na primeira volta pro anterior"
+
+    def test_a_grade_nao_passa_do_primeiro_nem_do_ultimo_capitulo(self, flow):
         flow.show_menu()
         grid = flow.menu._grid
         grid.selected = 0
         grid.move(-1, 0)
-        assert grid.selected == 0, "nao existe ato antes do primeiro"
+        assert grid.selected == 0, "nao existe capitulo antes do primeiro"
         grid.selected = grid.count - 1
         grid.move(1, 0)
         assert grid.selected == grid.count - 1, "nem depois do ultimo"
+
+    def test_a_selecao_nunca_sai_do_capitulo_visivel(self, flow):
+        """Um capitulo mais curto deixa a grade pela metade. Descer numa
+        coluna vazia nao pode levar o cursor pra uma fase de outro capitulo
+        que nem esta na tela."""
+        flow.show_menu()
+        grid = flow.menu._grid
+        for chapter in grid.chapters:
+            for start in range(chapter.first, chapter.last + 1):
+                for columns, rows in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                    grid.selected = start
+                    grid.move(columns, rows)
+                    assert chapter.first <= grid.selected <= chapter.last or (
+                        columns != 0
+                    ), f"cap {chapter.number}: {start} -> {grid.selected} com {(columns, rows)}"
 
     def test_o_hud_cala_a_boca_fora_da_fase(self, flow):
         """O HUD e um callback GLOBAL de `set_on_draw_ui` -- roda independente

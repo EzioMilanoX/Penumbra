@@ -1,7 +1,9 @@
 {
-  "id": "23_abrigos",
-  "name": "Abrigos",
-  "hint": "No auge, a fonte dissolve a Umbra a tres celulas. So dentro do veu a luz nao chega: ande de abrigo em abrigo.",
+  "id": "03_a_absorcao",
+  "name": "A Absorcao",
+  "hint": "Agora a ponte esta acesa: da Lumen, de graca. A Umbra so a toma apagando -- e a escuridao anda com ela.",
+  "chapter": 1,
+  "teaches": "absorcao",
   "rows": [
     ".........###########........",
     ".........###########........",
@@ -14,9 +16,9 @@
     ".........###########........",
     "...*.....###########....*...",
     ".........###########...+.X..",
-    "......................######",
-    "...B..A....:..@..:..Y.......",
-    "#########~~#~~#~~#~~########",
+    "...........*.....*....######",
+    "...B..A.............Y.......",
+    "#########~~~~~~~~~~~########",
     "#########...........########",
     "#########...........########",
     "............................"

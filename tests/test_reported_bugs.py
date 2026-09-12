@@ -28,9 +28,18 @@ from tests.conftest import advance, load_custom, place
 
 _BINDINGS = Path(__file__).resolve().parents[1] / "data" / "input_bindings" / "penumbra_keyboard.json"
 
-# Fases de escolta sob o vidro: indice no catalogo -> (colunas do vao que so
-# o facho preenche, coluna onde a Lumen tem de parar pra preenche-lo).
-_ESCORT_LEVELS = {19: ((12, 14), 13), 23: ((9, 11), 10)}
+# Fases de escolta sob o vidro: id -> (colunas do vao que so o facho
+# preenche, coluna onde a Lumen tem de parar pra preenche-lo). Endereca por
+# ID e nao por numero: a reorganizacao em capitulos renumerou tudo, e um
+# teste preso ao numero passa a medir a fase errada em silencio.
+_ESCORT_LEVELS = {"13_sob_o_vidro": ((12, 14), 13), "30_a_fonte_aberta": ((9, 11), 10)}
+
+
+def _level(simulation, level_id: str) -> int:
+    for index in range(simulation.catalog.count):
+        if simulation.catalog.at(index).level_id == level_id:
+            return index
+    raise AssertionError(f"fase {level_id!r} nao esta no catalogo")
 
 
 def _hold(input_provider, *actions):
@@ -168,8 +177,8 @@ class TestEscortFitsOneCharge:
     def test_as_lampadas_deixam_um_vao_do_tamanho_da_mancha_do_facho(
         self, simulation, input_provider
     ):
-        for level_index, (gap, stand_col) in _ESCORT_LEVELS.items():
-            simulation.runtime.load(level_index)
+        for level_id, (gap, stand_col) in _ESCORT_LEVELS.items():
+            simulation.runtime.load(_level(simulation, level_id))
             simulation.state.ability_on[:] = False
             advance(simulation, input_provider, frames=4)
             name = simulation.runtime.current.name
@@ -195,8 +204,8 @@ class TestEscortFitsOneCharge:
         """O numero que faltava. A Umbra atravessa o vao inteiro enquanto a
         Lumen fica parada -- e sobra carga. Antes ela chegava a um terco do
         caminho e caia."""
-        for level_index, (gap, stand_col) in _ESCORT_LEVELS.items():
-            simulation.runtime.load(level_index)
+        for level_id, (gap, stand_col) in _ESCORT_LEVELS.items():
+            simulation.runtime.load(_level(simulation, level_id))
             state = simulation.state
             name = simulation.runtime.current.name
             first, last = gap
@@ -227,10 +236,12 @@ class TestEscortFitsOneCharge:
                 f"sem folga pra posicionar a Lumen antes"
             )
 
-    def test_o_ultimo_trecho_da_24_continua_dependendo_do_altar(self, simulation, input_provider):
+    def test_o_ultimo_trecho_da_fonte_aberta_continua_dependendo_do_altar(
+        self, simulation, input_provider
+    ):
         """As lampadas novas nao podem ter acendido o que a pedra existe pra
         acender -- senao o altar final vira enfeite."""
-        simulation.runtime.load(23)
+        simulation.runtime.load(_level(simulation, "30_a_fonte_aberta"))
         simulation.state.ability_on[:] = False
         advance(simulation, input_provider, frames=4)
         for col in range(19, 23):

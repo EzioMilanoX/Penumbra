@@ -1,7 +1,8 @@
 {
-  "id": "11_espelhos",
+  "id": "19_espelhos",
   "name": "Espelhos",
   "hint": "Tres pontes, duas delas ao contrario. Uma virada do farol troca o dono de todas de uma vez.",
+  "chapter": 2,
   "rows": [
     "........###.####.####.......",
     "........###.####.####.......",

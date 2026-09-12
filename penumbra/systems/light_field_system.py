@@ -143,8 +143,10 @@ class LightFieldSystem(ISystem):
 
         np.multiply(terrain.lamp, light_tuning.lamp_intensity, out=self._seed)
         np.maximum(self._seed, state.altar_light, out=self._seed)
-        if terrain.has_source and state.source_intensity > 0.0:
+        if terrain.has_source:
             np.multiply(terrain.source, state.source_intensity, out=self._mask_b_float)
+            np.maximum(self._seed, self._mask_b_float, out=self._seed)
+            np.multiply(terrain.source_alt, state.source_alt_intensity, out=self._mask_b_float)
             np.maximum(self._seed, self._mask_b_float, out=self._seed)
         if terrain.has_wanderer:
             # Uma unica celula, arredondada da coluna continua: a lanterna

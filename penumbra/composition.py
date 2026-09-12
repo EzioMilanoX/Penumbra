@@ -55,6 +55,7 @@ from penumbra.systems.form_altar_system import FormAltarSystem
 from penumbra.systems.light_field_system import LightFieldSystem
 from penumbra.systems.outcome_system import OutcomeSystem
 from penumbra.systems.polarity_door_system import PolarityDoorSystem
+from penumbra.systems.polarity_lever_system import PolarityLeverSystem
 from penumbra.systems.presentation_system import PresentationSystem
 from penumbra.systems.world_clock_system import WorldClockSystem
 from penumbra.terrain import Terrain
@@ -218,9 +219,10 @@ def _assemble(
     8. `WorldClockSystem`     -- farol, lanterna e eclipse; o que muda sozinho
     9. `CrustBreakSystem`     -- o verbo da Umbra; muta o terreno
     10. `FormAltarSystem`     -- a renuncia; muta o SER, e tambem le `state.cell`
-    11. `PolarityDoorSystem`  -- le a luz deste frame
-    12. `OutcomeSystem`       -- le posicoes ja resolvidas
-    13. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
+    11. `PolarityLeverSystem` -- troca eter por contra-eter no mapa inteiro
+    12. `PolarityDoorSystem`  -- le a luz deste frame
+    13. `OutcomeSystem`       -- le posicoes ja resolvidas
+    14. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
 
     Nao ha sistema de "sair": ESC e tratado nas CENAS (volta ao menu durante
     a fase, encerra no menu), porque um `ISystem` so roda dentro de
@@ -263,6 +265,7 @@ def _assemble(
         )
     )
     world.register_system(FormAltarSystem(terrain, state, tuning))
+    world.register_system(PolarityLeverSystem(terrain, state))
     world.register_system(PolarityDoorSystem(terrain, state))
     world.register_system(OutcomeSystem(terrain, state, tuning))
     world.register_system(

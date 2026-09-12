@@ -185,7 +185,7 @@ class TestLevelCatalog:
 
     def test_fase_invalida_e_apontada_pelo_id(self, tmp_path):
         (tmp_path / "01.json").write_text(
-            json.dumps({"id": "quebrada", "name": "q", "hint": "h", "rows": ["."]}),
+            json.dumps({"id": "quebrada", "name": "q", "hint": "h", "chapter": 1, "rows": ["."]}),
             encoding="utf-8",
         )
         catalog = LevelCatalog.load_from_directory(tmp_path)
