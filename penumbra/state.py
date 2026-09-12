@@ -113,6 +113,13 @@ class DualityState:
         self.altar_shadow = np.zeros(shape, dtype=np.float32)
         """O espelho: escuridao fixa deixada pela Umbra."""
 
+        # --- a fonte que respira ---
+        self.source_phase = 0.0
+        self.source_intensity = 0.0
+        """Intensidade da fonte neste frame. O raio aceso sai dela --
+        `(I - solid_threshold) * falloff_radius_cells` -- entao o chao dilata e
+        contrai sem que nada se mova."""
+
         # --- lanterna errante ---
         self.wander_col = 0.0
         """Coluna da lanterna, em `float` -- ela anda continuamente e so e
@@ -270,6 +277,8 @@ class LevelRuntime:
         state.altar_shadow[:] = 0.0
         state.wander_col = float(self._terrain.wander_min_col)
         state.wander_dir = 1.0
+        state.source_phase = 0.0
+        state.source_intensity = 0.0
         state.beacon_phase = 0.0
         state.beacon_on = True
         state.beacon_seconds_left = 0.0

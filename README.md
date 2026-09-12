@@ -1,9 +1,8 @@
 # Penumbra — Luz e Sombra: Dualidade
 
 Puzzle-platformer sobre dois seres que não podem se tocar e não conseguem
-avançar separados. **Dezoito fases** em três atos, menu com seleção visual,
-colecionáveis e
-**multiplayer local**, construído sobre a
+avançar separados. **Vinte e quatro fases** em quatro atos, menu com seleção
+visual, colecionáveis e **multiplayer local**, construído sobre a
 [OuroborosEngine](https://github.com/EzioMilanoX/OuroborosEngine) — a engine
 vive no repositório dela, não é vendorizada aqui.
 
@@ -87,10 +86,12 @@ uma fase de pedir dela o que ela não faz.
 | **eclipse** `=` | **dos dois ao mesmo tempo** — a única célula assim | mas com prazo: o primeiro passo de qualquer um inicia o colapso da zona inteira |
 | **contra-éter** `;` | de exatamente um, **pela regra invertida** | sólido para a Lumen no *escuro* e para a Umbra na *luz* |
 | **altar** `^` | não é chão — é onde se **larga a forma** | segure a habilidade em cima e ela fica ali *para sempre*; quem a deixou não a usa mais nesta fase |
+| **véu** `:` | de ninguém — **atravessa-se a pé** | mas não se atravessa com luz. Do lado de lá há sombra sem parede, e lá dentro o facho **não existe** |
+| **vidro** `-` | dos dois, sempre — e **a luz passa** | é o que torna possível empilhar dois andares: uma luz em cima acende o chão de baixo |
 
 E três fontes de luz: a **lâmpada** `*`, fixa; o **farol** `o`, que acende e
-apaga sozinho; e a **lanterna errante**, uma lâmpada que percorre um trilho
-`>` de ponta a ponta e volta.
+apaga sozinho; a **lanterna errante**, uma lâmpada que percorre um trilho `>`
+de ponta a ponta e volta; e a **fonte** `@`, que não anda — **incha**.
 
 Mais dois marcadores: a **placa de pressão** `_`, que mantém uma porta aberta
 só enquanto alguém está em cima dela, e o **fragmento da fonte** `+`, o
@@ -155,6 +156,24 @@ Disso saem as situações que as fases exploram:
   círculo. Numa ponte longa a Umbra não atravessa de uma vez — a janela acesa
   volta por cima dela no meio do caminho — então toda ponte de lanterna tem
   uma **ilha de rocha** onde se espera a passagem.
+- **O véu e o vidro separam duas coisas que eram uma só.** Até o ato III,
+  toda célula sólida barrava luz e toda célula vazada a deixava passar: *ser
+  chão* e *fazer sombra* eram a mesma pergunta, e por isso nenhuma fase tinha
+  mais de um andar. O véu atravessa-se a pé e não com luz; o vidro é chão e
+  deixa a luz descer. Cada um quebra a fusão para um lado.
+- **O véu é a única coisa que tira o verbo da Lumen.** Dentro dele o facho
+  simplesmente não existe — a semente é multiplicada pela máscara de
+  propagação, que ali é zero. Ela continua com a habilidade ligada e ela não
+  produz nada.
+- **Sob o vidro, a luz de um serve ao outro.** É a única travessia do jogo em
+  que isso acontece: a Lumen caminha na passarela, o facho desce pelo vidro, e
+  o contra-éter quatro linhas abaixo vira chão da Umbra. Quatro linhas não é
+  escolha estética — é a **única** distância em que o chão dela fica sólido
+  (`>= 0.35`) e a célula onde ela anda não a dissolve (`<= 0.60`).
+- **A fonte incha; a lanterna anda; o farol liga e desliga.** As três coisas
+  que o mundo faz sozinho pedem três leituras diferentes: do farol se
+  **espera**, a lanterna se **acompanha**, e da fonte se **recua** — ela vem
+  buscar você onde você estava parado.
 - **A crosta não volta.** Todo o resto do terreno é interruptor — acender,
   apagar, acender de novo. A crosta, não: rompida, rompida para a fase
   inteira. É a única decisão do jogo que não dá para desfazer. E como ela é
@@ -184,6 +203,12 @@ Disso saem as situações que as fases exploram:
 | 16 | **Contracorrente** | Metade éter, metade contra-éter, uma lanterna só: o mesmo círculo monta uma metade e desmonta a outra. Um segue a lanterna, o outro foge dela. |
 | 17 | **O Guardião** | Lanterna e placa: a placa só vale com alguém **em cima**, e a lanterna não espera quem está segurando. A primeira vez que ficar parado é a tarefa difícil. |
 | 18 | **A Fonte Partida** | Ponte dourada com prazo, lanterna que não para, e um altar no fim do caminho. A última luz da Lumen é o que abre a última ponte da Umbra. |
+| 19 | **A Cortina** | O véu: sombra sem parede. Atravessa-se a pé, nunca com luz — e lá dentro o facho não existe. |
+| 20 | **Sob o Vidro** | A Lumen caminha na passarela e o facho desce pelo vidro, acendendo o chão da Umbra quatro linhas abaixo. Andam juntos, sem poder se tocar — é a imagem do jogo inteiro numa tela. |
+| 21 | **A Fonte Respira** | Ela não anda: incha. O chão aceso dilata e contrai, e quem estava seguro deixa de estar sem ter dado um passo. |
+| 22 | **Maré** | Meia ponte obedece à luz, meia a desobedece — e a mesma respiração monta uma e desmonta a outra, no mesmo instante. |
+| 23 | **Abrigos** | No auge, a fonte dissolve a Umbra a três células. Só dentro do véu a luz não chega: ela atravessa de abrigo em abrigo, e cada travessia tem de caber numa expiração. |
+| 24 | **A Fonte Aberta** | A escolta sob o vidro, e depois a Lumen **desce** ao chão dela para deixar a última luz numa pedra — para que a Umbra termine sozinha. |
 
 Três princípios de desenho, todos aprendidos errando:
 
@@ -209,6 +234,8 @@ Três princípios de desenho, todos aprendidos errando:
 =  eclipse (sólida para os dois, com prazo)      Y  portal da Umbra
 ;  contra-éter (a regra invertida)               +  fragmento da fonte
 ^  altar de forma (larga a habilidade ali)       >  trilho da lanterna
+:  véu (passa o pé, não passa a luz)            -  vidro (chão, e a luz passa)
+@  fonte que respira (o raio dilata e contrai)
 *  lâmpada fixa                                  .  vazio
 o  farol pulsante
 D  porta         L/S  zonas de polaridade      _  placa de pressão
@@ -253,7 +280,7 @@ penumbra/
   levels.py          catálogo de data/levels/*.json
   reachability.py    modelo de salto + grafo de alcance (auditoria de geometria)
   state.py           estado compartilhado + troca de fase
-  scenes.py          fluxo título -> fases -> jogo, e quando o mundo congela
+  scenes.py          fluxo título -> fases -> jogo -> fim, e o congelamento
   menu.py            tela de título, grade de cards, prévia do terreno
   hud.py             HUD e avisos de fim de fase
   systems/
@@ -268,7 +295,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              126 testes headless
+tests/              139 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -338,7 +365,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 126 testes, ~22 s, headless
+pytest -q                      # 139 testes, ~21 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -368,6 +395,17 @@ onde cada ser sobrevive, se o facho vaza até a zona de sombra). Ele achou um
 soft-lock real na fase 4 — a Lumen descia da saliência para atravessar a porta
 e não tinha como voltar à zona de luz —, corrigido com dois degraus de rocha.
 
+## O fim
+
+Depois da fase 24 o jogo faz a pergunta que passou 24 fases fazendo sem dizer
+em voz alta: **fundir os dois, ou segui-los separados.**
+
+Nenhum dos dois é recompensado, e é de propósito. Fundir resolve o problema do
+jogo eliminando o jogo — ninguém mais cai porque o outro acendeu, e ninguém
+mais atravessa o que sozinho não atravessaria. Seguir dois mantém o problema,
+porque o problema é a razão de os dois existirem. A tela só põe os dois lado a
+lado, com a consequência escrita embaixo de cada um.
+
 ## O menu
 
 Duas telas. A **de título** existe porque o modo era, antes, um atalho de TAB
@@ -378,14 +416,14 @@ casos, porque em ambos eles existem; o que muda é quem os comanda, e é isso
 que o desenho diz: num jogador, um `TAB` entre eles; em dois, um rótulo J1 e
 J2.
 
-A **seleção de fase** é uma grade de 3×2 cards por **ato**, cada um com
+A **seleção de fase** é uma grade de 3×2 cards por **ato** (são quatro), cada um com
 **numerão**, nome, dois selos (fase vencida, fragmento) e uma **prévia** da
 fase.
 
-Dezoito fases não cabem numa grade só, e encolher o card até caberem
+Vinte e quatro fases não cabem numa grade só, e encolher o card até caberem
 transformaria a miniatura — a única coisa que faz o card valer mais que uma
 lista de nomes — em manchinha. Paginar também diz algo verdadeiro sobre o
-jogo: as mecânicas chegam em três levas, e cada ato é uma delas. O ato é uma
+jogo: as mecânicas chegam em levas, e cada ato é uma delas. O ato é uma
 **página, não uma tranca** — nada fica bloqueado, e a seta anda de ato como
 anda de card, virando pela borda da grade. Assim o menu inteiro continua em
 quatro teclas.

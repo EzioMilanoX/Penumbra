@@ -189,7 +189,7 @@ def _report_standing(terrain, light, light_tuning) -> None:
     de fato ficar de pe -- classificada pelas faixas dos dois."""
     print("\n  onde da pe ficar de pe:")
     solid = (terrain.rock | terrain.ether | terrain.counter_ether
-             | terrain.crust | terrain.eclipse | terrain.door)
+             | terrain.crust | terrain.eclipse | terrain.glass | terrain.door)
     for row in range(terrain.rows - 1):
         standable = [
             col for col in range(terrain.cols)

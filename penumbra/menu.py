@@ -37,6 +37,9 @@ from penumbra.terrain import (
     ROLE_ZONE_SHADOW,
     ROLE_ALTAR,
     ROLE_WANDER,
+    ROLE_VEIL,
+    ROLE_GLASS,
+    ROLE_SOURCE,
     Terrain,
 )
 
@@ -68,6 +71,9 @@ _PREVIEW_COLORS = {
     ROLE_SHARD: (247, 214, 138, 255),
     ROLE_ALTAR: (170, 158, 200, 255),
     ROLE_WANDER: (128, 122, 158, 255),
+    ROLE_VEIL: (74, 66, 106, 255),
+    ROLE_GLASS: (166, 188, 216, 255),
+    ROLE_SOURCE: (255, 246, 226, 255),
 }
 """Cor de cada papel na miniatura. Deliberadamente mais CLARAS que no jogo:
 numa miniatura de 3 px por celula o contraste real do jogo (rocha quase preta
@@ -95,6 +101,7 @@ _ACTS = (
     ("ATO I", "ALTERNANCIA", "andar, acender, apagar"),
     ("ATO II", "CONSEQUENCIA", "o que nao volta atras"),
     ("ATO III", "RENUNCIA", "o que se deixa pra tras"),
+    ("ATO IV", "A FONTE", "a luz de um serve ao outro"),
 )
 
 
@@ -237,7 +244,7 @@ class LevelCardGrid:
         com os cards, que sao o que o jogador veio ver."""
         center = self._viewport_width / 2.0
         total = self.act_count
-        slot = 190.0
+        slot = min(190.0, (self._viewport_width - 40.0) / max(1, total))
         left = center - (total * slot) / 2.0
         for index in range(total):
             numeral, title, subtitle = _ACTS[index] if index < len(_ACTS) else (f"ATO {index + 1}", "", "")
@@ -453,3 +460,109 @@ class MenuChrome:
             else "A/D mover   ESPACO pular   J habilidade   TAB trocar de ser"
         )
         renderer.draw_text(center, footer_y + 20.0, controls, 11, _TEXT_FAINT, anchor="center")
+
+
+_ENDING_TITLE = "A FONTE"
+_ENDING_LEAD = (
+    "Voces nasceram da mesma fonte, e ela esta aberta.",
+    "Podem voltar a ser uma coisa so -- e nunca mais precisar um do outro.",
+    "Ou seguir dois, e continuar precisando.",
+)
+
+_ENDING_LINE_SIZE = 11
+_ENDING_CHOICES = (
+    ("FUNDIR", (
+        "Uma luz so, sem polaridade.",
+        "Ninguem cai porque o outro acende.",
+        "E ninguem atravessa o impossivel.",
+    )),
+    ("SEGUIR DOIS", (
+        "Continuam sem poder se tocar.",
+        "Continuam sem avancar sozinhos.",
+        "Era isso que os levava adiante.",
+    )),
+)
+"""Cada linha cabe na largura do botao: a 11 px a fonte monoespacada do
+backend gasta ~0,6 em por glifo, entao 268 px de card levam 40 caracteres.
+A primeira versao tinha linhas de 56 -- elas saiam do card e as duas colunas
+se sobrepunham no meio da tela. `tests/` mede isso agora."""
+
+
+class EndingScreen:
+    """
+    A escolha do fim: fundir os dois, ou segui-los separados.
+
+    O documento de design sempre previu este final, e ate agora a ultima fase
+    simplesmente devolvia o jogador ao menu -- dezoito fases sobre depender do
+    outro terminavam sem dizer nada sobre isso.
+
+    Nao ha final certo, e por isso nenhum dos dois e recompensado: fundir
+    resolve o problema do jogo eliminando o jogo, e seguir dois mantem o
+    problema porque ele e a razao de os dois existirem. A tela so os coloca
+    lado a lado, com a consequencia escrita embaixo de cada um.
+    """
+
+    def __init__(self) -> None:
+        self.fused = False
+        self.confirmed = False
+
+    def move(self, step: int) -> None:
+        if step and not self.confirmed:
+            self.fused = step < 0
+
+    @property
+    def choice(self) -> str:
+        return "fundidos" if self.fused else "separados"
+
+    def draw(self, renderer: IRenderer, shards: int, total: int) -> None:
+        width, height = renderer.get_viewport_size()
+        renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
+        center = width / 2.0
+
+        renderer.draw_text(center, 58.0, _ENDING_TITLE, 44, _GOLD, anchor="center")
+        renderer.draw_ui_rect(center - 180.0, 118.0, 360.0, 1.0, _RULE)
+
+        if self.confirmed:
+            self._draw_epilogue(renderer, center, shards, total)
+            return
+
+        for index, line in enumerate(_ENDING_LEAD):
+            renderer.draw_text(center, 146.0 + index * 24.0, line, 14, _TEXT_DIM, anchor="center")
+
+        top = 246.0
+        total_width = 2 * _BUTTON_WIDTH + _BUTTON_GAP
+        left = (width - total_width) / 2.0
+        for index, (label, consequence) in enumerate(_ENDING_CHOICES):
+            x = left + index * (_BUTTON_WIDTH + _BUTTON_GAP)
+            selected = (index == 0) == self.fused
+            renderer.draw_ui_rect(x, top, _BUTTON_WIDTH, 132.0,
+                                  _CARD_SELECTED if selected else _CARD)
+            if selected:
+                renderer.draw_ui_rect(x, top, _BUTTON_WIDTH, 2.0, _GOLD)
+                renderer.draw_ui_rect(x, top + 130.0, _BUTTON_WIDTH, 2.0, _GOLD)
+            middle = x + _BUTTON_WIDTH / 2.0
+            renderer.draw_text(middle, top + 18.0, label, 20,
+                               _GOLD if selected else _TEXT_DIM, anchor="center")
+            for line_index, line in enumerate(consequence):
+                renderer.draw_text(middle, top + 56.0 + line_index * 20.0, line, _ENDING_LINE_SIZE,
+                                   _TEXT_DIM if selected else _TEXT_FAINT, anchor="center")
+
+        renderer.draw_text(center, 418.0, "A/D escolher      ESPACO confirmar", 13,
+                           _TEXT_FAINT, anchor="center")
+
+    def _draw_epilogue(self, renderer: IRenderer, center: float, shards: int, total: int) -> None:
+        label, consequence = _ENDING_CHOICES[0 if self.fused else 1]
+        renderer.draw_text(center, 152.0, label, 22, _GOLD, anchor="center")
+        for index, line in enumerate(consequence):
+            renderer.draw_text(center, 202.0 + index * 26.0, line, 15, _TEXT, anchor="center")
+
+        renderer.draw_ui_rect(center - 180.0, 306.0, 360.0, 1.0, _RULE)
+        renderer.draw_text(center, 330.0, f"{total} fases atravessadas", 14, _TEXT_DIM,
+                           anchor="center")
+        renderer.draw_text(center, 354.0, f"{shards}/{total} fragmentos da fonte", 14,
+                           _GOLD if shards == total else _TEXT_DIM, anchor="center")
+        if shards < total:
+            renderer.draw_text(center, 386.0,
+                               "Os fragmentos que faltam continuam la. Nada fica trancado.",
+                               12, _TEXT_FAINT, anchor="center")
+        renderer.draw_text(center, 430.0, "ESPACO volta ao menu", 13, _TEXT_FAINT, anchor="center")

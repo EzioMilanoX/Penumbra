@@ -28,7 +28,7 @@ from ouroboros.interfaces.input_provider import IInputProvider
 from ouroboros.interfaces.renderer import IRenderer
 
 from penumbra.levels import LevelCatalog
-from penumbra.menu import LevelCardGrid, MenuChrome, TitleScreen
+from penumbra.menu import EndingScreen, LevelCardGrid, MenuChrome, TitleScreen
 from penumbra.terrain import Terrain
 from penumbra.state import DualityState, LevelRuntime, OUTCOME_COMPLETE, OUTCOME_PLAYING
 from penumbra.tuning import DualityTuning
@@ -71,9 +71,14 @@ class PenumbraFlow:
         self._catalog = catalog
         self.completed: List[bool] = [False] * catalog.count
         self.shards: List[bool] = [False] * catalog.count
+        self.ending_choice: Optional[str] = None
+        """O que o jogador escolheu no fim, ou `None` se ainda nao chegou la.
+        Mora aqui, e nao no `DualityState`, pela mesma razao que o modo: e uma
+        decisao da SESSAO, e o `World` nao tem opiniao sobre ela."""
         self.title = TitleScene(self, input_provider)
         self.menu = MenuScene(self, catalog, preview_terrain, input_provider)
         self.gameplay = PenumbraScene(self, runtime, state, tuning, input_provider)
+        self.ending = EndingScene(self, input_provider)
 
     def show_title(self) -> None:
         self._game_loop.reset_scenes(self.title)
@@ -81,6 +86,12 @@ class PenumbraFlow:
     def show_menu(self, message: str = "") -> None:
         self.menu.message = message
         self._game_loop.reset_scenes(self.menu)
+
+    def show_ending(self) -> None:
+        """Depois da ultima fase. Nao e uma tela de parabens: e a pergunta que
+        o jogo passou dezoito fases fazendo sem dizer em voz alta."""
+        self.ending.restart()
+        self._game_loop.reset_scenes(self.ending)
 
     @property
     def duo(self) -> bool:
@@ -120,7 +131,7 @@ class PenumbraFlow:
         if level_index + 1 < self._catalog.count:
             self.start_level(level_index + 1)
         else:
-            self.show_menu("Voce atravessou as duas polaridades ate o fim.")
+            self.show_ending()
 
     def quit(self) -> None:
         self._game_loop.stop()
@@ -173,6 +184,51 @@ class TitleScene(IScene):
         del world
         completed, shards, total = self._flow.progress
         self._screen.draw(renderer, completed, shards, total)
+
+
+class EndingScene(IScene):
+    """
+    A escolha do fim, e o epilogo dela.
+
+    Duas telas numa: a pergunta, e depois a consequencia escrita. O ESPACO
+    serve as duas -- confirmar e, no segundo toque, voltar ao menu -- porque
+    um epilogo que exigisse outra tecla faria o jogador procurar qual.
+
+    Nao chama `world.step()`: o mundo fica parado onde a ultima fase parou.
+    """
+
+    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+        self._flow = flow
+        self._input = input_provider
+        self._screen = EndingScreen()
+
+    def restart(self) -> None:
+        self._screen = EndingScreen()
+
+    @property
+    def screen(self) -> EndingScreen:
+        return self._screen
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world, delta_time
+        screen = self._screen
+        if self._input.is_action_pressed("move_left"):
+            screen.move(-1)
+        if self._input.is_action_pressed("move_right"):
+            screen.move(1)
+        if self._input.is_action_pressed("jump"):
+            if screen.confirmed:
+                self._flow.show_menu()
+            else:
+                screen.confirmed = True
+                self._flow.ending_choice = screen.choice
+        elif self._input.is_action_pressed("quit"):
+            self._flow.show_menu()
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        del world
+        _, shards, total = self._flow.progress
+        self._screen.draw(renderer, shards, total)
 
 
 class MenuScene(IScene):

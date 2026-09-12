@@ -42,10 +42,11 @@ class LightFieldSystem(ISystem):
     celulas), e a sombra da Umbra obedece a mesma geometria da luz (o mesmo
     flood roda duas vezes, com sementes diferentes).
 
-    Quatro sementes de luz alimentam o mesmo flood, e nenhuma delas e um caso
+    Cinco sementes de luz alimentam o mesmo flood, e nenhuma delas e um caso
     especial no relaxamento: as lampadas fixas do ASCII, o farol pulsante, a
-    lanterna errante (uma lampada cuja coluna o `WorldClockSystem` move) e a
-    luz que a Lumen deixou num altar. O flood da sombra recebe duas: o bolsao
+    lanterna errante (uma lampada cuja coluna o `WorldClockSystem` move), a
+    fonte que respira (uma lampada cuja INTENSIDADE ele move) e a luz que a
+    Lumen deixou num altar. O flood da sombra recebe duas: o bolsao
     que a Umbra carrega e o que ela deixou na pedra. Somar sementes em vez de
     somar regras e o que mantem este sistema do mesmo tamanho a cada mecanica
     nova.
@@ -120,6 +121,11 @@ class LightFieldSystem(ISystem):
         np.logical_and(terrain.door, not state.door_open, out=self._mask_a)
         np.logical_or(terrain.rock, terrain.crust, out=self._blocked)
         np.logical_or(self._blocked, self._mask_a, out=self._blocked)
+        # O veu barra luz sem barrar passagem; o vidro, o contrario. Sao as
+        # duas unicas celulas do jogo em que "e chao" e "faz sombra" deixam
+        # de ser a mesma pergunta -- e o vidro, justamente por nao entrar
+        # aqui, deixa uma lampada acender o andar de baixo.
+        np.logical_or(self._blocked, terrain.veil, out=self._blocked)
         np.logical_not(self._blocked, out=self._mask_b)
         np.copyto(self._open_solid, self._mask_b)
 
@@ -137,6 +143,9 @@ class LightFieldSystem(ISystem):
 
         np.multiply(terrain.lamp, light_tuning.lamp_intensity, out=self._seed)
         np.maximum(self._seed, state.altar_light, out=self._seed)
+        if terrain.has_source and state.source_intensity > 0.0:
+            np.multiply(terrain.source, state.source_intensity, out=self._mask_b_float)
+            np.maximum(self._seed, self._mask_b_float, out=self._seed)
         if terrain.has_wanderer:
             # Uma unica celula, arredondada da coluna continua: a lanterna
             # anda em `float` pra o movimento ser suave, mas o campo de luz e
@@ -239,6 +248,10 @@ class LightFieldSystem(ISystem):
         dois ao mesmo tempo, o que e exatamente o ponto."""
         terrain, state = self._terrain, self._state
         np.logical_or(self._blocked, terrain.eclipse, out=self._shared_solid)
+        np.logical_or(self._shared_solid, terrain.glass, out=self._shared_solid)
+        # ... e o veu, que esta em `_blocked` por causa da LUZ, nao e chao de
+        # ninguem: tira-lo aqui e o que o mantem atravessavel a pe.
+        np.logical_and(self._shared_solid, np.logical_not(terrain.veil), out=self._shared_solid)
 
         np.logical_not(state.lit, out=self._dark)
 

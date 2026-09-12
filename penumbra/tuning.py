@@ -103,6 +103,9 @@ class FlowTuning:
     eclipse_collapse_seconds: float = 6.5
     wanderer_speed_cells: float = 2.1
     form_sacrifice_seconds: float = 1.1
+    source_period_seconds: float = 5.2
+    source_min_intensity: float = 0.45
+    source_max_intensity: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -185,6 +188,14 @@ def _validate(tuning: DualityTuning, path: str) -> None:
         raise TuningDefinitionError(f"{path}: 'flow.eclipse_collapse_seconds' precisa ser positivo")
     if flow.wanderer_speed_cells <= 0.0:
         raise TuningDefinitionError(f"{path}: 'flow.wanderer_speed_cells' precisa ser positivo")
+    if flow.source_period_seconds <= 0.0:
+        raise TuningDefinitionError(f"{path}: 'flow.source_period_seconds' precisa ser positivo")
+    if not (0.0 <= flow.source_min_intensity < flow.source_max_intensity):
+        raise TuningDefinitionError(
+            f"{path}: a fonte precisa de source_min_intensity < source_max_intensity "
+            f"(recebido {flow.source_min_intensity} / {flow.source_max_intensity}) -- "
+            f"iguais, ela seria uma lampada comum e nada respiraria"
+        )
     if flow.form_sacrifice_seconds <= 0.0:
         raise TuningDefinitionError(
             f"{path}: 'flow.form_sacrifice_seconds' precisa ser positivo -- deixar a forma e "

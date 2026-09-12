@@ -48,6 +48,20 @@ class TestEveryLevelIsPlayable:
                 f"caracteres, e so cabem {max_chars}"
             )
 
+    def test_o_texto_do_final_cabe_dentro_do_card(self):
+        """Mesma falha da dica, noutro lugar: uma linha mais larga que o card
+        nao estoura nada -- ela sai por fora e as duas colunas do final se
+        sobrepoem no meio da tela. O limite sai da largura do botao e da
+        largura do glifo da fonte monoespacada."""
+        from penumbra.menu import _BUTTON_WIDTH, _ENDING_CHOICES, _ENDING_LINE_SIZE
+
+        max_chars = int(_BUTTON_WIDTH / (_ENDING_LINE_SIZE * 0.6))
+        for label, consequence in _ENDING_CHOICES:
+            for line in consequence:
+                assert len(line) <= max_chars, (
+                    f"{label}: linha de {len(line)} caracteres, e so cabem {max_chars}"
+                )
+
     def test_ninguem_morre_parado_no_spawn(self, simulation, input_provider):
         """O ponto de partida de cada fase tem que estar dentro da faixa que
         os DOIS aguentam. Um spawn fora dela mataria o jogador antes de ele
@@ -503,7 +517,7 @@ class TestLevelFlow:
         Sem isso a metade do jogo ficaria atras de uma tecla nao documentada."""
         flow.show_menu()
         grid = flow.menu._grid
-        assert grid.act_count == 3
+        assert grid.act_count >= 2, "a paginacao so faz sentido com mais de um ato"
         grid.selected = 2               # ultima coluna do ato I
         grid.move(1, 0)
         assert grid.selected == 6, "a direita na ultima coluna abre o ato seguinte"
@@ -580,9 +594,10 @@ class TestLevelFlow:
         assert flow.completed[1], "a fase vencida fica marcada no menu"
         assert state.level_index == 2
 
-    def test_vencer_a_ultima_fase_volta_ao_menu(self, flow, simulation, input_provider):
+    def test_vencer_a_ultima_fase_abre_a_escolha_do_fim(self, flow, simulation, input_provider):
         """Antes o ciclo reiniciava da fase 1 em silencio, o que parecia um
-        bug. Agora o jogo diz que acabou."""
+        bug; depois voltava ao menu com um recado. Agora faz a pergunta que o
+        jogo passou o jogo inteiro fazendo sem dizer em voz alta."""
         last = simulation.catalog.count - 1
         flow.start_level(last)
         simulation.state.complete("teste")
@@ -590,9 +605,51 @@ class TestLevelFlow:
         frames = int(simulation.tuning.flow.overlay_seconds * 60) + 4
         self._drive(flow, simulation, input_provider, frames=frames)
 
-        assert isinstance(flow._game_loop.current_scene, MenuScene)
+        assert flow._game_loop.current_scene is flow.ending
         assert flow.completed[last]
-        assert flow.menu.message, "o menu deveria dizer que o jogo acabou"
+        assert flow.ending_choice is None, "a escolha ainda nao foi feita"
+
+    def test_a_escolha_do_fim_fica_registrada_e_devolve_ao_menu(
+        self, flow, simulation, input_provider
+    ):
+        """Duas telas numa: confirmar escreve a escolha e mostra o epilogo; o
+        ESPACO seguinte volta ao menu. Se a mesma tecla nao servisse as duas,
+        o jogador teria de procurar qual."""
+        flow.show_ending()
+        input_provider.set_action_held("move_right", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        input_provider.set_action_held("move_right", False)
+        input_provider.set_action_held("jump", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+
+        assert flow.ending_choice == "separados"
+        assert flow.ending.screen.confirmed
+        assert flow._game_loop.current_scene is flow.ending, "o epilogo fica na tela"
+
+        # Segurar o ESPACO nao atravessa o epilogo: `is_action_pressed` e
+        # borda, entao o texto que acabou de aparecer nao e engolido pela
+        # mesma tecla que o revelou.
+        self._drive(flow, simulation, input_provider, frames=3)
+        assert flow._game_loop.current_scene is flow.ending
+
+        input_provider.set_action_held("jump", False)
+        self._drive(flow, simulation, input_provider, frames=1)
+        input_provider.set_action_held("jump", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        assert isinstance(flow._game_loop.current_scene, MenuScene)
+
+    def test_a_escolha_do_fim_tem_os_dois_lados(self, flow, simulation, input_provider):
+        """Nenhum dos dois e recompensado: fundir resolve o problema do jogo
+        eliminando o jogo, e seguir dois mantem o problema porque ele e a
+        razao de os dois existirem."""
+        flow.show_ending()
+        input_provider.set_action_held("move_left", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+        input_provider.set_action_held("move_left", False)
+        input_provider.set_action_held("jump", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+
+        assert flow.ending_choice == "fundidos"
 
     def test_o_aviso_ignora_a_tecla_ainda_pressionada_no_frame_da_morte(
         self, flow, simulation, input_provider

@@ -215,8 +215,10 @@ class TraversalGraph:
 
 def solid_mask(terrain, door_open: bool, crust_broken: bool = False) -> np.ndarray:
     """
-    Mascara otimista de solidos: rocha + eter + eclipse + crosta + porta, se
-    trancada. O eclipse entra como solido porque ELE E solido -- que ele tenha
+    Mascara otimista de solidos: rocha + eter + eclipse + vidro + crosta +
+    porta, se trancada. O VEU nao entra: ele barra luz, nao pes -- e trata-lo
+    como parede faria a auditoria declarar insolvel exatamente a fase que o
+    veu existe pra permitir. O eclipse entra como solido porque ELE E solido -- que ele tenha
     prazo e questao de tempo, nao de geometria, e o alcance so responde "os
     pes chegam?".
 
@@ -225,7 +227,8 @@ def solid_mask(terrain, door_open: bool, crust_broken: bool = False) -> np.ndarr
     com a crosta intacta se mede se a fase e atravessavel SEM gastar o
     irreversivel; com ela rompida, se romper de fato abre o caminho.
     """
-    mask = terrain.rock | terrain.ether | terrain.counter_ether | terrain.eclipse
+    mask = (terrain.rock | terrain.ether | terrain.counter_ether
+            | terrain.eclipse | terrain.glass)
     if not crust_broken:
         mask = mask | terrain.crust
     if not door_open:

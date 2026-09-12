@@ -55,6 +55,10 @@
     "_nota_lanterna": "Velocidade da lanterna errante, em celulas/s. Abaixo da Umbra (142 px/s = 4,4 cel/s) de proposito: os dois precisam conseguir andar com ela e tambem fugir dela, e a mais lenta dos dois e quem define o teto.",
     "wanderer_speed_cells": 2.1,
     "_nota_altar": "Quanto tempo a habilidade fica ligada em cima do altar ate a forma ficar la. Como o da crosta, existe pra que nada irreversivel aconteca de raspao -- e um pouco maior que ele porque o custo aqui e maior.",
-    "form_sacrifice_seconds": 1.1
+    "form_sacrifice_seconds": 1.1,
+    "_nota_fonte": "A fonte que respira: em vez de andar, o raio aceso dilata e contrai. Entre 0.45 e 1.0 o raio solido vai de 0,7 a 4,55 celulas -- e acima de 0.60 ela dissolve a Umbra, entao a cada respiracao ha um momento em que ficar perto deixa de ser possivel.",
+    "source_period_seconds": 5.2,
+    "source_min_intensity": 0.45,
+    "source_max_intensity": 1.0
   }
 }

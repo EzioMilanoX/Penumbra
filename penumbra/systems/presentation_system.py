@@ -42,6 +42,9 @@ from penumbra.terrain import (
     ROLE_ZONE_SHADOW,
     ROLE_ALTAR,
     ROLE_WANDER,
+    ROLE_VEIL,
+    ROLE_GLASS,
+    ROLE_SOURCE,
     Terrain,
 )
 from penumbra.tuning import DualityTuning
@@ -120,7 +123,23 @@ RAIL = (52, 50, 68)
 volta' -- se competisse em brilho com a propria lanterna, a unica coisa que
 importa (onde ela esta AGORA) ficaria mais dificil de achar."""
 
-_ROLE_COUNT = 17
+VEIL = (30, 26, 44)
+VEIL_EDGE = (72, 64, 104)
+"""O veu e a unica celula que se atravessa a pe e nao se atravessa com luz.
+Ele precisa ler como CORTINA e nao como parede: por isso preenche a celula
+inteira (como a rocha) mas num roxo fechado, quase sem contraste com o
+fundo -- o que ele comunica e "aqui nao chega nada", nao "aqui voce para"."""
+
+GLASS = (146, 168, 196)
+"""Vidro: chao dos dois, e a luz passa. Fica numa fita FINA no meio da
+celula, e nao preenchendo-a, porque a leitura que ele precisa entregar e
+"da pra pisar, e da pra ver atraves" -- uma celula cheia diria o contrario
+das duas coisas."""
+
+SOURCE_CALM = (120, 104, 150)
+SOURCE_FULL = (255, 246, 226)
+
+_ROLE_COUNT = 20
 _CELL_SPRITE_UNIT = 8.0
 """`PygameRenderer.draw_batch` converte `transform.scale` em pixels
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
@@ -206,8 +225,15 @@ class PresentationSystem(ISystem):
         self._size_by_role[ROLE_ALTAR] = 0.78
         # Trilho: fita fina no meio da celula, pra nao parecer chao.
         self._size_by_role[ROLE_WANDER] = 0.3
+        # Vidro: fita fina TAMBEM, mas larga e clara -- e chao, so que se ve
+        # atraves. Trilho e vidro nunca aparecem na mesma linha.
+        self._size_by_role[ROLE_GLASS] = 0.44
+        self._shape_by_role[ROLE_SOURCE] = SHAPE_CIRCLE
+        self._size_by_role[ROLE_SOURCE] = 0.74
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
         self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
+        self._source_min = tuning.flow.source_min_intensity
+        self._source_max = tuning.flow.source_max_intensity
 
     def update(self, world: World, delta_time: float) -> None:
         if self._sprite_pool is None:
@@ -321,6 +347,23 @@ class PresentationSystem(ISystem):
             self._fill(self._mask, BEACON_OFF, BEACON_OFF)
             np.copyto(self._alpha, 190.0, where=self._mask)
 
+        # veu: cortina que a luz nao atravessa e os pes atravessam
+        np.equal(role, ROLE_VEIL, out=self._mask)
+        self._fill(self._mask, VEIL, VEIL_EDGE)
+        np.copyto(self._alpha, 218.0, where=self._mask)
+
+        # vidro: chao transparente, revelado pela luz que o atravessa
+        np.equal(role, ROLE_GLASS, out=self._mask)
+        np.clip(light, 0.0, 1.0, out=self._ramp)
+        self._fill(self._mask, GLASS, GLASS)
+        np.copyto(self._alpha, 210.0, where=self._mask)
+
+        # a fonte que respira: clareia e incha junto com o proprio raio
+        np.equal(role, ROLE_SOURCE, out=self._mask)
+        self._ramp[:] = self._source_breath()
+        self._fill(self._mask, SOURCE_CALM, SOURCE_FULL)
+        np.copyto(self._alpha, 255.0, where=self._mask)
+
         # trilho da lanterna (a lanterna em si e escrita no flush)
         np.equal(role, ROLE_WANDER, out=self._mask)
         self._fill(self._mask, RAIL, RAIL)
@@ -356,6 +399,16 @@ class PresentationSystem(ISystem):
         self._paint_goal(role, ROLE_UMBRA_GOAL, UMBRA, pulse)
 
         self._flush_cells(role, pulse)
+
+    def _source_breath(self) -> float:
+        """0..1 entre as duas intensidades da fonte. O corpo dela clareia e
+        incha junto com o raio que ela projeta -- sem isso o jogador leria a
+        borda do chao aceso mexendo e nao teria onde olhar pra prever o
+        proximo instante."""
+        low, high = self._source_min, self._source_max
+        if high <= low:
+            return 1.0
+        return min(1.0, max(0.0, (self._state.source_intensity - low) / (high - low)))
 
     def _paint_altars(self, pulse: float) -> None:
         """Tres estados num unico papel de celula: vazio, recebendo, cheio.
@@ -446,6 +499,12 @@ class PresentationSystem(ISystem):
         # e o que a torna deliberada em vez de acidental.
         state = self._state
         terrain = self._terrain
+        if terrain.has_source:
+            breath = self._source_breath()
+            np.equal(role, ROLE_SOURCE, out=self._mask)
+            np.multiply(self._channel, 0.7 + 0.5 * breath, out=self._ramp)
+            np.copyto(self._channel, self._ramp, where=self._mask)
+
         if terrain.has_wanderer:
             # A lanterna nao tem papel de celula proprio: ela e UMA celula do
             # trilho repintada aqui. Um papel novo exigiria reescrever `role`

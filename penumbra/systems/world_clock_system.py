@@ -18,12 +18,19 @@ Os dois moram juntos porque sao a mesma ideia contada de dois jeitos:
   unica que se atravessa ACOMPANHANDO em vez de esperando: o farol troca o
   dono do eter sem sair do lugar, a lanterna leva o chao junto com ela. A
   Lumen anda no passo da lanterna; a Umbra anda sempre fora do circulo dela.
+* **Fonte que respira** -- uma lampada cuja INTENSIDADE sobe e desce em
+  ciclo, entao o raio aceso dilata e contrai sem que nada saia do lugar. As
+  tres coisas que o mundo faz sozinho pedem tres leituras diferentes: do
+  farol se ESPERA a virada, a lanterna se ACOMPANHA, e da fonte se RECUA --
+  ela vem buscar voce onde voce esta parado.
 * **Zona de eclipse** -- a unica celula que aceita os DOIS, e a unica com
   prazo. Ao primeiro toque de qualquer um deles a zona inteira comeca a
   colapsar; no fim do prazo, desaparece. E a resposta a pergunta que o resto
   do jogo nunca faz: nao "de quem e este chao?", mas "da tempo pros dois?".
 """
 from __future__ import annotations
+
+import math
 
 from ouroboros.core.systems.base_system import ISystem
 from ouroboros.core.world import World
@@ -57,11 +64,15 @@ class WorldClockSystem(ISystem):
         self._beacon_off_seconds = tuning.flow.beacon_off_seconds
         self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
         self._wanderer_speed = tuning.flow.wanderer_speed_cells
+        self._source_period = tuning.flow.source_period_seconds
+        self._source_min = tuning.flow.source_min_intensity
+        self._source_max = tuning.flow.source_max_intensity
 
     def update(self, world: World, delta_time: float) -> None:
         del world
         self._advance_beacon(delta_time)
         self._advance_wanderer(delta_time)
+        self._advance_source(delta_time)
         self._advance_eclipse(delta_time)
 
     # ------------------------------------------------------------------
@@ -115,6 +126,23 @@ class WorldClockSystem(ISystem):
                 position = low
                 break
         state.wander_col = position
+
+    def _advance_source(self, delta_time: float) -> None:
+        """Respiracao senoidal entre as duas intensidades.
+
+        Senoide e nao dente-de-serra porque o que o jogador le nao e a
+        intensidade, e a BORDA do chao aceso -- e uma borda que para e volta
+        suavemente pode ser acompanhada de perto, enquanto uma que salta do
+        maximo pro minimo so pode ser evitada de longe. O objetivo e que dar
+        um passo atras no instante certo baste."""
+        state, terrain = self._state, self._terrain
+        if not terrain.has_source:
+            state.source_intensity = 0.0
+            return
+
+        state.source_phase = (state.source_phase + delta_time) % self._source_period
+        breath = 0.5 - 0.5 * math.cos(math.tau * state.source_phase / self._source_period)
+        state.source_intensity = self._source_min + (self._source_max - self._source_min) * breath
 
     def _advance_eclipse(self, delta_time: float) -> None:
         """O prazo comeca no primeiro toque de QUALQUER um dos dois -- nao no

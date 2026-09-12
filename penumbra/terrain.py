@@ -28,6 +28,9 @@ COUNTER_ETHER_CHAR = ";"
 PLATE_CHAR = "_"
 ALTAR_CHAR = "^"
 WANDER_CHAR = ">"
+VEIL_CHAR = ":"
+GLASS_CHAR = "-"
+SOURCE_CHAR = "@"
 SHARD_CHAR = "+"
 LAMP_CHAR = "*"
 DOOR_CHAR = "D"
@@ -59,6 +62,9 @@ ROLE_PLATE = 13
 ROLE_SHARD = 14
 ROLE_ALTAR = 15
 ROLE_WANDER = 16
+ROLE_VEIL = 17
+ROLE_GLASS = 18
+ROLE_SOURCE = 19
 
 _MARKER_CHARS = frozenset(
     {LUMEN_SPAWN_CHAR, UMBRA_SPAWN_CHAR, LUMEN_GOAL_CHAR, UMBRA_GOAL_CHAR}
@@ -115,6 +121,26 @@ class Terrain:
     circulo. E a unica coisa do jogo que se atravessa acompanhando, e nao
     escolhendo o instante.
 
+    `veil` e o veu e `glass` e o vidro. Ate aqui toda celula solida barrava
+    luz e toda celula vazada a deixava passar -- "chao" e "quem faz sombra"
+    eram a mesma coisa, e por isso nenhuma fase tinha mais de um andar. Os
+    dois separam essas duas propriedades, cada um pra um lado:
+
+    * **Veu**: atravessa-se a pe, mas nao se atravessa com luz. Dentro dele o
+      facho da Lumen simplesmente NAO EXISTE (a semente e multiplicada pela
+      mascara de propagacao, que ali e zero) -- e e a unica coisa do jogo que
+      tira o verbo dela sem tirar a habilidade. Do lado de la fica sombra sem
+      que haja parede nenhuma.
+    * **Vidro**: chao dos dois, e a luz passa por ele. E o que torna possivel
+      empilhar andares: uma lampada no alto acende o eter de dois pisos
+      abaixo sem que o piso do meio deixe de ser piso.
+
+    `source` e a fonte que respira: uma lampada cuja intensidade sobe e desce
+    em ciclo, entao o raio aceso DILATA e contrai em vez de andar. O farol
+    liga e desliga, a lanterna se desloca, a fonte incha -- as tres unicas
+    formas de o mundo mexer no chao sozinho, e cada uma pede uma leitura
+    diferente do jogador: esperar, acompanhar, e recuar.
+
     `crust` e a crosta: solida para os dois e opaca como a rocha, mas a
     Umbra a rompe empurrando-a. Romper e IRREVERSIVEL dentro da fase, e a
     consequencia interessante nao e a passagem -- e a luz. Como a crosta
@@ -147,6 +173,9 @@ class Terrain:
         self.plate = np.zeros(shape, dtype=bool)
         self.altar = np.zeros(shape, dtype=bool)
         self.wander = np.zeros(shape, dtype=bool)
+        self.veil = np.zeros(shape, dtype=bool)
+        self.glass = np.zeros(shape, dtype=bool)
+        self.source = np.zeros(shape, dtype=np.float32)
         self.ether = np.zeros(shape, dtype=bool)
         self.door = np.zeros(shape, dtype=bool)
         self.zone_light = np.zeros(shape, dtype=bool)
@@ -174,6 +203,7 @@ class Terrain:
         self.has_beacon = False
         self.has_altar = False
         self.has_wanderer = False
+        self.has_source = False
         self.wander_row = -1
         self.wander_min_col = -1
         self.wander_max_col = -1
@@ -218,6 +248,9 @@ class Terrain:
         self.plate[:] = False
         self.altar[:] = False
         self.wander[:] = False
+        self.veil[:] = False
+        self.glass[:] = False
+        self.source[:] = 0.0
         self.ether[:] = False
         self.door[:] = False
         self.zone_light[:] = False
@@ -250,6 +283,15 @@ class Terrain:
                 elif char == WANDER_CHAR:
                     self.wander[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_WANDER
+                elif char == VEIL_CHAR:
+                    self.veil[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_VEIL
+                elif char == GLASS_CHAR:
+                    self.glass[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_GLASS
+                elif char == SOURCE_CHAR:
+                    self.source[row_index, col_index] = 1.0
+                    self.role[row_index, col_index] = ROLE_SOURCE
                 elif char == SHARD_CHAR:
                     if self.shard_cell is not None:
                         raise TerrainDefinitionError("uma fase tem no maximo um fragmento ('+')")
@@ -302,6 +344,7 @@ class Terrain:
         self.has_beacon = bool(self.beacon.any())
         self.has_plate = bool(self.plate.any())
         self.has_altar = bool(self.altar.any())
+        self.has_source = bool(self.source.any())
         self._resolve_rail()
 
         has_zones = bool(self.zone_light.any() and self.zone_shadow.any())
