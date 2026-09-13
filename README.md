@@ -375,6 +375,8 @@ penumbra/
   state.py           estado compartilhado + troca de fase
   scenes.py          fluxo título -> fases -> jogo -> pausa -> fim
   audio.py           a voz do jogo, sintetizada (nenhum arquivo de som)
+  sparks.py          a poeira dos instantes em que alguma coisa cede
+  paths.py           onde estao os dados, rodando do repo ou do .exe
   progress.py        o que sobrevive a fechar o jogo
   achievements.py    onze conquistas, e o motivo dos fragmentos
   menu.py            tela de título, grade de cards, prévia do terreno
@@ -386,12 +388,14 @@ penumbra/
     world_clock_system.py       farol e eclipse; o que muda sozinho
     form_altar_system.py        a renúncia: poder trocado por permanência
     polarity_door_system.py     a porta que exige os dois ao mesmo tempo
+    polarity_lever_system.py    a alavanca que inverte a polaridade da sala
+    echo_system.py              o segredo: ficar parado, perto, sem se tocar
     outcome_system.py           as quatro mortes e a única vitória
     presentation_system.py      estado -> pixels
-    quit_on_action_system.py
+    spark_system.py             as mesmas bordas do áudio, viradas em faísca
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              239 testes headless
+tests/              252 testes headless
 tools/               audit_levels.py, build_exe.py, generate_icon.py
 penumbra.spec        receita do executável
 ```
@@ -430,7 +434,12 @@ faz a ação de um ser desfazer o terreno do outro.
 10. PolarityDoorSystem               lê a luz deste frame
 11. OutcomeSystem                    lê posições já resolvidas
 12. PresentationSystem               só pixels
+13. AudioSystem                      as bordas que merecem um tom
+14. SparkSystem                      as mesmas bordas, viradas em faísca
 ```
+
+Os dois últimos só existem em `build_game`, nunca em `CompositionRoot.build()`:
+removidos, o jogo roda idêntico, mudo e sem poeira.
 
 Não há sistema de "sair": **ESC é tratado nas cenas** (volta ao menu durante
 a fase, encerra no menu), porque um `ISystem` só roda dentro de `world.step()`
@@ -543,6 +552,34 @@ em vez de recusado — acrescentar fases não pode apagar o que você já fez.
 tentativa; não havia como só parar. Agora empilha um painel por cima
 (`push_scene`), o mundo congela onde estava, e dá para continuar, reiniciar ou
 sair.
+
+## A poeira
+
+Até aqui, **tudo acontecia trocando de cor**. A crosta rompia, o eclipse
+colapsava, um ser morria — e a única diferença na tela era uma célula que
+passava a ser desenhada de outro jeito. O jogador via o *resultado* e nunca o
+evento, o que faz uma fase inteira parecer que nada de físico acontece nela.
+
+As faíscas marcam **exatamente os mesmos instantes que o áudio marca**, e isso
+é deliberado: som e luz têm de concordar, senão um dos dois vira ruído. Se um
+evento não mereceu um tom em `audio.py`, também não merece faísca. Com os dois:
+crosta, eclipse, fragmento, altar, o Instante, e a morte. Com som e *sem*
+faísca: porta, farol, alavanca, habilidade, vitória — são mudanças de **estado**
+do mundo, não coisas que se despedaçam.
+
+O blend é **aditivo** (`IRenderer.draw_particles`), que é o que separa faísca de
+sprite: num jogo cujo assunto é luz, uma partícula que *soma* luz onde cai diz a
+coisa certa sozinha. A gravidade é nossa — `ParticleStorage.update` só integra
+posição por velocidade — e é ela que faz o estilhaço cair como pedra em vez de
+flutuar como fumaça.
+
+A primeira versão **não aparecia**. Eu tinha escolhido tamanhos de 2,4 a 4,7 px
+de olho, e o backend desenha `radius = max(1, int(size) // 2)`: quarenta e
+quatro partículas acendiam **doze pixels no total**. Existiam, custavam frame, e
+eram invisíveis. A correção foi medir em vez de espremer os olhos — somar o
+brilho da tela antes e depois da rajada — e o piso `_MIN_READABLE_SIZE = 5.0`
+está no código com o número medido ao lado, porque a próxima pessoa a escolher
+um tamanho "que parece bom" vai errar do mesmo jeito.
 
 ## Há algo que o jogo não conta
 
@@ -734,13 +771,20 @@ e nada avisa.
 Este é o vertical slice das mecânicas centrais. Ficaram **fora**, do documento
 de design original:
 
-- **Sacrifício de forma** (a Umbra cobrindo a Lumen para protegê-la)
-- **Controle simultâneo** dos dois seres (um em cada analógico)
-- **Boss fight** e a narrativa com a escolha da fusão
-- **Áudio** — a engine tem `IAudioEngine` e bancos data-driven, mas o slice
-  não tem nenhum asset de som. É a lacuna mais funcional das que restam: o
-  medidor de perigo é hoje **só visual**, e você olha o ser que comanda
-  enquanto o outro morre fora da sua atenção
+- **Sacrifício de forma** (a Umbra cobrindo a Lumen para protegê-la) — o
+  altar troca poder por permanência, que é a mesma ideia sem o gesto
+- **Boss fight**
+- **Controle por gamepad** — a única lacuna que ainda muda como se joga. Os
+  bindings resolvem `KEY_*` e `MOUSE_*`, e o suporte a joystick da engine é só
+  rumble; caberia um `IInputProvider` do lado do Penumbra
+- **Música** — a engine expõe `load_track`/`play_track` e ninguém chama. O
+  jogo tem voz e não tem fundo
+
+Já **não** estão fora, e estiveram: o **controle simultâneo** (modo duo, e o
+mesmo mapa muda de forma quando há dois jogadores), a **escolha da fusão** (o
+fim pergunta, e a raiz do menu lembra o que você respondeu) e o **áudio** — o
+medidor de perigo era só visual, e você olhava o ser que comanda enquanto o
+outro morria fora da sua atenção.
 
 ## Paleta
 

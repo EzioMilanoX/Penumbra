@@ -50,6 +50,8 @@ from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
 from penumbra.paths import resolve, resource
 from penumbra.progress import Progress
+from penumbra.sparks import SparkField
+from penumbra.systems.spark_system import SparkSystem
 from penumbra.scenes import PenumbraFlow
 from penumbra.state import DualityState, LevelRuntime, LUMEN, UMBRA
 from penumbra.systems.crust_break_system import CrustBreakSystem
@@ -154,6 +156,8 @@ def build_game(config: EngineConfig) -> GameLoop:
     # ele, e os testes seguem headless.
     audio = PenumbraAudio(game_loop.audio_engine)
     world.register_system(AudioSystem(audio, simulation.state, terrain))
+    sparks = SparkField()
+    world.register_system(SparkSystem(sparks, simulation.state, terrain))
 
     # O menu desenha a miniatura de cada fase parseando o ASCII com um
     # `Terrain` PROPRIO -- se usasse o do jogo, montar as previas na
@@ -168,14 +172,27 @@ def build_game(config: EngineConfig) -> GameLoop:
     # O HUD e um callback GLOBAL (roda independente da cena no topo), entao
     # ele consulta `flow.hud_visible` -- senao desenha o rodape e os
     # medidores dos seres por cima do menu.
-    game_loop.set_on_draw_ui(
-        PenumbraHud(
-            simulation.state, simulation.runtime, tuning,
-            world.get_pool("transform"), game_loop.renderer.get_viewport_size(),
-            visible=lambda: flow.hud_visible,
-            unlocked=lambda: flow.unlocked,
-        )
+    hud = PenumbraHud(
+        simulation.state, simulation.runtime, tuning,
+        world.get_pool("transform"), game_loop.renderer.get_viewport_size(),
+        visible=lambda: flow.hud_visible,
+        unlocked=lambda: flow.unlocked,
     )
+
+    def draw_overlay(renderer) -> None:
+        """Particulas e depois HUD, nessa ordem.
+
+        As particulas sao do MUNDO e o HUD e interface -- mas nao existe pool
+        de particulas registrada no `World` (diferente de `fx`), e desenha-las
+        e responsabilidade explicita de quem chama. O unico gancho de desenho
+        depois da cena e este, entao as duas coisas dividem o callback e a
+        ordem e o que as separa: faisca por baixo do rodape, nunca por cima.
+        """
+        if flow.hud_visible:
+            sparks.draw(renderer)
+        hud(renderer)
+
+    game_loop.set_on_draw_ui(draw_overlay)
     flow.show_main()
     return game_loop
 

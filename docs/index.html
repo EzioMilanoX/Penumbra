@@ -270,7 +270,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Manual de campo · v1.3 · 30 fases em três capítulos</p>
+    <p class="kicker">Manual de campo · v1.4 · 30 fases em três capítulos</p>
     <h1>Penumbra</h1>
     <p class="lede">
       Dois seres que não podem se tocar e não avançam separados. O mundo não tem
@@ -716,6 +716,39 @@
       jogo fica idêntico e mudo.</b>
     </p>
 
+    <h3>E a poeira, que marca os mesmos instantes</h3>
+    <p class="measure">
+      Até aqui <b>tudo acontecia trocando de cor</b>. A crosta rompia, o eclipse
+      colapsava, um ser morria — e a única diferença na tela era uma célula
+      desenhada de outro jeito. O jogador via o <i>resultado</i> e nunca o evento,
+      o que faz uma fase inteira parecer que nada de físico acontece nela.
+    </p>
+    <p class="measure">
+      A regra não é "tem faísca", é <b>som e luz concordam</b>: as partículas
+      marcam exatamente os mesmos instantes que o áudio marca. Com os dois —
+      crosta, eclipse, fragmento, altar, o Instante, a morte. Com som e <i>sem</i>
+      faísca — porta, farol, alavanca, habilidade, vitória: essas são mudanças de
+      <b>estado</b> do mundo, não coisas que se despedaçam. Um evento marcado só
+      de um lado faria o outro virar ruído.
+    </p>
+    <p class="measure">
+      O blend é <b>aditivo</b>, e é isso que separa faísca de sprite: num jogo
+      cujo assunto é luz, uma partícula que <i>soma</i> luz onde cai já diz a
+      coisa certa. A gravidade é nossa — <code>ParticleStorage.update</code> só
+      integra posição por velocidade — e é ela que faz o estilhaço da crosta cair
+      como pedra em vez de flutuar como fumaça.
+    </p>
+    <p class="note">
+      <b>A primeira versão não aparecia.</b> Eu escolhi tamanhos de 2,4 a 4,7 px
+      de olho, e o backend desenha <code>radius = max(1, int(size) // 2)</code>:
+      quarenta e quatro partículas acendiam <b>doze pixels no total</b>. Existiam,
+      custavam frame, e eram invisíveis. A correção foi medir em vez de espremer
+      os olhos — somar o brilho da tela antes e depois da rajada — e o piso
+      <span class="mono">_MIN_READABLE_SIZE = 5.0</span> ficou no código com o
+      número medido ao lado, porque quem escolher o próximo tamanho "que parece
+      bom" vai errar do mesmo jeito.
+    </p>
+
     <h3>O progresso sobrevive a fechar o jogo</h3>
     <p class="measure">
       Trinta fases e trinta fragmentos evaporavam ao fechar a janela. Três regras,
@@ -762,6 +795,8 @@
         <li class="ours"><span class="who">PolarityDoorSystem</span> <span class="why">— lê a luz deste frame</span></li>
         <li class="ours"><span class="who">OutcomeSystem</span> <span class="why">— lê posições já resolvidas</span></li>
         <li class="ours"><span class="who">PresentationSystem</span> <span class="why">— só pixels; removível sem mudar o jogo</span></li>
+        <li class="ours"><span class="who">AudioSystem</span> <span class="why">— as bordas que merecem um tom</span></li>
+        <li class="ours"><span class="who">SparkSystem</span> <span class="why">— as mesmas bordas, viradas em faísca</span></li>
       </ol>
     </div>
 
@@ -810,7 +845,7 @@ git clone https://github.com/EzioMilanoX/Penumbra.git
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 232 testes headless
+pytest -q                      # 252 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
       <code>python -m</code> não é preferência de estilo: os imports são
