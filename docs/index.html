@@ -270,7 +270,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Manual de campo · v1.4 · 30 fases em três capítulos</p>
+    <p class="kicker">Manual de campo · v1.5 · 30 fases em três capítulos</p>
     <h1>Penumbra</h1>
     <p class="lede">
       Dois seres que não podem se tocar e não avançam separados. O mundo não tem
@@ -691,6 +691,73 @@
     </div>
   </section>
 
+  <section id="controle">
+    <p class="eyebrow">As mãos</p>
+    <h2>Dois no sofá, e um teclado só</h2>
+    <p class="measure">
+      Penumbra é um jogo de sofá para dois, e até aqui os dois dividiam um
+      teclado: o jogador 1 em WASD+ESPAÇO, o jogador 2 nas setas. Funciona, e é
+      apertado — dois pares de mãos a trinta centímetros um do outro, e ninguém
+      pode se levantar.
+    </p>
+    <p class="measure">
+      A engine não resolvia isso: <code>PygameInputProvider</code> entende
+      <span class="mono">KEY_*</span> e <span class="mono">MOUSE_*</span> e mais
+      nada, e o único uso que ela faz de joystick é <code>set_rumble</code>. O
+      adaptador vive então em <code>penumbra/gamepad.py</code> — <b>não</b> dentro
+      da engine, cujos arquivos este projeto nunca modificou, e não dentro do
+      núcleo, que nunca importa um backend. Ele não <i>substitui</i> nada: toda
+      consulta vai primeiro ao teclado e só depois olha o controle, então no duo
+      um jogador pode estar no controle e o outro nas setas, na mesma partida.
+    </p>
+
+    <h3>Onde ele é amostrado, e por que essa é a parte difícil</h3>
+    <p class="measure">
+      <code>GameLoop.run()</code> chama <code>poll()</code> no provider que o
+      <code>CompositionRoot</code> construiu, e <code>input_provider</code> é uma
+      propriedade <b>somente-leitura</b>, documentada como tal. Entregar um
+      embrulho ao laço exigiria escrever no atributo privado, e contrariar uma
+      decisão explícita de API da engine para ganhar um wrapper não vale o
+      precedente.
+    </p>
+    <p class="measure">
+      Então a amostragem se prende ao frame por outro caminho, todo público:
+      <code>set_on_draw_ui</code> roda uma vez por frame, no fim, e ali o controle
+      só é marcado como <b>velho</b>. Quem amostra é a <b>primeira consulta do
+      frame seguinte</b>, dentro do <code>update()</code> da cena — no mesmo
+      ponto em que o teclado acabou de ser amostrado. Amostrar dentro do próprio
+      <code>set_on_draw_ui</code> custaria os ~16 ms entre um frame e outro, que
+      num jogo de plataforma é a diferença entre o coyote time perdoar e não
+      perdoar.
+    </p>
+
+    <h3>Duas soleiras, não uma</h3>
+    <p class="measure">
+      Um analógico em repouso não para em zero: fica tremendo perto dele. Com uma
+      soleira só, um polegar parado na fronteira manda dezenas de bordas por
+      segundo — na fase o ser vibra no lugar, e no menu o cursor atravessa a
+      lista sozinho. A direção <b>engata</b> em <span class="mono">0.55</span> e
+      só <b>solta</b> abaixo de <span class="mono">0.30</span>, e o tremor inteiro
+      acontece dentro do vão.
+    </p>
+    <p class="note">
+      <b>E as telas passam a dizer a verdade.</b> Uma dica de controle que
+      <i>mente</i> é pior que dica nenhuma: quem está com o controle na mão lendo
+      "ESPAÇO pular" conclui que o controle não funciona — e ele funciona. O
+      rodapé da fase, a tela de modo e a grade trocam de rótulo conforme quantos
+      controles estão ligados, e no duo cada jogador lê a sua metade: com
+      <b>um</b> controle só, o jogador 1 lê o controle e o 2 lê as setas.
+    </p>
+    <p class="note">
+      Isso custou o <b>terceiro</b> caso do mesmo defeito neste projeto: estado
+      escrito e nunca lido. A contagem existia no provider, as telas sabiam
+      desenhá-la, e no meio o fluxo não guardava o provider — a tela de título
+      levantava <code>AttributeError</code> no primeiro frame, com 271 testes
+      verdes. Nenhum deles passava por ali: todos desenhavam as telas
+      <b>direto</b>, com o número na mão.
+    </p>
+  </section>
+
   <section id="voz">
     <p class="eyebrow">A voz</p>
     <h2>Som sintetizado, nenhum arquivo</h2>
@@ -845,7 +912,7 @@ git clone https://github.com/EzioMilanoX/Penumbra.git
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 252 testes headless
+pytest -q                      # 273 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
       <code>python -m</code> não é preferência de estilo: os imports são

@@ -87,6 +87,10 @@ class PenumbraFlow:
         de que houve um reset que a conquista reconhece."""
         self.unlocked: List[str] = []
         """Conquistas destravadas na ultima vitoria, pro menu anunciar."""
+        # Guardado tambem aqui, e nao so repassado as cenas: `flow.pads` e
+        # lido pelas telas que ENSINAM os controles, e elas perguntam ao
+        # fluxo, nao ao provider.
+        self._input = input_provider
         self.title = TitleScene(self, input_provider)
         self.menu = MenuScene(self, catalog, preview_terrain, input_provider)
         self.gameplay = PenumbraScene(self, runtime, state, tuning, input_provider)
@@ -183,6 +187,17 @@ class PenumbraFlow:
         no `DualityState` porque e escolha de SESSAO, nao de partida: trocar
         de fase nao devia devolver o jogador ao modo solo."""
         return self.title.duo
+
+    @property
+    def pads(self) -> int:
+        """Quantos controles estao ligados -- 0 quando o provider e o do
+        teclado puro, que e o caso de todo teste headless.
+
+        As telas que ENSINAM os controles leem isto. E a unica hora em que o
+        jogador ainda esta decidindo o que fazer com as maos, e alguem com o
+        controle na mao lendo "ESPACO pular" conclui que o controle nao
+        funciona -- quando ele funciona."""
+        return getattr(self._input, "pad_count", 0)
 
     def toggle_duo(self) -> None:
         self.title.duo = not self.title.duo
@@ -492,6 +507,7 @@ class TitleScene(IScene):
             renderer, completed, shards, total,
             achievements=len(self._flow.progress.achievements),
             achievement_total=len(achievements.CATALOG),
+            pads=self._flow.pads,
         )
 
 
@@ -656,8 +672,10 @@ class MenuScene(IScene):
         self._chrome.draw(
             renderer, self._flow.duo,
             sum(1 for got in self._flow.shards if got), len(self._flow.shards),
+            pads=self._flow.pads,
         )
-        self._grid.draw(renderer, self._flow.completed, self._flow.shards, self._flow.duo)
+        self._grid.draw(renderer, self._flow.completed, self._flow.shards, self._flow.duo,
+                        pads=self._flow.pads)
 
 
 class PenumbraScene(IScene):

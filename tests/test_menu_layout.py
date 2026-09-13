@@ -20,8 +20,16 @@ import pytest
 
 from penumbra import achievements
 from penumbra.menu import (
-    AchievementsScreen, MainMenuScreen, OptionsScreen, PauseScreen,
+    AchievementsScreen, MainMenuScreen, OptionsScreen, PauseScreen, TitleScreen,
 )
+
+
+def TitleScreenWithMode(duo: bool):
+    """A tela de titulo no modo pedido. `duo` mora na propria tela (e a
+    primeira decisao da sessao), entao nao da pra passa-lo no `draw`."""
+    screen = TitleScreen()
+    screen.duo = duo
+    return screen
 
 _CARD_SELECTED = (34, 32, 44, 255)
 
@@ -151,6 +159,12 @@ class TestNothingLeavesTheWindow:
             # baixo, e foi assim que a decima primeira encostou no rodape.
             ("conquistas vazia", lambda r: AchievementsScreen().draw(r, set(), 0, 30)),
             ("conquistas cheia", lambda r: AchievementsScreen().draw(r, every, 30, 30)),
+            # A tela de titulo ENSINA os controles, e as linhas mudam com
+            # quantos controles estao ligados -- quatro textos diferentes no
+            # mesmo lugar, e o do controle e o mais longo dos quatro.
+            *[(f"titulo duo={d} pads={n}",
+               (lambda d=d, n=n: lambda r: TitleScreenWithMode(d).draw(r, 0, 0, 30, 0, 11, pads=n))())
+              for d in (False, True) for n in (0, 1, 2)],
         )
         for name, draw in screens:
             renderer = _RecordingRenderer(width, height)
@@ -158,6 +172,14 @@ class TestNothingLeavesTheWindow:
             for entry in renderer.texts:
                 assert 0.0 <= entry["top"] and entry["bottom"] <= height, (
                     f"{name}: {entry['text']!r} sai da janela na vertical"
+                )
+                # A horizontal faltava, e a falta tinha consequencia: as
+                # linhas mais longas do jogo sao justamente as que LISTAM
+                # controles, centradas, e uma lista de botoes de controle e
+                # mais comprida que a de teclas. Sair pelos lados nao empurra
+                # nada -- so corta, e headless ninguem ve.
+                assert 0.0 <= entry["left"] and entry["right"] <= width, (
+                    f"{name}: {entry['text']!r} sai da janela na horizontal"
                 )
             for left, top, w, h, _ in renderer.rects:
                 assert top >= 0.0 and top + h <= height, f"{name}: retangulo fora da janela"
@@ -175,6 +197,12 @@ class TestNothingLeavesTheWindow:
             ("pausa", lambda r: PauseScreen().draw(r, "A Crosta", False)),
             ("opcoes", lambda r: OptionsScreen().draw(r, True, 0.7, False, 3, 30)),
             ("conquistas cheia", lambda r: AchievementsScreen().draw(r, every, 30, 30)),
+            # A tela de titulo ENSINA os controles, e as linhas mudam com
+            # quantos controles estao ligados -- quatro textos diferentes no
+            # mesmo lugar, e o do controle e o mais longo dos quatro.
+            *[(f"titulo duo={d} pads={n}",
+               (lambda d=d, n=n: lambda r: TitleScreenWithMode(d).draw(r, 0, 0, 30, 0, 11, pads=n))())
+              for d in (False, True) for n in (0, 1, 2)],
         )
         for name, draw in screens:
             renderer = _RecordingRenderer()

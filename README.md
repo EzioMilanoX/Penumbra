@@ -376,6 +376,7 @@ penumbra/
   scenes.py          fluxo título -> fases -> jogo -> pausa -> fim
   audio.py           a voz do jogo, sintetizada (nenhum arquivo de som)
   sparks.py          a poeira dos instantes em que alguma coisa cede
+  gamepad.py         o controle -- o unico adaptador de backend daqui
   paths.py           onde estao os dados, rodando do repo ou do .exe
   progress.py        o que sobrevive a fechar o jogo
   achievements.py    onze conquistas, e o motivo dos fragmentos
@@ -395,7 +396,7 @@ penumbra/
     spark_system.py             as mesmas bordas do áudio, viradas em faísca
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              252 testes headless
+tests/              273 testes headless
 tools/               audit_levels.py, build_exe.py, generate_icon.py
 penumbra.spec        receita do executável
 ```
@@ -552,6 +553,66 @@ em vez de recusado — acrescentar fases não pode apagar o que você já fez.
 tentativa; não havia como só parar. Agora empilha um painel por cima
 (`push_scene`), o mundo congela onde estava, e dá para continuar, reiniciar ou
 sair.
+
+## O controle
+
+Penumbra é um jogo de sofá para dois, e até aqui os dois dividiam **um
+teclado**: o jogador 1 em WASD+ESPAÇO, o jogador 2 nas setas. Funciona, e é
+apertado — dois pares de mãos a trinta centímetros um do outro, e ninguém pode
+se levantar.
+
+A engine não resolvia isso: `PygameInputProvider` entende `KEY_*` e `MOUSE_*` e
+mais nada, e o único uso que ela faz de joystick é `set_rumble`. Então o
+adaptador vive em `penumbra/gamepad.py` — não dentro da engine, cujos arquivos
+este projeto nunca modificou, e não dentro do núcleo, que nunca importa um
+backend. É registrado só em `build_game`: removido, o jogo continua idêntico e
+só com teclado.
+
+Ele **não substitui** nada. Toda consulta vai primeiro ao provider do teclado e
+só depois olha o controle, então os dois arranjos se misturam: no duo, um
+jogador no controle e o outro nas setas, na mesma partida. Um controle por
+jogador — o 0 dirige as ações do jogador 1, o 1 as `p2_*`.
+
+### Onde ele é amostrado, e por que essa é a parte difícil
+
+`GameLoop.run()` chama `poll()` no provider que o `CompositionRoot` construiu, e
+`GameLoop.input_provider` é uma propriedade **somente-leitura** — documentada
+como tal. Entregar um embrulho ao laço exigiria escrever em `_input_provider`, e
+contrariar uma decisão explícita de API da engine para ganhar um wrapper não
+vale o precedente.
+
+Então a amostragem se prende ao frame por outro caminho, todo público:
+`set_on_draw_ui` roda uma vez por frame, no fim, e ali o controle só é marcado
+como **velho**. Quem amostra é a **primeira consulta do frame seguinte**, dentro
+do `update()` da cena — no mesmo ponto em que o teclado acabou de ser amostrado.
+As bordas saem exatas e sem atraso; amostrar dentro do próprio `set_on_draw_ui`
+custaria os ~16 ms entre um frame e outro, que num jogo de plataforma é a
+diferença entre o coyote time perdoar e não perdoar.
+
+### Duas soleiras, não uma
+
+Um analógico em repouso não para em zero: fica tremendo perto dele. Com uma
+soleira só, um polegar parado na fronteira manda dezenas de bordas por segundo —
+na fase o ser vibra no lugar, e no menu o cursor atravessa a lista sozinho. A
+direção **engata** em 0.55 e só **solta** abaixo de 0.30, e o tremor inteiro
+acontece dentro do vão. O direcional e o analógico entram pelo mesmo código:
+para o jogo são a mesma intenção.
+
+### E as telas passam a dizer a verdade
+
+Uma dica de controle que **mente** é pior que dica nenhuma: quem está com o
+controle na mão lendo "ESPAÇO pular" conclui que o controle não funciona — e ele
+funciona. Então o rodapé da fase, a tela de escolha de modo e a grade de fases
+trocam de rótulo conforme quantos controles estão ligados, e no duo cada jogador
+lê a sua metade: com **um** controle só, o jogador 1 lê o controle e o 2 lê as
+setas, que é o arranjo real de um sofá com um controle.
+
+Isso custou o terceiro caso do mesmo defeito neste projeto — **estado escrito e
+nunca lido**. A contagem existia no provider, as telas sabiam desenhá-la, e no
+meio o `PenumbraFlow` não guardava o provider: `flow.pads` levantava
+`AttributeError` no primeiro frame da tela de título, com 271 testes verdes.
+Nenhum deles passava por ali, porque todos desenhavam as telas **direto**, com o
+número na mão. Os testes novos desenham pelo caminho de verdade.
 
 ## A poeira
 
@@ -774,17 +835,15 @@ de design original:
 - **Sacrifício de forma** (a Umbra cobrindo a Lumen para protegê-la) — o
   altar troca poder por permanência, que é a mesma ideia sem o gesto
 - **Boss fight**
-- **Controle por gamepad** — a única lacuna que ainda muda como se joga. Os
-  bindings resolvem `KEY_*` e `MOUSE_*`, e o suporte a joystick da engine é só
-  rumble; caberia um `IInputProvider` do lado do Penumbra
 - **Música** — a engine expõe `load_track`/`play_track` e ninguém chama. O
   jogo tem voz e não tem fundo
+- **Editor de fases**, **estatísticas**, **localização**
 
 Já **não** estão fora, e estiveram: o **controle simultâneo** (modo duo, e o
 mesmo mapa muda de forma quando há dois jogadores), a **escolha da fusão** (o
-fim pergunta, e a raiz do menu lembra o que você respondeu) e o **áudio** — o
+fim pergunta, e a raiz do menu lembra o que você respondeu), o **áudio** — o
 medidor de perigo era só visual, e você olhava o ser que comanda enquanto o
-outro morria fora da sua atenção.
+outro morria fora da sua atenção — e o **controle**.
 
 ## Paleta
 

@@ -1,0 +1,16 @@
+{
+  "move_left": "PAD_LEFT",
+  "move_right": "PAD_RIGHT",
+  "jump": "PAD_A",
+  "ability": "PAD_X",
+  "switch": "PAD_RB",
+  "restart": "PAD_BACK",
+  "menu_up": "PAD_UP",
+  "menu_down": "PAD_DOWN",
+  "quit": "PAD_START",
+  "p2_move_left": "PAD_LEFT",
+  "p2_move_right": "PAD_RIGHT",
+  "p2_jump": "PAD_A",
+  "p2_ability": "PAD_X",
+  "p2_restart": "PAD_BACK"
+}

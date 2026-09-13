@@ -242,6 +242,7 @@ class LevelCardGrid:
         completed: List[bool],
         shards: List[bool],
         duo: bool = False,
+        pads: int = 0,
     ) -> None:
         self._viewport_width, _ = renderer.get_viewport_size()
         self._draw_chapter_tabs(renderer, completed)
@@ -354,6 +355,38 @@ def _block(renderer: IRenderer, center_x: float, center_y: float, size: float, f
     renderer.draw_ui_rect(center_x - half, center_y - half, size, size, fill)
 
 
+def mode_controls(duo: bool, pads: int):
+    """As duas linhas que a tela de escolha de modo mostra sobre as maos.
+
+    E a tela mais importante para isto: e a ultima hora em que o jogador
+    ainda pode mudar de ideia sabendo o que cada modo vai exigir dele. Com um
+    controle na mao e "ESPAÇO pular" escrito na tela, ele larga o controle --
+    e o controle funciona.
+
+    No duo as duas linhas sao independentes de proposito: com UM controle so,
+    o jogador 1 le o controle e o 2 le as setas. E o arranjo real de um sofa
+    com um controle, e inventar um segundo controle na linha do jogador 2
+    mandaria alguem procurar o que nao existe."""
+    if duo:
+        return (
+            "JOGADOR 1   " + ("controle: direcional   A pular   X habilidade   SELECT reinicia"
+                              if pads >= 1 else
+                              "A/D mover   ESPAÇO pular   S habilidade   R reinicia"),
+            "JOGADOR 2   " + ("controle: direcional   A pular   X habilidade   SELECT reinicia"
+                              if pads >= 2 else
+                              "setas mover   CIMA pular   BAIXO habilidade   END reinicia"),
+        )
+    if pads:
+        return (
+            "direcional mover   A pular   X habilidade",
+            "RB alterna entre os dois seres   SELECT reinicia a fase",
+        )
+    return (
+        "A/D mover   ESPAÇO pular   S habilidade",
+        "TAB alterna entre os dois seres   R reinicia a fase",
+    )
+
+
 class TitleScreen:
     """
     Tela de abertura com a escolha de modo em dois botoes grandes.
@@ -376,7 +409,7 @@ class TitleScreen:
             self.duo = step > 0
 
     def draw(self, renderer: IRenderer, completed: int, shards: int, total: int,
-             achievements: int = 0, achievement_total: int = 0) -> None:
+             achievements: int = 0, achievement_total: int = 0, pads: int = 0) -> None:
         width, height = renderer.get_viewport_size()
         renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
         center = width / 2.0
@@ -388,8 +421,8 @@ class TitleScreen:
         top = 196.0
         total_width = 2 * _BUTTON_WIDTH + _BUTTON_GAP
         left = (width - total_width) / 2.0
-        self._draw_button(renderer, left, top, duo=False)
-        self._draw_button(renderer, left + _BUTTON_WIDTH + _BUTTON_GAP, top, duo=True)
+        self._draw_button(renderer, left, top, duo=False, pads=pads)
+        self._draw_button(renderer, left + _BUTTON_WIDTH + _BUTTON_GAP, top, duo=True, pads=pads)
 
         progress_y = top + _BUTTON_HEIGHT + 34.0
         renderer.draw_text(
@@ -404,21 +437,18 @@ class TitleScreen:
         # cada modo exige das maos dele.
         renderer.draw_ui_rect(center - 210.0, progress_y + 40.0, 420.0, 1.0, _RULE)
         controls_y = progress_y + 58.0
-        if self.duo:
-            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPAÇO pular   S habilidade   R reinicia",
-                               13, _TEXT_DIM, anchor="center")
-            renderer.draw_text(center, controls_y + 22.0, "JOGADOR 2   setas mover   CIMA pular   BAIXO habilidade   END reinicia",
-                               13, _TEXT_DIM, anchor="center")
-        else:
-            renderer.draw_text(center, controls_y, "A/D mover   ESPAÇO pular   S habilidade",
-                               13, _TEXT_DIM, anchor="center")
-            renderer.draw_text(center, controls_y + 22.0, "TAB alterna entre os dois seres   R reinicia a fase",
+        for offset, line in enumerate(mode_controls(self.duo, pads)):
+            renderer.draw_text(center, controls_y + offset * 22.0, line,
                                13, _TEXT_DIM, anchor="center")
 
-        renderer.draw_text(center, height - 40.0, "A/D escolher      ESPAÇO confirmar      ESC sair",
-                           13, _TEXT_FAINT, anchor="center")
+        renderer.draw_text(
+            center, height - 40.0,
+            "direcional escolher      A confirmar      START sair" if pads
+            else "A/D escolher      ESPAÇO confirmar      ESC sair",
+            13, _TEXT_FAINT, anchor="center")
 
-    def _draw_button(self, renderer: IRenderer, x: float, y: float, duo: bool) -> None:
+    def _draw_button(self, renderer: IRenderer, x: float, y: float, duo: bool,
+                     pads: int = 0) -> None:
         selected = duo == self.duo
         renderer.draw_ui_rect(x, y, _BUTTON_WIDTH, _BUTTON_HEIGHT,
                               _CARD_SELECTED if selected else _CARD)
@@ -448,9 +478,12 @@ class TitleScreen:
                                _GOLD if selected else _TEXT_FAINT, anchor="center")
             hint = "cada um no seu"
         else:
-            renderer.draw_text(center_x, figures_y, "TAB", 13,
+            # A tecla que ALTERNA entre os dois seres e a mecanica central do
+            # modo solo, e este card e onde ela e dita pela primeira vez.
+            troca = "RB" if pads else "TAB"
+            renderer.draw_text(center_x, figures_y, troca, 13,
                                _GOLD if selected else _TEXT_FAINT, anchor="center")
-            hint = "um por vez, TAB alterna"
+            hint = f"um por vez, {troca} alterna"
         renderer.draw_text(center_x, y + _BUTTON_HEIGHT - 28.0, hint, 12,
                            _TEXT_DIM if selected else _TEXT_FAINT, anchor="center")
 
@@ -461,7 +494,8 @@ class MenuChrome:
     def __init__(self) -> None:
         self.message = ""
 
-    def draw(self, renderer: IRenderer, duo: bool, collected: int, total: int) -> None:
+    def draw(self, renderer: IRenderer, duo: bool, collected: int, total: int,
+             pads: int = 0) -> None:
         width, height = renderer.get_viewport_size()
         renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
         center = width / 2.0
@@ -471,7 +505,8 @@ class MenuChrome:
 
         mode = "DOIS JOGADORES" if duo else "UM JOGADOR"
         renderer.draw_text(24.0, 30.0, f"modo: {mode}", 13, _GOLD if duo else _TEXT_DIM)
-        renderer.draw_text(24.0, 50.0, "TAB troca de modo", 11, _TEXT_FAINT)
+        renderer.draw_text(24.0, 50.0, "RB troca de modo" if pads else "TAB troca de modo",
+                           11, _TEXT_FAINT)
         renderer.draw_text(width - 24.0, 30.0, f"fragmentos {collected}/{total}", 13, _GOLD,
                            anchor="topright")
 
@@ -480,13 +515,19 @@ class MenuChrome:
 
         footer_y = height - 46.0
         renderer.draw_ui_rect(0.0, footer_y - 12.0, width, 1.0, _RULE)
-        renderer.draw_text(center, footer_y, "W/A/S/D escolher      ESPAÇO jogar      ESC sair",
-                           12, _TEXT_DIM, anchor="center")
-        controls = (
-            "J1: A/D  ESPAÇO  S          J2: setas  cima  baixo"
-            if duo
-            else "A/D mover   ESPAÇO pular   S habilidade   TAB trocar de ser"
-        )
+        renderer.draw_text(
+            center, footer_y,
+            "direcional escolher      A jogar      START sair" if pads
+            else "W/A/S/D escolher      ESPAÇO jogar      ESC sair",
+            12, _TEXT_DIM, anchor="center")
+        if duo:
+            controls = (("J1: controle" if pads >= 1 else "J1: A/D  ESPAÇO  S")
+                        + "          "
+                        + ("J2: controle" if pads >= 2 else "J2: setas  cima  baixo"))
+        elif pads:
+            controls = "direcional mover   A pular   X habilidade   RB trocar de ser"
+        else:
+            controls = "A/D mover   ESPAÇO pular   S habilidade   TAB trocar de ser"
         renderer.draw_text(center, footer_y + 20.0, controls, 11, _TEXT_FAINT, anchor="center")
 
 

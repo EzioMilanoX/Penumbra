@@ -53,6 +53,29 @@ _BAR_HEIGHT = 3.0
 _BAR_GAP = 2.0
 
 
+def _control_line(duo: bool, pads: int) -> str:
+    """A linha de controles do rodape, para quem esta de fato jogando.
+
+    Uma dica de controle que MENTE e pior que dica nenhuma: um jogador com o
+    controle na mao lendo "ESPACO pular" conclui que o controle nao funciona --
+    e ele funciona. Como o controle e um `ou` sobre o teclado, o que muda aqui
+    nao e a verdade, e qual metade dela vale a pena ocupar a linha.
+
+    No duo cada jogador tem a sua metade, e elas sao independentes: com UM
+    controle so, o jogador 1 le o controle e o 2 le as setas, que e exatamente
+    o arranjo de um sofa com um controle."""
+    if duo:
+        um = "J1: controle" if pads >= 1 else "J1: A/D  ESPAÇO  S   R"
+        dois = "J2: controle" if pads >= 2 else "J2: setas  CIMA  BAIXO  END"
+        sair = "START/ESC sair" if pads else "ESC sair"
+        return f"{um}      {dois}      {sair}"
+    if pads:
+        return ("direcional mover   A pular   X habilidade   "
+                "RB trocar   SELECT reiniciar   START sair")
+    return ("A/D mover   ESPAÇO pular   S habilidade   "
+            "TAB trocar   R reiniciar   ESC sair")
+
+
 class PenumbraHud:
     """Callable registrado em `GameLoop.set_on_draw_ui`.
 
@@ -72,8 +95,13 @@ class PenumbraHud:
         viewport_size,
         visible=None,
         unlocked=None,
+        pads=None,
     ) -> None:
         self._unlocked = unlocked
+        # Quantos controles estao ligados AGORA -- e um callable, nao um
+        # numero, porque um controle pode ser ligado com o jogo aberto e o
+        # rodape tem de passar a falar dele no frame seguinte.
+        self._pads = pads if pads is not None else (lambda: 0)
         self._state = state
         self._runtime = runtime
         self._tuning = tuning
@@ -158,12 +186,8 @@ class PenumbraHud:
         else:
             renderer.draw_text(14.0, top + _LINE_2, level.hint, 12, _TEXT_DIM)
         self._draw_world_clock(renderer, top)
-        controls = (
-            "J1: A/D  ESPAÇO  S   R      J2: setas  CIMA  BAIXO  END      ESC sair"
-            if state.duo else
-            "A/D mover   ESPAÇO pular   S habilidade   TAB trocar   R reiniciar   ESC sair"
-        )
-        renderer.draw_text(14.0, top + _LINE_3, controls, 11, _TEXT_FAINT)
+        renderer.draw_text(14.0, top + _LINE_3,
+                           _control_line(state.duo, self._pads()), 11, _TEXT_FAINT)
 
     def _draw_world_clock(self, renderer: IRenderer, top: float) -> None:
         """Os dois relogios do mundo, quando a fase tem um deles. O farol e o

@@ -46,6 +46,7 @@ from ouroboros.interfaces.renderer import SHAPE_CIRCLE, SHAPE_RECT
 from ouroboros.roguelite.entities.archetype_loader import ArchetypeLoader
 
 from penumbra.audio import AudioSystem, PenumbraAudio
+from penumbra.gamepad import GamepadInput, load_gamepad_bindings
 from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
 from penumbra.paths import resolve, resource
@@ -143,9 +144,20 @@ def build_game(config: EngineConfig) -> GameLoop:
     # ordem; `gravity_y` e deliberadamente OMITIDO pra que o GravitySystem
     # possa ser registrado depois do segundo TileCollisionSystem.
     game_loop = CompositionRoot(config).build(tile_grid=lumen_grid)
+
+    # O controle entra AQUI, embrulhando o provider do teclado -- e nao dentro
+    # de `_assemble`, que e a simulacao e nao pode conhecer um backend. Tudo a
+    # partir daqui (cenas, controle dos seres, menus) recebe o embrulho no
+    # lugar de `game_loop.input_provider`; o laco da engine continua com o de
+    # dentro, e `end_frame` e o que prende a amostragem ao frame.
+    game_input = GamepadInput(
+        game_loop.input_provider,
+        load_gamepad_bindings(resource("data", "input_bindings", "penumbra_gamepad.json")),
+    )
+
     simulation = _assemble(
         game_loop.world, config, tuning, terrain, catalog,
-        lumen_grid, umbra_grid, game_loop.input_provider,
+        lumen_grid, umbra_grid, game_input,
     )
 
     world = simulation.world
@@ -164,7 +176,7 @@ def build_game(config: EngineConfig) -> GameLoop:
     # composicao sobrescreveria a fase carregada.
     flow = PenumbraFlow(
         game_loop, simulation.runtime, simulation.state,
-        simulation.catalog, tuning, game_loop.input_provider,
+        simulation.catalog, tuning, game_input,
         preview_terrain=_make_terrain(tuning.world),
         audio=audio,
         progress=Progress(catalog.count).load(),
@@ -177,6 +189,7 @@ def build_game(config: EngineConfig) -> GameLoop:
         world.get_pool("transform"), game_loop.renderer.get_viewport_size(),
         visible=lambda: flow.hud_visible,
         unlocked=lambda: flow.unlocked,
+        pads=lambda: game_input.pad_count,
     )
 
     def draw_overlay(renderer) -> None:
@@ -191,6 +204,10 @@ def build_game(config: EngineConfig) -> GameLoop:
         if flow.hud_visible:
             sparks.draw(renderer)
         hud(renderer)
+        # Fim do frame: so MARCA o controle como velho. Quem amostra e a
+        # primeira consulta do frame seguinte, ja dentro do update da cena --
+        # amostrar aqui custaria um frame de atraso (ver `penumbra.gamepad`).
+        game_input.end_frame()
 
     game_loop.set_on_draw_ui(draw_overlay)
     flow.show_main()
