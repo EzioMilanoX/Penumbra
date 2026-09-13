@@ -85,7 +85,12 @@ class DualityControlSystem(ISystem):
             self._velocity_pool = world.get_pool(self._velocity_pool_name)
 
         state = self._state
-        if self._input.is_action_pressed("restart"):
+        # Os DOIS reiniciam. Com `restart` so no R (jogador 1), quem se
+        # encurralava no duo dependia do outro pra recomecar -- e no duo o
+        # normal e que os dois se encurralem ao mesmo tempo.
+        if self._input.is_action_pressed("restart") or (
+            state.duo and self._input.is_action_pressed(f"{_PLAYER_TWO_PREFIX}restart")
+        ):
             state.restart_requested = True
 
         if state.duo:

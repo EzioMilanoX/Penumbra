@@ -54,7 +54,10 @@ título.
 **Um jogador**: A/D mover · ESPAÇO pular · S habilidade · TAB trocar de ser ·
 R reiniciar · ESC voltar ao menu.
 
-**Dois jogadores** (mesmo teclado): J1 = A/D, ESPAÇO, S · J2 = setas ←→, ↑, ↓.
+**Dois jogadores** (mesmo teclado): J1 = A/D, ESPAÇO, S, **R** · J2 = setas ←→,
+↑, ↓, **END**. Os dois reiniciam: no duo o normal é que os dois se encurralem
+ao mesmo tempo, e depender do teclado do outro para recomeçar é depender de
+quem também está preso.
 Os dois lados têm o mesmo formato: mover nos lados, pular pra cima,
 habilidade pra baixo.
 Ninguém espera, e o contato entre os dois continua aniquilando os dois — o que
@@ -388,7 +391,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              232 testes headless
+tests/              239 testes headless
 tools/               audit_levels.py, build_exe.py, generate_icon.py
 penumbra.spec        receita do executável
 ```
@@ -459,7 +462,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 232 testes, ~20 s, headless
+pytest -q                      # 239 testes, ~21 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -617,6 +620,10 @@ jogo eliminando o jogo — ninguém mais cai porque o outro acendeu, e ninguém
 mais atravessa o que sozinho não atravessaria. Seguir dois mantém o problema,
 porque o problema é a razão de os dois existirem. A tela só põe os dois lado a
 lado, com a consequência escrita embaixo de cada um.
+
+A escolha **fica**: o menu principal passa a dizer *"no fim, vocês seguiram
+dois"*. Ela era gravada e nunca mais mencionada — o que transforma a decisão
+mais séria do jogo numa formalidade.
 
 ## As telas
 

@@ -329,6 +329,7 @@ class MainMenuScene(IScene):
         self._screen.draw(
             renderer, completed, total,
             len(self._flow.progress.achievements), len(achievements.CATALOG),
+            ending=self._flow.ending_choice or "",
         )
 
 

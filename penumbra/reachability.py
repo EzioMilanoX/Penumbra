@@ -236,7 +236,3 @@ def solid_mask(terrain, door_open: bool, crust_broken: bool = False) -> np.ndarr
     return mask
 
 
-def standing_cell_above(terrain, cell: Cell) -> Cell:
-    """Marcadores de fase (`A`/`X`/`L`/...) sao celulas de ar; o ser fica de
-    pe na propria celula do marcador quando ha chao logo abaixo."""
-    return cell

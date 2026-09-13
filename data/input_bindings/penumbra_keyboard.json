@@ -11,5 +11,6 @@
   "p2_move_left": "KEY_LEFT",
   "p2_move_right": "KEY_RIGHT",
   "p2_jump": "KEY_UP",
-  "p2_ability": "KEY_DOWN"
+  "p2_ability": "KEY_DOWN",
+  "p2_restart": "KEY_END"
 }

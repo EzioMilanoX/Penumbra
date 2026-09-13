@@ -118,10 +118,3 @@ class EchoSystem(ISystem):
             return False
         gap = abs(lumen_x - umbra_x)
         return self._min_gap <= gap <= self._max_gap
-
-    @property
-    def progress(self) -> float:
-        """0..1 -- quanto falta. A apresentacao usa isto pra que o jogador
-        VEJA que algo esta acontecendo antes de saber o que e; sem esse
-        retorno, o segredo seria indistinguivel de nao existir."""
-        return min(1.0, self._state.echo_seconds / self._seconds)

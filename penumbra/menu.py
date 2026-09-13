@@ -405,9 +405,9 @@ class TitleScreen:
         renderer.draw_ui_rect(center - 210.0, progress_y + 40.0, 420.0, 1.0, _RULE)
         controls_y = progress_y + 58.0
         if self.duo:
-            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPAÇO pular   S habilidade",
+            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPAÇO pular   S habilidade   R reinicia",
                                13, _TEXT_DIM, anchor="center")
-            renderer.draw_text(center, controls_y + 22.0, "JOGADOR 2   setas mover   CIMA pular   BAIXO habilidade",
+            renderer.draw_text(center, controls_y + 22.0, "JOGADOR 2   setas mover   CIMA pular   BAIXO habilidade   END reinicia",
                                13, _TEXT_DIM, anchor="center")
         else:
             renderer.draw_text(center, controls_y, "A/D mover   ESPAÇO pular   S habilidade",
@@ -712,7 +712,7 @@ class MainMenuScreen:
             self.selected = max(0, min(len(_MAIN_ROWS) - 1, self.selected + step))
 
     def draw(self, renderer: IRenderer, completed: int, total: int,
-             unlocked: int, achievement_total: int) -> None:
+             unlocked: int, achievement_total: int, ending: str = "") -> None:
         width, height = renderer.get_viewport_size()
         renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
         center = width / 2.0
@@ -739,6 +739,18 @@ class MainMenuScreen:
 
         renderer.draw_text(center, top + len(_MAIN_ROWS) * 46.0 + 8.0,
                            _MAIN_ROWS[self.selected][1], 12, _TEXT_FAINT, anchor="center")
+
+        # A escolha do fim era gravada e nunca mais dita. O jogo faz uma
+        # pergunta grave na ultima tela e depois esquecia a resposta -- o que
+        # transforma a decisao em formalidade. Ela fica aqui, na raiz, que e
+        # onde se volta pra saber onde a gente parou.
+        if ending:
+            renderer.draw_text(
+                center, top + len(_MAIN_ROWS) * 46.0 + 34.0,
+                "no fim, vocês se fundiram" if ending == "fundidos"
+                else "no fim, vocês seguiram dois",
+                12, _GOLD, anchor="center",
+            )
 
         renderer.draw_ui_rect(center - 210.0, height - 96.0, 420.0, 1.0, _RULE)
         renderer.draw_text(
