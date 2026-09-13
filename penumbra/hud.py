@@ -151,9 +151,9 @@ class PenumbraHud:
             renderer.draw_text(14.0, top + _LINE_2, level.hint, 12, _TEXT_DIM)
         self._draw_world_clock(renderer, top)
         controls = (
-            "J1: A/D  ESPACO  S       J2: setas  CIMA  BAIXO       R reiniciar   ESC sair"
+            "J1: A/D  ESPAÇO  S       J2: setas  CIMA  BAIXO       R reiniciar   ESC sair"
             if state.duo else
-            "A/D mover   ESPACO pular   S habilidade   TAB trocar   R reiniciar   ESC sair"
+            "A/D mover   ESPAÇO pular   S habilidade   TAB trocar   R reiniciar   ESC sair"
         )
         renderer.draw_text(14.0, top + _LINE_3, controls, 11, _TEXT_FAINT)
 
@@ -199,6 +199,6 @@ class PenumbraHud:
         renderer.draw_text(center_x, y + 58.0, state.message, 13, _TEXT, anchor="center")
         renderer.draw_text(
             center_x, y + 86.0,
-            "ESPACO para continuar" if won else "ESPACO para tentar de novo",
+            "ESPAÇO para continuar" if won else "ESPAÇO para tentar de novo",
             11, _TEXT_DIM, anchor="center",
         )

@@ -368,7 +368,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              197 testes headless
+tests/              205 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -438,7 +438,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 197 testes, ~14 s, headless
+pytest -q                      # 205 testes, ~13 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -467,6 +467,29 @@ respondeu às perguntas de projeto das quatro fases (onde o éter fica sólido,
 onde cada ser sobrevive, se o facho vaza até a zona de sombra). Ele achou um
 soft-lock real na fase 4 — a Lumen descia da saliência para atravessar a porta
 e não tinha como voltar à zona de luz —, corrigido com dois degraus de rocha.
+
+## As duas tolerâncias do salto
+
+Existem contra o mesmo erro, e é o único erro de plataforma que o jogador não
+consegue **ver**: a diferença entre acertar e errar é de 16 ms.
+
+- **Coyote time** (0,10 s) — sair da beira um frame antes de apertar custava o
+  salto, e não havia como saber que se apertou tarde.
+- **Buffer de pulo** (0,12 s) — apertar um frame antes de pousar custava o
+  mesmo. É o caso de encadear dois saltos.
+
+Nenhuma das duas abre caminho novo, e há um teste que garante isso: as duas
+janelas são **menores que o tempo de queda de meia célula** (0,17 s sob a
+gravidade do jogo). Maiores, deixariam de perdoar um erro de tempo e passariam
+a estender o salto — e o alcance geométrico de trinta fases foi medido sem
+elas. Saltar zera as duas janelas, que é o que impede o salto duplo.
+
+## O português tem acento
+
+O jogo inteiro escrevia "A Absorcao", "Nao tem volta", "ESPACO" — por uma
+limitação que **não existe**: a fonte do backend renderiza acentuado sem
+problema nenhum. Era uma suposição minha, carregada por trinta fases. Os trinta
+nomes, as trinta dicas e toda a interface estão acentuados agora.
 
 ## Som, progresso e pausa
 

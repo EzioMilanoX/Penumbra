@@ -1,7 +1,7 @@
 {
   "id": "25_mare",
-  "name": "Mare",
-  "hint": "Meia ponte obedece a luz, meia a desobedece -- e a mesma respiracao monta uma e desmonta a outra.",
+  "name": "Maré",
+  "hint": "Meia ponte obedece à luz, meia a desobedece -- e a mesma respiração monta uma e desmonta a outra.",
   "chapter": 3,
   "rows": [
     ".........###########........",

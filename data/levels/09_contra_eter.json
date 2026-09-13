@@ -1,9 +1,9 @@
 {
   "id": "09_contra_eter",
-  "name": "Contra-Eter",
-  "hint": "A ponte da direita obedece a regra ao contrario. O farol governa as duas, em sentidos opostos.",
+  "name": "Contra-Éter",
+  "hint": "A ponte da direita obedece à regra ao contrário. O farol governa as duas, em sentidos opostos.",
   "chapter": 1,
-  "teaches": "contra-eter",
+  "teaches": "contra-éter",
   "rows": [
     ".........####.####..........",
     ".........####.####..........",

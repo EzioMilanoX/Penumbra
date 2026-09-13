@@ -83,6 +83,10 @@ class DualityState:
         ligado pra sempre)."""
         self.peril = np.zeros(2, dtype=np.float32)
         """Quanto falta pra polaridade errada matar cada ser, 0..1."""
+        self.coyote = np.zeros(2, dtype=np.float32)
+        """Segundos de salto ainda validos depois de sair da beira."""
+        self.jump_buffer = np.zeros(2, dtype=np.float32)
+        """Segundos de salto lembrado, apertado antes de encostar no chao."""
         self.cell = np.zeros((2, 2), dtype=np.int64)
         """Celula `(col, row)` de cada ser no frame corrente."""
         self.reached_goal = np.zeros(2, dtype=bool)
@@ -289,6 +293,8 @@ class LevelRuntime:
         state.ability_on[:] = False
         state.charge[:] = 1.0
         state.peril[:] = 0.0
+        state.coyote[:] = 0.0
+        state.jump_buffer[:] = 0.0
         state.reached_goal[:] = False
         state.shard_collected = False
         state.used_ability = False

@@ -48,15 +48,15 @@ BOTH_FORMS = "renuncia_dupla"
 
 CATALOG: Tuple[Achievement, ...] = (
     Achievement(FIRST_LIGHT, "Primeira Luz", "Vencer a primeira fase."),
-    Achievement(CHAPTER_ONE, "Aprendiz", "Vencer o capitulo de aprender inteiro."),
-    Achievement(CHAPTER_TWO, "Misturador", "Vencer o capitulo de misturar inteiro."),
-    Achievement(CHAPTER_THREE, "Especialista", "Vencer o capitulo das especiais inteiro."),
+    Achievement(CHAPTER_ONE, "Aprendiz", "Vencer o capítulo de aprender inteiro."),
+    Achievement(CHAPTER_TWO, "Misturador", "Vencer o capítulo de misturar inteiro."),
+    Achievement(CHAPTER_THREE, "Especialista", "Vencer o capítulo das especiais inteiro."),
     Achievement(WHOLE_SOURCE, "A Fonte Inteira", "Apanhar todos os fragmentos."),
-    Achievement(NO_ABILITY, "Sem as Maos", "Vencer uma fase sem ligar nenhuma habilidade."),
+    Achievement(NO_ABILITY, "Sem as Mãos", "Vencer uma fase sem ligar nenhuma habilidade."),
     Achievement(FIRST_TRY, "De Primeira", "Vencer uma fase sem morrer nem reiniciar."),
     Achievement(IN_TWO, "A Dois", "Vencer uma fase em dois jogadores."),
     Achievement(ESCORT_IN_TWO, "Escolta", "Vencer uma fase de escolta em dois jogadores."),
-    Achievement(BOTH_FORMS, "Renuncia Dupla", "Deixar as duas formas na mesma fase."),
+    Achievement(BOTH_FORMS, "Renúncia Dupla", "Deixar as duas formas na mesma fase."),
 )
 
 _BY_KEY = {achievement.key: achievement for achievement in CATALOG}

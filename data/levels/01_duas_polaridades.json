@@ -1,7 +1,7 @@
 {
   "id": "01_duas_polaridades",
   "name": "Duas Polaridades",
-  "hint": "O mesmo eter, dois donos: aceso e chao da Lumen, apagado e chao da Umbra. Vencivel so andando.",
+  "hint": "O mesmo éter, dois donos: aceso é chão da Lumen, apagado é chão da Umbra. Vencível só andando.",
   "chapter": 1,
   "teaches": "polaridade",
   "rows": [

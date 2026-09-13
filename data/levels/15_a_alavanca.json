@@ -1,7 +1,7 @@
 {
   "id": "15_a_alavanca",
   "name": "A Alavanca",
-  "hint": "A alavanca troca eter por contra-eter no mapa inteiro. A mesma ponte, a mesma luz, e o chao muda de dono.",
+  "hint": "A alavanca troca éter por contra-éter no mapa inteiro. A mesma ponte, a mesma luz, e o chão muda de dono.",
   "chapter": 1,
   "teaches": "alavanca",
   "rows": [

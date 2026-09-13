@@ -1,7 +1,7 @@
 {
   "id": "06_a_placa",
   "name": "A Placa",
-  "hint": "A placa mantem a porta aberta so enquanto alguem esta em cima. Sao duas -- uma de cada lado.",
+  "hint": "A placa mantém a porta aberta só enquanto alguém está em cima. São duas -- uma de cada lado.",
   "chapter": 1,
   "teaches": "placa",
   "rows": [

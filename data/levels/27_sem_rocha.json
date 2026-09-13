@@ -1,7 +1,7 @@
 {
   "id": "27_sem_rocha",
   "name": "Sem Rocha",
-  "hint": "Nenhuma rocha entre as margens. A mesma lanterna: em cima ela e o chao da Lumen, embaixo e o buraco da Umbra.",
+  "hint": "Nenhuma rocha entre as margens. A mesma lanterna: em cima é o chão da Lumen, embaixo é o buraco da Umbra.",
   "chapter": 3,
   "duo": {
     "note": "No duo a pista de baixo inverte: a Umbra deixa de fugir da lanterna e passa a ter de andar debaixo dela.",

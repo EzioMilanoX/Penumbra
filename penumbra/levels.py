@@ -92,9 +92,9 @@ class Chapter:
 
 
 _CHAPTER_TITLES = {
-    1: ("APRENDER", "uma mecanica de cada vez"),
+    1: ("APRENDER", "uma mecânica de cada vez"),
     2: ("MISTURAR", "duas ou mais, ao mesmo tempo"),
-    3: ("ESPECIAIS", "as que quebram a propria regra"),
+    3: ("ESPECIAIS", "as que quebram a própria regra"),
 }
 
 

@@ -1,7 +1,7 @@
 {
   "window_width": 896,
   "window_height": 616,
-  "window_title": "Penumbra -- Luz e Sombra: Dualidade",
+  "window_title": "Penumbra — Luz e Sombra: Dualidade",
   "entity_capacity": 640,
   "difficulty_path": "data/difficulties/penumbra/basic.json",
   "input_bindings_path": "data/input_bindings/penumbra_keyboard.json"

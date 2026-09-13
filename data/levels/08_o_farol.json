@@ -1,7 +1,7 @@
 {
   "id": "08_o_farol",
   "name": "Farol",
-  "hint": "O farol acende e apaga sozinho. Aceso, a ponte e chao da Lumen; apagado, da Umbra.",
+  "hint": "O farol acende e apaga sozinho. Aceso, a ponte é chão da Lumen; apagado, da Umbra.",
   "chapter": 1,
   "teaches": "farol",
   "rows": [

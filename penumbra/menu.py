@@ -95,7 +95,7 @@ _CHAPTER_TAB_Y = 104.0
 """Quinze slots por pagina, em 5x3 -- o tamanho do maior capitulo.
 
 A pagina e o CAPITULO, e nao um bloco de N fases, porque os tres nao tem o
-mesmo tamanho nem deveriam ter: aprender uma mecanica de cada vez custa uma
+mesmo tamanho nem deveriam ter: aprender uma mecânica de cada vez custa uma
 fase por mecanica, misturar custa menos, e as especiais sao poucas de
 proposito. Um capitulo mais curto deixa a grade pela metade, e isso e uma
 informacao verdadeira -- nao um buraco.
@@ -400,17 +400,17 @@ class TitleScreen:
         renderer.draw_ui_rect(center - 210.0, progress_y + 40.0, 420.0, 1.0, _RULE)
         controls_y = progress_y + 58.0
         if self.duo:
-            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPACO pular   S habilidade",
+            renderer.draw_text(center, controls_y, "JOGADOR 1   A/D mover   ESPAÇO pular   S habilidade",
                                13, _TEXT_DIM, anchor="center")
             renderer.draw_text(center, controls_y + 22.0, "JOGADOR 2   setas mover   CIMA pular   BAIXO habilidade",
                                13, _TEXT_DIM, anchor="center")
         else:
-            renderer.draw_text(center, controls_y, "A/D mover   ESPACO pular   S habilidade",
+            renderer.draw_text(center, controls_y, "A/D mover   ESPAÇO pular   S habilidade",
                                13, _TEXT_DIM, anchor="center")
             renderer.draw_text(center, controls_y + 22.0, "TAB alterna entre os dois seres   R reinicia a fase",
                                13, _TEXT_DIM, anchor="center")
 
-        renderer.draw_text(center, height - 40.0, "A/D escolher      ESPACO confirmar      ESC sair",
+        renderer.draw_text(center, height - 40.0, "A/D escolher      ESPAÇO confirmar      ESC sair",
                            13, _TEXT_FAINT, anchor="center")
 
     def _draw_button(self, renderer: IRenderer, x: float, y: float, duo: bool) -> None:
@@ -475,33 +475,33 @@ class MenuChrome:
 
         footer_y = height - 46.0
         renderer.draw_ui_rect(0.0, footer_y - 12.0, width, 1.0, _RULE)
-        renderer.draw_text(center, footer_y, "W/A/S/D escolher      ESPACO jogar      ESC sair",
+        renderer.draw_text(center, footer_y, "W/A/S/D escolher      ESPAÇO jogar      ESC sair",
                            12, _TEXT_DIM, anchor="center")
         controls = (
-            "J1: A/D  ESPACO  S          J2: setas  cima  baixo"
+            "J1: A/D  ESPAÇO  S          J2: setas  cima  baixo"
             if duo
-            else "A/D mover   ESPACO pular   S habilidade   TAB trocar de ser"
+            else "A/D mover   ESPAÇO pular   S habilidade   TAB trocar de ser"
         )
         renderer.draw_text(center, footer_y + 20.0, controls, 11, _TEXT_FAINT, anchor="center")
 
 
 _ENDING_TITLE = "A FONTE"
 _ENDING_LEAD = (
-    "Voces nasceram da mesma fonte, e ela esta aberta.",
-    "Podem voltar a ser uma coisa so -- e nunca mais precisar um do outro.",
+    "Vocês nasceram da mesma fonte, e ela está aberta.",
+    "Podem voltar a ser uma coisa só -- e nunca mais precisar um do outro.",
     "Ou seguir dois, e continuar precisando.",
 )
 
 _ENDING_LINE_SIZE = 11
 _ENDING_CHOICES = (
     ("FUNDIR", (
-        "Uma luz so, sem polaridade.",
-        "Ninguem cai porque o outro acende.",
-        "E ninguem atravessa o impossivel.",
+        "Uma luz só, sem polaridade.",
+        "Ninguém cai porque o outro acende.",
+        "E ninguém atravessa o impossível.",
     )),
     ("SEGUIR DOIS", (
         "Continuam sem poder se tocar.",
-        "Continuam sem avancar sozinhos.",
+        "Continuam sem avançar sozinhos.",
         "Era isso que os levava adiante.",
     )),
 )
@@ -580,7 +580,7 @@ class EndingScreen:
                                anchor="center")
             if locked:
                 # A razao de existirem trinta fragmentos, dita em uma linha.
-                renderer.draw_text(middle, top + 60.0, "A fonte esta incompleta.", 11,
+                renderer.draw_text(middle, top + 60.0, "A fonte está incompleta.", 11,
                                    _TEXT_FAINT, anchor="center")
                 renderer.draw_text(middle, top + 80.0, f"Faltam {total - shards} fragmentos.", 11,
                                    _GOLD_DIM, anchor="center")
@@ -591,7 +591,7 @@ class EndingScreen:
                 renderer.draw_text(middle, top + 56.0 + line_index * 20.0, line, _ENDING_LINE_SIZE,
                                    _TEXT_DIM if selected else _TEXT_FAINT, anchor="center")
 
-        renderer.draw_text(center, 418.0, "A/D escolher      ESPACO confirmar", 13,
+        renderer.draw_text(center, 418.0, "A/D escolher      ESPAÇO confirmar", 13,
                            _TEXT_FAINT, anchor="center")
 
     def _draw_epilogue(self, renderer: IRenderer, center: float, shards: int, total: int) -> None:
@@ -609,7 +609,7 @@ class EndingScreen:
             renderer.draw_text(center, 386.0,
                                "Os fragmentos que faltam continuam la. Nada fica trancado.",
                                12, _TEXT_FAINT, anchor="center")
-        renderer.draw_text(center, 430.0, "ESPACO volta ao menu", 13, _TEXT_FAINT, anchor="center")
+        renderer.draw_text(center, 430.0, "ESPAÇO volta ao menu", 13, _TEXT_FAINT, anchor="center")
 
 
 _PAUSE_OPTIONS = ("CONTINUAR", "REINICIAR A FASE", "VOLTAR AO MENU")
@@ -659,5 +659,5 @@ class PauseScreen:
                                _GOLD if chosen else _TEXT_DIM, anchor="center")
 
         renderer.draw_text(center, top + panel_h - 24.0,
-                           "W/S escolher   ESPACO confirmar   ESC continuar",
+                           "W/S escolher   ESPAÇO confirmar   ESC continuar",
                            11, _TEXT_FAINT, anchor="center")

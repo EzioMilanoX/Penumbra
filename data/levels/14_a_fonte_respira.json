@@ -1,7 +1,7 @@
 {
   "id": "14_a_fonte_respira",
   "name": "A Fonte Respira",
-  "hint": "Ela nao anda: incha. O chao aceso dilata e contrai, e quem estava seguro deixa de estar sem dar um passo.",
+  "hint": "Ela não anda: incha. O chão aceso dilata e contrai, e quem estava seguro deixa de estar sem dar um passo.",
   "chapter": 1,
   "teaches": "fonte",
   "rows": [

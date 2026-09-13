@@ -9,7 +9,10 @@
     "gravity_y": 1100.0
   },
 
+  "_nota_salto": "coyote_seconds e jump_buffer_seconds sao as duas tolerancias do salto, e existem contra o mesmo erro de 16 ms que o jogador nao consegue ver: sair da beira um frame antes de apertar, e apertar um frame antes de pousar. Nenhuma das duas abre caminho novo -- as duas janelas sao menores que o tempo de queda de meia celula (0,17 s).",
   "lumen": {
+    "coyote_seconds": 0.1,
+    "jump_buffer_seconds": 0.12,
     "move_speed": 200.0,
     "jump_velocity_y": -480.0,
     "half_width": 10.0,
@@ -21,6 +24,8 @@
   },
 
   "umbra": {
+    "coyote_seconds": 0.12,
+    "jump_buffer_seconds": 0.12,
     "move_speed": 142.0,
     "jump_velocity_y": -415.0,
     "half_width": 13.0,

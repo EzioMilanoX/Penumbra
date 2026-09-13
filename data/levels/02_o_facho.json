@@ -1,7 +1,7 @@
 {
   "id": "02_o_facho",
   "name": "O Facho",
-  "hint": "A ponte esta apagada: da Umbra, de graca. Pra Lumen ela so existe enquanto o facho estiver ligado.",
+  "hint": "A ponte está apagada: da Umbra, de graça. Pra Lumen ela só existe enquanto o facho estiver ligado.",
   "chapter": 1,
   "teaches": "facho",
   "rows": [

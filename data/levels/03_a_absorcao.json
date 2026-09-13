@@ -1,9 +1,9 @@
 {
   "id": "03_a_absorcao",
-  "name": "A Absorcao",
-  "hint": "Agora a ponte esta acesa: da Lumen, de graca. A Umbra so a toma apagando -- e a escuridao anda com ela.",
+  "name": "A Absorção",
+  "hint": "Agora a ponte está acesa: da Lumen, de graça. A Umbra só a toma apagando -- e a escuridão anda com ela.",
   "chapter": 1,
-  "teaches": "absorcao",
+  "teaches": "absorção",
   "rows": [
     ".........###########........",
     ".........###########........",

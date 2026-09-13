@@ -58,6 +58,19 @@ class CharacterTuning:
     """Segundos empurrando pra romper uma celula de crosta. So a Umbra
     rompe, entao so a secao dela precisa declarar isto -- o default zerado
     do lado da Lumen nunca e lido (`CrustBreakSystem` so olha a Umbra)."""
+    coyote_seconds: float = 0.10
+    """Quanto tempo depois de sair da beira o salto ainda vale.
+
+    Sem isto, sair da plataforma um frame antes de apertar custa o salto --
+    e o jogador nao tem como saber que apertou tarde, porque a diferenca e
+    de 16 ms. Nao abre caminho novo: a janela e menor que o tempo de queda
+    de meia celula."""
+    jump_buffer_seconds: float = 0.12
+    """Quanto tempo antes de encostar no chao o salto ainda e lembrado.
+
+    O espelho do coyote: apertar um frame ANTES de pousar tambem custava o
+    salto. Os dois juntos cobrem os dois lados do mesmo erro de 16 ms, que e
+    o unico erro de plataforma que o jogador nao consegue ver."""
 
 
 @dataclass(frozen=True)
@@ -211,5 +224,7 @@ def _validate(tuning: DualityTuning, path: str) -> None:
             raise TuningDefinitionError(f"{path}: '{who}.jump_velocity_y' precisa ser negativo (+y = baixo)")
         if character.crust_break_seconds < 0.0:
             raise TuningDefinitionError(f"{path}: '{who}.crust_break_seconds' nao pode ser negativo")
+        if character.coyote_seconds < 0.0 or character.jump_buffer_seconds < 0.0:
+            raise TuningDefinitionError(f"{path}: {who!r} nao pode ter coyote/buffer negativo")
         if character.peril_seconds <= 0.0 or character.ability_charge_seconds <= 0.0:
             raise TuningDefinitionError(f"{path}: {who!r} precisa de peril_seconds/ability_charge_seconds positivos")

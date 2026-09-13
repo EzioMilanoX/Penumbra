@@ -1,7 +1,7 @@
 {
   "id": "04_a_crosta",
   "name": "A Crosta",
-  "hint": "So a Umbra rompe a crosta: empurre contra ela andando. Nao tem volta -- e o buraco deixa a luz passar.",
+  "hint": "Só a Umbra rompe a crosta: empurre contra ela andando. Não tem volta -- e o buraco deixa a luz passar.",
   "chapter": 1,
   "teaches": "crosta",
   "rows": [

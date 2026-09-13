@@ -36,6 +36,12 @@ class DualityControlSystem(ISystem):
     """
     Le o input e escreve `velocity`. Dois modos, um caminho de codigo.
 
+    O salto tem duas tolerancias, e as duas existem contra o mesmo erro de
+    16 ms que o jogador nao consegue ver: o **coyote** deixa saltar por um
+    instante depois de sair da beira, e o **buffer** lembra o aperto feito um
+    instante antes de pousar. Nenhuma das duas abre caminho novo -- as duas
+    janelas sao menores que o tempo de queda de meia celula.
+
     **Solo**: comanda o ser ATIVO e zera a horizontal do inativo -- ele
     espera parado, mas continua sujeito a gravidade e ao proprio chao. Se a
     polaridade do terreno sob ele mudar enquanto o jogador cuida do outro,
@@ -89,6 +95,7 @@ class DualityControlSystem(ISystem):
                 if self._input.is_action_pressed(f"{prefix}ability"):
                     self._toggle_ability(side)
             self._update_charges(delta_time)
+            self._update_jump_assist(delta_time)
             for side, prefix in ((LUMEN, ""), (UMBRA, _PLAYER_TWO_PREFIX)):
                 self._drive(side, prefix)
             return
@@ -99,6 +106,7 @@ class DualityControlSystem(ISystem):
             self._toggle_ability(state.active)
 
         self._update_charges(delta_time)
+        self._update_jump_assist(delta_time)
         self._drive(state.active, "")
         self._park_inactive()
 
@@ -144,6 +152,26 @@ class DualityControlSystem(ISystem):
                 refilled = float(state.charge[side]) + tuning.ability_refill_per_second * delta_time
                 state.charge[side] = 1.0 if refilled > 1.0 else refilled
 
+    def _update_jump_assist(self, delta_time: float) -> None:
+        """Mantem os dois relogios de salto, para os DOIS seres.
+
+        Roda fora de `_drive` de proposito: no solo so o ser ativo e
+        conduzido, mas o inativo continua caindo -- e se o coyote dele
+        parasse de contar ao trocar de ser, trocar no ar daria um salto extra
+        de graca.
+        """
+        state = self._state
+        for side in (LUMEN, UMBRA):
+            tuning = self._sides[side]
+            grounded = self._tile_collision_systems[side].is_grounded(
+                int(state.entity_index[side])
+            )
+            if grounded:
+                state.coyote[side] = tuning.coyote_seconds
+            else:
+                state.coyote[side] = max(0.0, float(state.coyote[side]) - delta_time)
+            state.jump_buffer[side] = max(0.0, float(state.jump_buffer[side]) - delta_time)
+
     def _drive(self, side: int, prefix: str) -> None:
         """Move UM ser a partir de um conjunto de acoes. `prefix` e ""
         para o jogador 1 e `"p2_"` para o 2 -- o mesmo caminho de codigo
@@ -165,9 +193,17 @@ class DualityControlSystem(ISystem):
         else:
             view["linear_x"][row] = 0.0
 
-        jumped = self._input.is_action_pressed(f"{prefix}jump")
-        if jumped and self._tile_collision_systems[side].is_grounded(entity_index):
+        # Salto com as duas tolerancias. Apertar continua sendo o gatilho, mas
+        # nem a tecla nem o chao precisam acontecer no MESMO frame: o buffer
+        # lembra o aperto, o coyote lembra o chao. Zerar os dois ao saltar e o
+        # que impede um salto duplo -- sem isso, a janela de coyote ainda
+        # aberta no ar valeria uma segunda vez.
+        if self._input.is_action_pressed(f"{prefix}jump"):
+            state.jump_buffer[side] = tuning.jump_buffer_seconds
+        if state.jump_buffer[side] > 0.0 and state.coyote[side] > 0.0:
             view["linear_y"][row] = tuning.jump_velocity_y
+            state.jump_buffer[side] = 0.0
+            state.coyote[side] = 0.0
 
     def _park_inactive(self) -> None:
         state = self._state

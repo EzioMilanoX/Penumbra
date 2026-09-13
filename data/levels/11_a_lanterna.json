@@ -1,7 +1,7 @@
 {
   "id": "11_a_lanterna",
   "name": "A Lanterna",
-  "hint": "A lampada anda, e leva o chao junto. Onde ela esta a ponte e da Lumen; onde nao esta, e da Umbra.",
+  "hint": "A lâmpada anda, e leva o chão junto. Onde ela está a ponte é da Lumen; onde não está, é da Umbra.",
   "chapter": 1,
   "teaches": "lanterna",
   "rows": [

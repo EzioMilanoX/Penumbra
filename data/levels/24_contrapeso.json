@@ -1,7 +1,7 @@
 {
   "id": "24_contrapeso",
   "name": "Contrapeso",
-  "hint": "Meia ponte obedece a luz, meia a desobedece -- e a alavanca espelha a fase. Nao da pra agradar aos dois.",
+  "hint": "Meia ponte obedece à luz, meia a desobedece -- e a alavanca espelha a fase. Não dá pra agradar aos dois.",
   "chapter": 2,
   "rows": [
     ".........###########........",

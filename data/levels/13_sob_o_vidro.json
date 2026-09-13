@@ -1,11 +1,11 @@
 {
   "id": "13_sob_o_vidro",
   "name": "Sob o Vidro",
-  "hint": "A luz atravessa o vidro. Ela caminha em cima e acende o chao da Umbra embaixo -- nenhum dos dois faz isso so.",
+  "hint": "A luz atravessa o vidro. Ela caminha em cima e acende o chão da Umbra embaixo -- nenhum dos dois faz isso só.",
   "chapter": 1,
   "teaches": "vidro",
   "duo": {
-    "note": "No duo as lampadas saem: a escolta e a travessia inteira, e so funciona com os dois andando juntos.",
+    "note": "No duo as lâmpadas saem: a escolta é a travessia inteira, e só funciona com os dois andando juntos.",
     "cells": [
       [
         8,
