@@ -118,6 +118,7 @@ class DualityControlSystem(ISystem):
             state.ability_on[side] = False
         elif state.charge[side] >= _MIN_CHARGE_TO_ENGAGE:
             state.ability_on[side] = True
+            state.used_ability = True
 
     def _update_charges(self, delta_time: float) -> None:
         """Drena a carga da habilidade ligada, recompoe a da desligada, e

@@ -27,8 +27,11 @@ from ouroboros.core.world import World
 from ouroboros.interfaces.input_provider import IInputProvider
 from ouroboros.interfaces.renderer import IRenderer
 
+from penumbra import achievements
+from penumbra import audio as audio_ids
 from penumbra.levels import LevelCatalog
-from penumbra.menu import EndingScreen, LevelCardGrid, MenuChrome, TitleScreen
+from penumbra.progress import Progress
+from penumbra.menu import EndingScreen, LevelCardGrid, MenuChrome, PauseScreen, TitleScreen
 from penumbra.terrain import Terrain
 from penumbra.state import DualityState, LevelRuntime, OUTCOME_COMPLETE, OUTCOME_PLAYING
 from penumbra.tuning import DualityTuning
@@ -64,21 +67,27 @@ class PenumbraFlow:
         tuning: DualityTuning,
         input_provider: IInputProvider,
         preview_terrain: Terrain,
+        audio=None,
+        progress: Optional[Progress] = None,
     ) -> None:
         self._game_loop = game_loop
         self._runtime = runtime
         self._state = state
         self._catalog = catalog
-        self.completed: List[bool] = [False] * catalog.count
-        self.shards: List[bool] = [False] * catalog.count
-        self.ending_choice: Optional[str] = None
-        """O que o jogador escolheu no fim, ou `None` se ainda nao chegou la.
-        Mora aqui, e nao no `DualityState`, pela mesma razao que o modo: e uma
-        decisao da SESSAO, e o `World` nao tem opiniao sobre ela."""
+        self.audio = audio
+        self.progress = progress if progress is not None else Progress(catalog.count)
+        self._clean_run = True
+        """A tentativa corrente chegou ate aqui sem morte e sem `R`. Vive no
+        fluxo e nao no `DualityState` porque atravessa RESETS -- e a memoria
+        de que houve um reset que a conquista reconhece."""
+        self.unlocked: List[str] = []
+        """Conquistas destravadas na ultima vitoria, pro menu anunciar."""
         self.title = TitleScene(self, input_provider)
         self.menu = MenuScene(self, catalog, preview_terrain, input_provider)
         self.gameplay = PenumbraScene(self, runtime, state, tuning, input_provider)
         self.ending = EndingScene(self, input_provider)
+        self.pause = PauseScene(self, input_provider)
+        self.title.duo = self.progress.duo
 
     def show_title(self) -> None:
         self._game_loop.reset_scenes(self.title)
@@ -94,6 +103,39 @@ class PenumbraFlow:
         self._game_loop.reset_scenes(self.ending)
 
     @property
+    def completed(self) -> List[bool]:
+        return self.progress.completed
+
+    @property
+    def shards(self) -> List[bool]:
+        return self.progress.shards
+
+    @property
+    def ending_choice(self) -> Optional[str]:
+        return self.progress.ending_choice
+
+    @ending_choice.setter
+    def ending_choice(self, value: Optional[str]) -> None:
+        self.progress.ending_choice = value
+        self.progress.save()
+
+    @property
+    def source_is_whole(self) -> bool:
+        """Todos os fragmentos apanhados.
+
+        Nao se funde uma fonte que nunca foi remontada -- e essa e a unica
+        consequencia que os fragmentos tem, e a razao de eles existirem. Nao
+        e tranca: nenhuma fase fica bloqueada, e da pra voltar, apanhar os
+        que faltam e refazer a escolha."""
+        return all(self.progress.shards)
+
+    def play(self, sound_id: str, volume: float = 1.0) -> None:
+        """Som de interface. As cenas rodam com o mundo PARADO, fora de
+        qualquer `world.step()`, entao elas nao passam pelo `AudioSystem`."""
+        if self.audio is not None:
+            self.audio.play(sound_id, volume)
+
+    @property
     def duo(self) -> bool:
         """Um ou dois jogadores. Mora na tela de titulo -- e a primeira
         decisao da sessao, e a tela que a apresenta e a dona dela. Nao vive
@@ -103,9 +145,11 @@ class PenumbraFlow:
 
     def toggle_duo(self) -> None:
         self.title.duo = not self.title.duo
+        self.progress.duo = self.title.duo
+        self.progress.save()
 
     @property
-    def progress(self):
+    def summary(self):
         """(fases vencidas, fragmentos apanhados, total) -- a tela de titulo
         mostra isso pra que voltar ao jogo depois de um tempo diga, de cara,
         onde voce parou."""
@@ -113,7 +157,35 @@ class PenumbraFlow:
                 sum(1 for got in self.shards if got),
                 len(self.completed))
 
+    @property
+    def current_level_name(self) -> str:
+        return self._catalog.at(self._state.level_index).name
+
+    def show_pause(self) -> None:
+        """Empilha a pausa POR CIMA da fase, em vez de trocar de cena: o
+        mundo fica exatamente onde estava e volta sem recarregar nada.
+
+        Antes, ESC no meio da fase voltava ao menu e custava a tentativa --
+        nao havia como so PARAR."""
+        self.pause.restart()
+        self._game_loop.push_scene(self.pause)
+
+    def resume(self) -> None:
+        self._game_loop.pop_scene()
+
+    def restart_level(self) -> None:
+        self._clean_run = False
+        self._runtime.reset()
+        self.resume()
+
+    def note_failure(self) -> None:
+        """Morreu ou reiniciou: a tentativa deixa de ser limpa. Chamado pela
+        cena, que e quem ve o desfecho."""
+        self._clean_run = False
+
     def start_level(self, level_index: int) -> None:
+        self._clean_run = True
+        self.unlocked = []
         # O modo entra ANTES do load: a mesma fase pode ser um problema
         # diferente nos dois, e `LevelRuntime.load` escolhe a variante pelo
         # `state.duo`. Na ordem inversa, o duo comecava na fase do solo.
@@ -128,9 +200,14 @@ class PenumbraFlow:
         O fragmento e registrado aqui, e nao no instante em que e apanhado:
         so conta se a fase foi CONCLUIDA com ele. Pegar e morrer nao vale --
         senao o desvio deixaria de ser um risco."""
-        self.completed[level_index] = True
+        self.progress.completed[level_index] = True
         if self._state.shard_collected:
-            self.shards[level_index] = True
+            self.progress.shards[level_index] = True
+        self.unlocked = achievements.evaluate(
+            self._catalog, self.progress, level_index, self._state,
+            clean_run=self._clean_run, duo=self.duo,
+        )
+        self.progress.save()
         if level_index + 1 < self._catalog.count:
             self.start_level(level_index + 1)
         else:
@@ -185,8 +262,67 @@ class TitleScene(IScene):
 
     def render(self, world: World, renderer: IRenderer) -> None:
         del world
-        completed, shards, total = self._flow.progress
-        self._screen.draw(renderer, completed, shards, total)
+        completed, shards, total = self._flow.summary
+        self._screen.draw(
+            renderer, completed, shards, total,
+            achievements=len(self._flow.progress.achievements),
+            achievement_total=len(achievements.CATALOG),
+        )
+
+
+class PauseScene(IScene):
+    """
+    Parar sem perder a tentativa.
+
+    Fica EMPILHADA por cima da fase (`push_scene`), nao no lugar dela: o
+    mundo congela onde estava e volta sem recarregar nada. Por isso ela
+    tambem desenha a fase por baixo do proprio painel -- o `GameLoop`
+    renderiza so o topo da pilha.
+
+    Nao chama `world.step()`, que e o que "pausa" quer dizer aqui.
+    """
+
+    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+        self._flow = flow
+        self._input = input_provider
+        self._screen = PauseScreen()
+        self._gameplay = GameplayScene()
+
+    def restart(self) -> None:
+        self._screen.selected = 0
+
+    @property
+    def screen(self) -> PauseScreen:
+        return self._screen
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world, delta_time
+        if self._input.is_action_pressed("menu_up"):
+            self._screen.move(-1)
+            self._flow.play(audio_ids.MENU_MOVE, 0.5)
+        if self._input.is_action_pressed("menu_down"):
+            self._screen.move(1)
+            self._flow.play(audio_ids.MENU_MOVE, 0.5)
+
+        if self._input.is_action_pressed("quit"):
+            self._flow.resume()
+            return
+        if not self._input.is_action_pressed("jump"):
+            return
+
+        self._flow.play(audio_ids.MENU_PICK, 0.6)
+        chosen = self._screen.selected
+        if chosen == 0:
+            self._flow.resume()
+        elif chosen == 1:
+            self._flow.restart_level()
+        else:
+            self._flow.resume()
+            self._flow.show_menu()
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        self._gameplay.render(world, renderer)
+        self._screen.draw(renderer, self._flow.current_level_name, self._flow.duo)
 
 
 class EndingScene(IScene):
@@ -230,7 +366,7 @@ class EndingScene(IScene):
 
     def render(self, world: World, renderer: IRenderer) -> None:
         del world
-        _, shards, total = self._flow.progress
+        _, shards, total = self._flow.summary
         self._screen.draw(renderer, shards, total)
 
 
@@ -271,6 +407,7 @@ class MenuScene(IScene):
 
     def update(self, world: World, delta_time: float) -> None:
         del world, delta_time
+        before = self._grid.selected
         if self._input.is_action_pressed("move_left"):
             self._grid.move(-1, 0)
         if self._input.is_action_pressed("move_right"):
@@ -279,9 +416,12 @@ class MenuScene(IScene):
             self._grid.move(0, -1)
         if self._input.is_action_pressed("menu_down"):
             self._grid.move(0, 1)
+        if self._grid.selected != before:
+            self._flow.play(audio_ids.MENU_MOVE, 0.5)
         if self._input.is_action_pressed("switch"):
             self._flow.toggle_duo()
         if self._input.is_action_pressed("jump"):
+            self._flow.play(audio_ids.MENU_PICK, 0.7)
             self._flow.start_level(self._grid.selected)
         elif self._input.is_action_pressed("quit"):
             self._flow.show_title()
@@ -331,15 +471,18 @@ class PenumbraScene(IScene):
             return
 
         if self._input.is_action_pressed("quit"):
-            self._flow.show_menu()
+            self._flow.show_pause()
             return
 
         world.step(delta_time)
 
         if self._state.restart_requested:
+            self._flow.note_failure()
             self._runtime.reset()
             return
         if self._state.outcome != OUTCOME_PLAYING:
+            if self._state.outcome != OUTCOME_COMPLETE:
+                self._flow.note_failure()
             self._frozen_seconds = 0.0
 
     def render(self, world: World, renderer: IRenderer) -> None:

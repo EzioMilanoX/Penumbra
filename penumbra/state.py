@@ -90,6 +90,10 @@ class DualityState:
         """Fragmento da fonte desta fase, apanhado nesta tentativa. E
         opcional: nao entra na condicao de vitoria, e o desvio pra pegar
         costuma pedir a polaridade oposta a da rota obvia."""
+        self.used_ability = False
+        """Alguma habilidade foi ligada nesta TENTATIVA. Existe so pra
+        conquista de vencer sem usar nenhuma -- nenhuma regra do jogo le
+        isto, e por isso ele mora aqui e nao num campo por ser."""
         self.duo = False
         """Dois jogadores, um em cada ser, ao mesmo tempo. No solo o ser
         parado e a tensao (ele nao esta protegido); no duo ele e um parceiro
@@ -287,6 +291,7 @@ class LevelRuntime:
         state.peril[:] = 0.0
         state.reached_goal[:] = False
         state.shard_collected = False
+        state.used_ability = False
         state.crust_target_col = -1
         state.crust_target_row = -1
         state.crust_progress = 0.0

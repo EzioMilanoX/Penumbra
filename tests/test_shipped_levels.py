@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from penumbra.progress import Progress
 from penumbra.scenes import MenuScene, PenumbraFlow, TitleScene
 from penumbra.state import (
     LUMEN,
@@ -411,18 +412,31 @@ class TestPlaythrough:
 class _FakeGameLoop:
     """Duplo minimo do `GameLoop` para testar o fluxo de cenas.
 
-    O `PenumbraFlow` usa exatamente tres coisas do `GameLoop` --
-    `reset_scenes`, `stop` e `current_scene` -- e nenhuma delas precisa de
-    janela. Um duplo aqui deixa o fluxo (menu -> fase -> menu) ser testado
-    headless, que e o unico jeito de testa-lo: `CompositionRoot.build_world`
-    nao constroi `GameLoop` nenhum."""
+    O `PenumbraFlow` usa cinco coisas do `GameLoop` -- `reset_scenes`,
+    `push_scene`, `pop_scene`, `stop` e `current_scene` -- e nenhuma delas
+    precisa de janela. Um duplo aqui deixa o fluxo (menu -> fase -> pausa ->
+    menu) ser testado headless, que e o unico jeito de testa-lo:
+    `CompositionRoot.build_world` nao constroi `GameLoop` nenhum.
+
+    A pilha existe porque a PAUSA fica por cima da fase em vez de no lugar
+    dela -- o mundo congela onde estava e volta sem recarregar nada."""
 
     def __init__(self) -> None:
-        self.current_scene = None
+        self.scenes = []
         self.stopped = False
 
+    @property
+    def current_scene(self):
+        return self.scenes[-1] if self.scenes else None
+
     def reset_scenes(self, scene) -> None:
-        self.current_scene = scene
+        self.scenes = [scene]
+
+    def push_scene(self, scene) -> None:
+        self.scenes.append(scene)
+
+    def pop_scene(self):
+        return self.scenes.pop() if len(self.scenes) > 1 else None
 
     def stop(self) -> None:
         self.stopped = True
@@ -432,12 +446,16 @@ class TestLevelFlow:
     """Menu -> fase -> menu, e o congelamento entre elas."""
 
     @pytest.fixture
-    def flow(self, simulation, input_provider):
+    def flow(self, simulation, input_provider, tmp_path):
         loop = _FakeGameLoop()
+        # Progresso num arquivo TEMPORARIO. Sem isto, cada teste que vence
+        # uma fase gravaria por cima do save real de quem esta rodando a
+        # suite -- e apagaria o progresso do proprio jogador.
         flow = PenumbraFlow(
             loop, simulation.runtime, simulation.state,
             simulation.catalog, simulation.tuning, input_provider,
             preview_terrain=Terrain(GRID_COLS, GRID_ROWS, CELL_SIZE),
+            progress=Progress(simulation.catalog.count, tmp_path / "progress.json"),
         )
         flow.show_title()
         return flow
@@ -577,13 +595,38 @@ class TestLevelFlow:
 
     # ---------------- fase ----------------
 
-    def test_esc_na_fase_volta_ao_menu_em_vez_de_sair(self, flow, simulation, input_provider):
+    def test_esc_na_fase_pausa_em_vez_de_perder_a_tentativa(
+        self, flow, simulation, input_provider
+    ):
+        """Antes, ESC no meio da fase voltava ao menu e custava a tentativa:
+        nao havia como so PARAR. Agora empilha a pausa por cima -- o mundo
+        congela onde estava e volta sem recarregar nada."""
         flow.start_level(2)
+        gameplay = flow._game_loop.current_scene
         input_provider.set_action_held("quit", True)
         self._drive(flow, simulation, input_provider, frames=1)
 
-        assert isinstance(flow._game_loop.current_scene, MenuScene)
+        assert flow._game_loop.current_scene is flow.pause
+        assert flow._game_loop.scenes[0] is gameplay, "a fase continua embaixo"
         assert not flow._game_loop.stopped
+
+    def test_da_pausa_da_pra_voltar_pra_fase(self, flow, simulation, input_provider):
+        flow.start_level(2)
+        gameplay = flow._game_loop.current_scene
+        flow.show_pause()
+        input_provider.set_action_held("quit", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+
+        assert flow._game_loop.current_scene is gameplay
+
+    def test_da_pausa_da_pra_sair_pro_menu(self, flow, simulation, input_provider):
+        flow.start_level(2)
+        flow.show_pause()
+        flow.pause.screen.selected = 2          # VOLTAR AO MENU
+        input_provider.set_action_held("jump", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+
+        assert isinstance(flow._game_loop.current_scene, MenuScene)
 
     def test_a_cena_congela_o_mundo_enquanto_o_aviso_esta_na_tela(
         self, flow, simulation, input_provider

@@ -270,7 +270,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Manual de campo · v0.8 · 30 fases em três capítulos</p>
+    <p class="kicker">Manual de campo · v0.9 · 30 fases em três capítulos</p>
     <h1>Penumbra</h1>
     <p class="lede">
       Dois seres que não podem se tocar e não avançam separados. O mundo não tem
@@ -583,6 +583,84 @@
     </p>
   </section>
 
+  <section id="fragmentos">
+    <p class="eyebrow">Fragmentos e conquistas</p>
+    <h2>Por que colecionar</h2>
+    <p class="measure">
+      Os trinta fragmentos não valiam nada — um contador na tela de título. Um
+      colecionável sem consequência é um desvio que custa risco e não paga nada,
+      e o jogador aprende isso na terceira fase.
+    </p>
+    <p class="measure">
+      A resposta estava no nome deles. São <b>fragmentos da fonte</b>, e a última
+      tela do jogo pergunta se os dois querem se fundir <i>nela</i>:
+    </p>
+    <p class="note">
+      <b>Não se funde uma fonte que nunca foi remontada.</b> Com os trinta,
+      "fundir" é uma escolha de verdade. Sem eles, a tela diz quantos faltam e a
+      única saída é seguir dois. Não é tranca — nenhuma fase fica bloqueada, e dá
+      para voltar, apanhar os que faltam e refazer a escolha. É uma consequência.
+    </p>
+
+    <h3>Dez conquistas, nenhuma por repetição</h3>
+    <p class="measure">
+      Nenhuma premia tempo de tela. Todas reconhecem ter <b>entendido alguma
+      coisa</b> — o tipo de coisa que se faz de propósito ou não se faz nunca.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Conquista</th><th>Reconhece</th></tr></thead>
+        <tbody>
+          <tr><td><b>Primeira Luz</b></td><td>vencer a primeira fase</td></tr>
+          <tr><td><b>Aprendiz · Misturador · Especialista</b></td><td>vencer cada capítulo inteiro</td></tr>
+          <tr><td><b>A Fonte Inteira</b></td><td>apanhar todos os fragmentos</td></tr>
+          <tr><td><b>Sem as Mãos</b></td><td>vencer uma fase sem ligar nenhuma habilidade</td></tr>
+          <tr><td><b>De Primeira</b></td><td>vencer uma fase sem morrer nem reiniciar</td></tr>
+          <tr><td><b>A Dois</b></td><td>vencer uma fase em dois jogadores</td></tr>
+          <tr><td><b>Escolta</b></td><td>vencer uma fase de escolta em dois jogadores</td></tr>
+          <tr><td><b>Renúncia Dupla</b></td><td>deixar as duas formas na mesma fase</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="voz">
+    <p class="eyebrow">A voz</p>
+    <h2>Som sintetizado, nenhum arquivo</h2>
+    <p class="measure">
+      O jogo foi mudo por trinta fases, e a falta não era estética: o
+      <b>medidor de perigo é visual</b>, e ele sobe justamente quando a sua
+      atenção está no outro ser. Olhar para a Umbra atravessando custava não ver
+      a Lumen se apagando.
+    </p>
+    <p class="measure">
+      Agora cada ser tem uma <b>voz própria</b> — a Lumen aguda e limpa, a Umbra
+      grave — e o aviso <b>acelera</b> conforme o medidor sobe. O que o jogador lê
+      não é o tom, é a aceleração: um intervalo constante viraria ruído de fundo e
+      ele pararia de ouvir em duas fases. E a paleta sonora segue a lei da paleta
+      visual: <b>o dourado tem voz própria</b>, um <span class="mono">sweep</span>
+      médio reservado ao que exige os dois.
+    </p>
+    <p class="note">
+      Tudo sai de <code>IAudioEngine.register_tone</code> — <span class="mono">square
+      | noise | sweep | zap</span>. Não há um único arquivo de som no repositório,
+      e o jogo continua rodando headless: o <code>AudioSystem</code> só é
+      registrado em <code>build_game</code>, como a apresentação. <b>Removido, o
+      jogo fica idêntico e mudo.</b>
+    </p>
+
+    <h3>O progresso sobrevive a fechar o jogo</h3>
+    <p class="measure">
+      Trinta fases e trinta fragmentos evaporavam ao fechar a janela. Três regras,
+      todas pela mesma razão — <b>um save nunca pode ser o motivo de o jogo não
+      abrir</b>: ler nunca levanta (arquivo corrompido vira progresso vazio),
+      escrever é atômico (<span class="mono">.tmp</span> + rename, então um
+      desligamento no meio deixa o save anterior intacto), e um save de uma versão
+      com outro número de fases é <b>ajustado</b> em vez de recusado —
+      acrescentar fases não pode apagar o que o jogador já fez.
+    </p>
+  </section>
+
   <section id="arquitetura">
     <p class="eyebrow">Arquitetura</p>
     <h2>Dois chãos na mesma simulação</h2>
@@ -660,7 +738,7 @@ git clone https://github.com/EzioMilanoX/Penumbra.git
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 174 testes headless
+pytest -q                      # 197 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
       <code>python -m</code> não é preferência de estilo: os imports são absolutos

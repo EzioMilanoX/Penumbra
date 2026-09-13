@@ -45,8 +45,10 @@ from ouroboros.interfaces.null.null_input_provider import NullInputProvider
 from ouroboros.interfaces.renderer import SHAPE_CIRCLE, SHAPE_RECT
 from ouroboros.roguelite.entities.archetype_loader import ArchetypeLoader
 
+from penumbra.audio import AudioSystem, PenumbraAudio
 from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
+from penumbra.progress import Progress
 from penumbra.scenes import PenumbraFlow
 from penumbra.state import DualityState, LevelRuntime, LUMEN, UMBRA
 from penumbra.systems.crust_break_system import CrustBreakSystem
@@ -144,6 +146,14 @@ def build_game(config: EngineConfig) -> GameLoop:
     )
 
     world = simulation.world
+
+    # O audio e registrado SO aqui, e por ultimo. Como a apresentacao, ele
+    # nao decide nada: removido, o jogo continua identico e fica mudo -- e e
+    # justamente por isso que `build_simulation` monta a mesma simulacao sem
+    # ele, e os testes seguem headless.
+    audio = PenumbraAudio(game_loop.audio_engine)
+    world.register_system(AudioSystem(audio, simulation.state, terrain))
+
     # O menu desenha a miniatura de cada fase parseando o ASCII com um
     # `Terrain` PROPRIO -- se usasse o do jogo, montar as previas na
     # composicao sobrescreveria a fase carregada.
@@ -151,6 +161,8 @@ def build_game(config: EngineConfig) -> GameLoop:
         game_loop, simulation.runtime, simulation.state,
         simulation.catalog, tuning, game_loop.input_provider,
         preview_terrain=_make_terrain(tuning.world),
+        audio=audio,
+        progress=Progress(catalog.count).load(),
     )
     # O HUD e um callback GLOBAL (roda independente da cena no topo), entao
     # ele consulta `flow.hud_visible` -- senao desenha o rodape e os

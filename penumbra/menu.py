@@ -370,7 +370,8 @@ class TitleScreen:
         if step:
             self.duo = step > 0
 
-    def draw(self, renderer: IRenderer, completed: int, shards: int, total: int) -> None:
+    def draw(self, renderer: IRenderer, completed: int, shards: int, total: int,
+             achievements: int = 0, achievement_total: int = 0) -> None:
         width, height = renderer.get_viewport_size()
         renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
         center = width / 2.0
@@ -386,8 +387,12 @@ class TitleScreen:
         self._draw_button(renderer, left + _BUTTON_WIDTH + _BUTTON_GAP, top, duo=True)
 
         progress_y = top + _BUTTON_HEIGHT + 34.0
-        renderer.draw_text(center, progress_y, f"{completed}/{total} fases    {shards}/{total} fragmentos",
-                           14, _TEXT_DIM, anchor="center")
+        renderer.draw_text(
+            center, progress_y,
+            f"{completed}/{total} fases    {shards}/{total} fragmentos"
+            + (f"    {achievements}/{achievement_total} conquistas" if achievement_total else ""),
+            14, _GOLD if shards == total else _TEXT_DIM, anchor="center",
+        )
 
         # Os controles do modo ESCOLHIDO, na propria tela de escolha: e a
         # unica hora em que o jogador ainda pode mudar de ideia sabendo o que
@@ -520,12 +525,19 @@ class EndingScreen:
     lado a lado, com a consequencia escrita embaixo de cada um.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, whole: bool = True) -> None:
+        self.whole = whole
         self.fused = False
         self.confirmed = False
 
     def move(self, step: int) -> None:
+        """Fundir so e escolhivel com a fonte inteira. Nao e tranca: nenhuma
+        fase fica bloqueada, e da pra voltar, apanhar os fragmentos que
+        faltam e refazer a escolha -- mas nao se funde uma fonte que nunca
+        foi remontada, e e disso que os trinta fragmentos vivem."""
         if step and not self.confirmed:
+            if step < 0 and not self.whole:
+                return
             self.fused = step < 0
 
     @property
@@ -533,6 +545,9 @@ class EndingScreen:
         return "fundidos" if self.fused else "separados"
 
     def draw(self, renderer: IRenderer, shards: int, total: int) -> None:
+        self.whole = shards >= total
+        if not self.whole:
+            self.fused = False
         width, height = renderer.get_viewport_size()
         renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
         center = width / 2.0
@@ -559,8 +574,19 @@ class EndingScreen:
                 renderer.draw_ui_rect(x, top, _BUTTON_WIDTH, 2.0, _GOLD)
                 renderer.draw_ui_rect(x, top + 130.0, _BUTTON_WIDTH, 2.0, _GOLD)
             middle = x + _BUTTON_WIDTH / 2.0
+            locked = index == 0 and not self.whole
             renderer.draw_text(middle, top + 18.0, label, 20,
-                               _GOLD if selected else _TEXT_DIM, anchor="center")
+                               _TEXT_FAINT if locked else (_GOLD if selected else _TEXT_DIM),
+                               anchor="center")
+            if locked:
+                # A razao de existirem trinta fragmentos, dita em uma linha.
+                renderer.draw_text(middle, top + 60.0, "A fonte esta incompleta.", 11,
+                                   _TEXT_FAINT, anchor="center")
+                renderer.draw_text(middle, top + 80.0, f"Faltam {total - shards} fragmentos.", 11,
+                                   _GOLD_DIM, anchor="center")
+                renderer.draw_text(middle, top + 100.0, "Nada fica trancado: volte e apanhe.", 11,
+                                   _TEXT_FAINT, anchor="center")
+                continue
             for line_index, line in enumerate(consequence):
                 renderer.draw_text(middle, top + 56.0 + line_index * 20.0, line, _ENDING_LINE_SIZE,
                                    _TEXT_DIM if selected else _TEXT_FAINT, anchor="center")
@@ -584,3 +610,54 @@ class EndingScreen:
                                "Os fragmentos que faltam continuam la. Nada fica trancado.",
                                12, _TEXT_FAINT, anchor="center")
         renderer.draw_text(center, 430.0, "ESPACO volta ao menu", 13, _TEXT_FAINT, anchor="center")
+
+
+_PAUSE_OPTIONS = ("CONTINUAR", "REINICIAR A FASE", "VOLTAR AO MENU")
+
+
+class PauseScreen:
+    """
+    A pausa: um painel por cima da fase congelada.
+
+    Antes, ESC no meio da fase voltava ao menu -- e custava a tentativa.
+    Nao havia como so parar. O painel e estreito e escuro de proposito:
+    a fase continua visivel em volta, porque o jogador pausou olhando
+    alguma coisa e provavelmente quer continuar olhando.
+    """
+
+    def __init__(self) -> None:
+        self.selected = 0
+
+    def move(self, step: int) -> None:
+        if step:
+            self.selected = max(0, min(len(_PAUSE_OPTIONS) - 1, self.selected + step))
+
+    def draw(self, renderer: IRenderer, level_name: str, duo: bool) -> None:
+        width, height = renderer.get_viewport_size()
+        center = width / 2.0
+
+        # Veu sobre a fase inteira: escurece sem ESCONDER. A 190 o jogo
+        # sumia -- as fases ja sao escuras, e o jogador pausou olhando alguma
+        # coisa que provavelmente quer continuar olhando.
+        renderer.draw_ui_rect(0.0, 0.0, width, height, (8, 8, 14, 124))
+
+        panel_w, panel_h = 340.0, 236.0
+        left = center - panel_w / 2.0
+        top = height / 2.0 - panel_h / 2.0 - 20.0
+        renderer.draw_ui_rect(left, top, panel_w, panel_h, _CARD)
+        renderer.draw_ui_rect(left, top, panel_w, 2.0, _GOLD)
+
+        renderer.draw_text(center, top + 22.0, "PAUSA", 26, _GOLD, anchor="center")
+        renderer.draw_text(center, top + 58.0, level_name, 13, _TEXT_DIM, anchor="center")
+
+        for index, label in enumerate(_PAUSE_OPTIONS):
+            y = top + 96.0 + index * 34.0
+            chosen = index == self.selected
+            if chosen:
+                renderer.draw_ui_rect(left + 18.0, y - 6.0, panel_w - 36.0, 28.0, _CARD_SELECTED)
+            renderer.draw_text(center, y, label, 15,
+                               _GOLD if chosen else _TEXT_DIM, anchor="center")
+
+        renderer.draw_text(center, top + panel_h - 24.0,
+                           "W/S escolher   ESPACO confirmar   ESC continuar",
+                           11, _TEXT_FAINT, anchor="center")

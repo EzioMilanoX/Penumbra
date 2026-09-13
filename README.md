@@ -350,7 +350,10 @@ penumbra/
   levels.py          catálogo de data/levels/*.json
   reachability.py    modelo de salto + grafo de alcance (auditoria de geometria)
   state.py           estado compartilhado + troca de fase
-  scenes.py          fluxo título -> fases -> jogo -> fim, e o congelamento
+  scenes.py          fluxo título -> fases -> jogo -> pausa -> fim
+  audio.py           a voz do jogo, sintetizada (nenhum arquivo de som)
+  progress.py        o que sobrevive a fechar o jogo
+  achievements.py    dez conquistas, e o motivo dos fragmentos
   menu.py            tela de título, grade de cards, prévia do terreno
   hud.py             HUD e avisos de fim de fase
   systems/
@@ -365,7 +368,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              174 testes headless
+tests/              197 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -435,7 +438,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 174 testes, ~12 s, headless
+pytest -q                      # 197 testes, ~14 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -464,6 +467,68 @@ respondeu às perguntas de projeto das quatro fases (onde o éter fica sólido,
 onde cada ser sobrevive, se o facho vaza até a zona de sombra). Ele achou um
 soft-lock real na fase 4 — a Lumen descia da saliência para atravessar a porta
 e não tinha como voltar à zona de luz —, corrigido com dois degraus de rocha.
+
+## Som, progresso e pausa
+
+O jogo foi mudo por trinta fases, e a falta não era estética: o **medidor de
+perigo é visual**, e ele sobe justamente quando sua atenção está no outro ser.
+Agora cada ser tem uma **voz própria** — a Lumen aguda e limpa, a Umbra grave —
+e o aviso **acelera** conforme o medidor sobe. O que se lê não é o tom, é a
+aceleração: um intervalo constante viraria ruído de fundo em duas fases.
+
+Tudo é **sintetizado** por `IAudioEngine.register_tone` (`square | noise |
+sweep | zap`). Não há um único arquivo de som no repositório, e o jogo continua
+rodando headless — o `AudioSystem` só é registrado em `build_game`, como a
+apresentação. Removido, o jogo fica idêntico e mudo.
+
+A paleta sonora segue a lei da paleta visual: **o dourado tem voz própria**, um
+`sweep` médio reservado ao que exige os dois (porta, eclipse, fragmento,
+altar).
+
+**O progresso agora sobrevive** a fechar o jogo (`%APPDATA%/Penumbra/`). Três
+regras, todas pela mesma razão — um save nunca pode ser o motivo de o jogo não
+abrir: ler nunca levanta (arquivo corrompido vira progresso vazio), escrever é
+atômico (`.tmp` + rename, então um desligamento no meio deixa o save anterior
+intacto), e um save gravado numa versão com outro número de fases é **ajustado**
+em vez de recusado — acrescentar fases não pode apagar o que você já fez.
+
+**E dá para pausar.** Antes, ESC no meio da fase voltava ao menu e custava a
+tentativa; não havia como só parar. Agora empilha um painel por cima
+(`push_scene`), o mundo congela onde estava, e dá para continuar, reiniciar ou
+sair.
+
+## Por que colecionar fragmentos
+
+Eles não valiam nada — um contador na tela de título. Um colecionável sem
+consequência é um desvio que custa risco e não paga nada, e o jogador aprende
+isso na terceira fase.
+
+A resposta estava no nome deles. São **fragmentos da fonte**, e a última tela
+pergunta se os dois querem se fundir *nela*:
+
+> **Não se funde uma fonte que nunca foi remontada.**
+
+Com os trinta, "fundir" é uma escolha de verdade. Sem eles, a tela diz quantos
+faltam e a única saída é seguir dois. **Não é tranca**: nenhuma fase fica
+bloqueada, o jogo inteiro continua jogável, e dá para voltar, apanhar os que
+faltam e refazer a escolha. É uma consequência.
+
+### Conquistas
+
+Dez, e nenhuma premia repetição ou tempo de tela — todas reconhecem ter
+**entendido alguma coisa**, o tipo de coisa que se faz de propósito ou não se
+faz nunca.
+
+| | |
+|---|---|
+| **Primeira Luz** | vencer a primeira fase |
+| **Aprendiz · Misturador · Especialista** | vencer cada capítulo inteiro |
+| **A Fonte Inteira** | apanhar todos os fragmentos |
+| **Sem as Mãos** | vencer uma fase sem ligar nenhuma habilidade |
+| **De Primeira** | vencer uma fase sem morrer nem reiniciar |
+| **A Dois** | vencer uma fase em dois jogadores |
+| **Escolta** | vencer uma fase de escolta em dois jogadores |
+| **Renúncia Dupla** | deixar as duas formas na mesma fase |
 
 ## O fim
 
