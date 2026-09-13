@@ -368,7 +368,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              205 testes headless
+tests/              207 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -438,7 +438,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 205 testes, ~13 s, headless
+pytest -q                      # 207 testes, ~14 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -563,6 +563,33 @@ jogo eliminando o jogo — ninguém mais cai porque o outro acendeu, e ninguém
 mais atravessa o que sozinho não atravessaria. Seguir dois mantém o problema,
 porque o problema é a razão de os dois existirem. A tela só põe os dois lado a
 lado, com a consequência escrita embaixo de cada um.
+
+## As telas
+
+O jogo abria direto na escolha de modo, e **ESC ali fechava a janela** — não
+havia porta nenhuma para conquistas, opções ou sair, e a única saída era um
+atalho que ninguém descobriria. Uma tela que só faz uma pergunta ("um ou
+dois?") não é uma raiz: é um passo do caminho, e passou a ser exatamente isso.
+
+```
+MENU PRINCIPAL          jogar · conquistas · opções · sair
+  └─ JOGAR              um jogador ou dois
+       └─ FASES         3 capítulos × grade de cards
+            └─ FASE     ESC pausa (continuar · reiniciar · menu)
+                 └─ FIM fundir ou seguir dois
+```
+
+**Conquistas** mostra as dez com título e descrição **legíveis**, mesmo as que
+faltam — elas são a lista do que o jogo considera ter entendido alguma coisa.
+Escondidas, deixariam de ser um convite e virariam só um placar.
+
+**Opções** tem som, volume, tela cheia e apagar progresso. Apagar fica no mesmo
+lugar que o volume porque é ali que o jogador vai procurar — mas exige um
+**segundo ESPAÇO**, com o aviso escrito na própria linha. Um menu que apaga
+trinta fases num toque é hostil; um que esconde a opção é um menu que mente.
+Tudo grava a cada mudança, e não ao sair: fechar pela janela não passa por ali,
+e um ajuste perdido assim é o tipo de coisa que ninguém reporta — só deixa de
+mexer.
 
 ## O menu
 

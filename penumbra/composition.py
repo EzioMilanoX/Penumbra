@@ -174,7 +174,7 @@ def build_game(config: EngineConfig) -> GameLoop:
             visible=lambda: flow.hud_visible,
         )
     )
-    flow.show_title()
+    flow.show_main()
     return game_loop
 
 

@@ -97,7 +97,11 @@ class PenumbraAudio:
 
     def __init__(self, engine, enabled: bool = True) -> None:
         self._engine = engine
-        self.enabled = bool(enabled and engine is not None)
+        self.has_engine = engine is not None
+        """Sem motor nao ha o que ligar. A opcao de som do menu alterna
+        `enabled`, e sem isto ela poderia 'ligar' o silencio de um build
+        headless e mentir pro jogador."""
+        self.enabled = bool(enabled and self.has_engine)
         self.volume = 0.7
         if self._engine is None:
             return

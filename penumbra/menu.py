@@ -19,6 +19,7 @@ from typing import List, Optional, Tuple
 
 from ouroboros.interfaces.renderer import IRenderer
 
+from penumbra import achievements
 from penumbra.levels import LevelCatalog, LevelDefinition
 from penumbra.terrain import (
     ROLE_BEACON,
@@ -55,6 +56,10 @@ _TEXT_FAINT = (100, 102, 120, 255)
 _GOLD = (247, 214, 138, 255)
 _GOLD_DIM = (110, 90, 48, 255)
 _NUMBER_IDLE = (74, 74, 92, 255)
+_PERIL = (206, 88, 88, 255)
+"""O unico vermelho do menu, e num lugar so: o aviso de apagar o
+progresso. O dourado significa cooperacao -- o oposto do que esta
+linha quer dizer."""
 
 _PREVIEW_COLORS = {
     ROLE_ROCK: (86, 90, 106, 255),
@@ -661,3 +666,194 @@ class PauseScreen:
         renderer.draw_text(center, top + panel_h - 24.0,
                            "W/S escolher   ESPAÇO confirmar   ESC continuar",
                            11, _TEXT_FAINT, anchor="center")
+
+
+# ======================================================================
+# A raiz do jogo: as quatro portas
+# ======================================================================
+
+MAIN_PLAY = 0
+MAIN_ACHIEVEMENTS = 1
+MAIN_OPTIONS = 2
+MAIN_QUIT = 3
+
+_MAIN_ROWS = (
+    ("JOGAR", "escolher o modo e a fase"),
+    ("CONQUISTAS", "o que você já entendeu"),
+    ("OPÇÕES", "som, tela e progresso"),
+    ("SAIR", ""),
+)
+
+
+class MainMenuScreen:
+    """
+    A primeira tela, e a que faltava.
+
+    Antes o jogo abria direto na escolha de modo, e nao havia porta nenhuma
+    pra conquistas, opcoes ou sair -- ESC ali simplesmente fechava a janela.
+    Uma tela que so faz uma pergunta ("um ou dois?") nao e uma raiz: e um
+    passo do caminho, e passou a ser exatamente isso.
+
+    Vertical, quatro itens, com a legenda do escolhido embaixo. O que um menu
+    de quatro botoes precisa entregar e onde cada porta vai dar.
+    """
+
+    def __init__(self) -> None:
+        self.selected = MAIN_PLAY
+
+    def move(self, step: int) -> None:
+        if step:
+            self.selected = max(0, min(len(_MAIN_ROWS) - 1, self.selected + step))
+
+    def draw(self, renderer: IRenderer, completed: int, total: int,
+             unlocked: int, achievement_total: int) -> None:
+        width, height = renderer.get_viewport_size()
+        renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
+        center = width / 2.0
+
+        renderer.draw_text(center, 70.0, "PENUMBRA", 60, _TEXT, anchor="center")
+        renderer.draw_text(center, 144.0, "Luz e Sombra: Dualidade", 16, _GOLD, anchor="center")
+        renderer.draw_ui_rect(center - 210.0, 180.0, 420.0, 1.0, _RULE)
+
+        top = 220.0
+        for index, (label, _) in enumerate(_MAIN_ROWS):
+            y = top + index * 46.0
+            chosen = index == self.selected
+            if chosen:
+                # `draw_text` ancora o TOPO do texto, entao o realce nao pode
+                # ser simetrico em torno de `y` -- senao a palavra encosta na
+                # borda de cima da faixa.
+                renderer.draw_ui_rect(center - 150.0, y - 5.0, 300.0, 36.0, _CARD_SELECTED)
+                renderer.draw_ui_rect(center - 150.0, y - 5.0, 3.0, 36.0, _GOLD)
+            renderer.draw_text(center, y, label, 22,
+                               _GOLD if chosen else _TEXT_DIM, anchor="center")
+
+        renderer.draw_text(center, top + len(_MAIN_ROWS) * 46.0 + 8.0,
+                           _MAIN_ROWS[self.selected][1], 12, _TEXT_FAINT, anchor="center")
+
+        renderer.draw_ui_rect(center - 210.0, height - 96.0, 420.0, 1.0, _RULE)
+        renderer.draw_text(
+            center, height - 78.0,
+            f"{completed}/{total} fases      {unlocked}/{achievement_total} conquistas",
+            13, _TEXT_DIM, anchor="center",
+        )
+        renderer.draw_text(center, height - 50.0, "W/S escolher      ESPAÇO confirmar",
+                           12, _TEXT_FAINT, anchor="center")
+
+
+class AchievementsScreen:
+    """
+    As dez, e o que cada uma reconhece.
+
+    As que faltam aparecem com titulo e descricao LEGIVEIS, e nao ocultas:
+    elas sao a lista do que o jogo considera ter entendido alguma coisa.
+    Escondidas, deixariam de ser um convite e virariam so um placar.
+    """
+
+    def draw(self, renderer: IRenderer, unlocked, shards: int, total: int) -> None:
+        width, height = renderer.get_viewport_size()
+        renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
+        center = width / 2.0
+
+        renderer.draw_text(center, 22.0, "CONQUISTAS", 32, _TEXT, anchor="center")
+        got = sum(1 for a in achievements.CATALOG if a.key in unlocked)
+        whole = got == len(achievements.CATALOG)
+        renderer.draw_text(center, 62.0, f"{got} de {len(achievements.CATALOG)}", 14,
+                           _GOLD if whole else _TEXT_DIM, anchor="center")
+        renderer.draw_ui_rect(center - 320.0, 88.0, 640.0, 1.0, _RULE)
+
+        top = 104.0
+        row_height = 44.0
+        for index, achievement in enumerate(achievements.CATALOG):
+            y = top + index * row_height
+            has = achievement.key in unlocked
+            if has:
+                renderer.draw_ui_rect(center - 320.0, y - 4.0, 640.0, row_height - 8.0, _CARD)
+                renderer.draw_ui_rect(center - 320.0, y - 4.0, 3.0, row_height - 8.0, _GOLD)
+            renderer.draw_text(center - 306.0, y, achievement.title, 15,
+                               _GOLD if has else _TEXT_FAINT)
+            renderer.draw_text(center - 306.0, y + 19.0, achievement.description, 11,
+                               _TEXT_DIM if has else _TEXT_FAINT)
+            renderer.draw_text(center + 306.0, y + 7.0, "feito" if has else "-", 12,
+                               _GOLD if has else _GOLD_DIM, anchor="topright")
+
+        renderer.draw_text(center, height - 40.0,
+                           f"fragmentos da fonte  {shards}/{total}          ESC volta",
+                           12, _TEXT_FAINT, anchor="center")
+
+
+OPTION_SOUND = 0
+OPTION_VOLUME = 1
+OPTION_FULLSCREEN = 2
+OPTION_ERASE = 3
+
+_OPTION_ROWS = ("SOM", "VOLUME", "TELA CHEIA", "APAGAR PROGRESSO")
+
+
+class OptionsScreen:
+    """
+    Quatro linhas, e a ultima pede confirmacao.
+
+    Apagar o progresso fica no mesmo lugar que o volume porque e ali que o
+    jogador vai procurar -- mas exige um segundo ESPAÇO, com o aviso escrito
+    na propria linha. Um menu que apaga trinta fases num toque e hostil; um
+    que esconde a opcao e um menu que mente.
+    """
+
+    def __init__(self) -> None:
+        self.selected = OPTION_SOUND
+        self.confirm_erase = False
+
+    def move(self, step: int) -> None:
+        if step:
+            self.selected = max(0, min(len(_OPTION_ROWS) - 1, self.selected + step))
+            # Sair da linha cancela a confirmacao: voltar a ela e comecar de
+            # novo, porque a intencao de apagar nao sobrevive a uma distracao.
+            self.confirm_erase = False
+
+    def draw(self, renderer: IRenderer, sound_on: bool, volume: float,
+             fullscreen: bool, completed: int, total: int) -> None:
+        width, height = renderer.get_viewport_size()
+        renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
+        center = width / 2.0
+
+        renderer.draw_text(center, 44.0, "OPÇÕES", 34, _TEXT, anchor="center")
+        renderer.draw_ui_rect(center - 260.0, 96.0, 520.0, 1.0, _RULE)
+
+        values = (
+            "ligado" if sound_on else "desligado",
+            f"{int(round(volume * 100))}%",
+            "sim" if fullscreen else "não",
+            f"{completed} de {total} fases vencidas",
+        )
+        top = 140.0
+        for index, label in enumerate(_OPTION_ROWS):
+            y = top + index * 56.0
+            chosen = index == self.selected
+            if chosen:
+                renderer.draw_ui_rect(center - 260.0, y - 8.0, 520.0, 40.0, _CARD_SELECTED)
+                renderer.draw_ui_rect(center - 260.0, y - 8.0, 3.0, 40.0, _GOLD)
+            renderer.draw_text(center - 244.0, y, label, 16,
+                               _GOLD if chosen else _TEXT_DIM)
+            renderer.draw_text(center + 244.0, y, values[index], 15,
+                               _TEXT if chosen else _TEXT_DIM, anchor="topright")
+
+            if index == OPTION_VOLUME:
+                # A barra e o unico valor daqui que se le melhor em forma que
+                # em numero: e a unica linha que muda em passos pequenos.
+                bar_y = y + 26.0
+                renderer.draw_ui_rect(center - 244.0, bar_y, 488.0, 4.0, _RULE)
+                renderer.draw_ui_rect(center - 244.0, bar_y, 488.0 * volume, 4.0,
+                                      _GOLD if sound_on else _GOLD_DIM)
+
+        if self.selected == OPTION_ERASE:
+            warning = ("Aperte ESPAÇO de novo para apagar. Não tem volta."
+                       if self.confirm_erase
+                       else "Apaga fases, fragmentos e conquistas.")
+            renderer.draw_text(center, top + OPTION_ERASE * 56.0 + 28.0, warning, 12,
+                               _PERIL if self.confirm_erase else _TEXT_FAINT, anchor="center")
+
+        renderer.draw_ui_rect(center - 260.0, height - 92.0, 520.0, 1.0, _RULE)
+        renderer.draw_text(center, height - 72.0,
+                           "W/S escolher      A/D ajustar      ESPAÇO alternar      ESC volta",
+                           12, _TEXT_FAINT, anchor="center")

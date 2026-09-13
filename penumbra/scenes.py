@@ -31,7 +31,12 @@ from penumbra import achievements
 from penumbra import audio as audio_ids
 from penumbra.levels import LevelCatalog
 from penumbra.progress import Progress
-from penumbra.menu import EndingScreen, LevelCardGrid, MenuChrome, PauseScreen, TitleScreen
+from penumbra.menu import (
+    MAIN_ACHIEVEMENTS, MAIN_OPTIONS, MAIN_PLAY,
+    OPTION_ERASE, OPTION_FULLSCREEN, OPTION_SOUND, OPTION_VOLUME,
+    AchievementsScreen, EndingScreen, LevelCardGrid, MainMenuScreen, MenuChrome,
+    OptionsScreen, PauseScreen, TitleScreen,
+)
 from penumbra.terrain import Terrain
 from penumbra.state import DualityState, LevelRuntime, OUTCOME_COMPLETE, OUTCOME_PLAYING
 from penumbra.tuning import DualityTuning
@@ -87,7 +92,43 @@ class PenumbraFlow:
         self.gameplay = PenumbraScene(self, runtime, state, tuning, input_provider)
         self.ending = EndingScene(self, input_provider)
         self.pause = PauseScene(self, input_provider)
+        self.main = MainMenuScene(self, input_provider)
+        self.achievements = AchievementsScene(self, input_provider)
+        self.options = OptionsScene(self, input_provider)
         self.title.duo = self.progress.duo
+        self.apply_audio_settings()
+
+    def show_main(self) -> None:
+        """A raiz. O jogo abria na escolha de MODO, que e um passo do caminho
+        e nao uma raiz -- e por isso nao havia porta nenhuma pras conquistas,
+        pras opcoes nem pra sair."""
+        self._game_loop.reset_scenes(self.main)
+
+    def show_achievements(self) -> None:
+        self._game_loop.reset_scenes(self.achievements)
+
+    def show_options(self) -> None:
+        self.options.restart()
+        self._game_loop.reset_scenes(self.options)
+
+    def apply_audio_settings(self) -> None:
+        """Leva som e volume do progresso pro motor. Chamado na abertura e a
+        cada ajuste -- o `PenumbraAudio` nao le o progresso sozinho, pra que
+        o audio continue removivel sem que nada mais saiba disso."""
+        if self.audio is None:
+            return
+        self.audio.enabled = bool(self.progress.sound_on) and self.audio.has_engine
+        self.audio.volume = float(self.progress.volume)
+
+    def erase_progress(self) -> None:
+        """Apaga tudo menos os ajustes: quem apaga o progresso raramente
+        quer o volume de volta no padrao."""
+        progress = self.progress
+        progress.completed = [False] * progress.level_count
+        progress.shards = [False] * progress.level_count
+        progress.achievements = set()
+        progress.ending_choice = None
+        progress.save()
 
     def show_title(self) -> None:
         self._game_loop.reset_scenes(self.title)
@@ -225,6 +266,178 @@ class PenumbraFlow:
         return self._game_loop.current_scene is self.gameplay
 
 
+class MainMenuScene(IScene):
+    """
+    A raiz: jogar, conquistas, opcoes, sair.
+
+    O jogo abria direto na escolha de modo, e ESC ali fechava a janela --
+    nao havia porta nenhuma pras conquistas nem pras opcoes, e a unica saida
+    era um atalho que ninguem descobriria. A escolha de modo continua
+    existindo; virou o passo seguinte a "JOGAR", que e o que ela sempre foi.
+
+    Nao chama `world.step()`: o mundo fica parado.
+    """
+
+    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+        self._flow = flow
+        self._input = input_provider
+        self._screen = MainMenuScreen()
+
+    @property
+    def screen(self) -> MainMenuScreen:
+        return self._screen
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world, delta_time
+        if self._input.is_action_pressed("menu_up"):
+            self._screen.move(-1)
+            self._flow.play(audio_ids.MENU_MOVE, 0.5)
+        if self._input.is_action_pressed("menu_down"):
+            self._screen.move(1)
+            self._flow.play(audio_ids.MENU_MOVE, 0.5)
+
+        if self._input.is_action_pressed("quit"):
+            self._flow.quit()
+            return
+        if not self._input.is_action_pressed("jump"):
+            return
+
+        self._flow.play(audio_ids.MENU_PICK, 0.7)
+        chosen = self._screen.selected
+        if chosen == MAIN_PLAY:
+            self._flow.show_title()
+        elif chosen == MAIN_ACHIEVEMENTS:
+            self._flow.show_achievements()
+        elif chosen == MAIN_OPTIONS:
+            self._flow.show_options()
+        else:
+            self._flow.quit()
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        del world
+        completed, _, total = self._flow.summary
+        self._screen.draw(
+            renderer, completed, total,
+            len(self._flow.progress.achievements), len(achievements.CATALOG),
+        )
+
+
+class AchievementsScene(IScene):
+    """So mostra. A unica tecla e ESC, porque nao ha nada a decidir aqui."""
+
+    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+        self._flow = flow
+        self._input = input_provider
+        self._screen = AchievementsScreen()
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world, delta_time
+        if self._input.is_action_pressed("quit") or self._input.is_action_pressed("jump"):
+            self._flow.show_main()
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        del world
+        _, shards, total = self._flow.summary
+        self._screen.draw(renderer, self._flow.progress.achievements, shards, total)
+
+
+class OptionsScene(IScene):
+    """
+    Som, volume, tela cheia e apagar progresso.
+
+    Grava a cada mudanca em vez de ao sair: fechar o jogo pela janela nao
+    passa por aqui, e um ajuste perdido por causa disso seria exatamente o
+    tipo de coisa que o jogador nao reporta -- so deixa de mexer.
+
+    A tela cheia e aplicada no `render`, que e o unico lugar com o renderer
+    em maos; `set_fullscreen` e idempotente, entao comparar com o estado ja
+    aplicado basta pra nao recriar a janela sessenta vezes por segundo.
+    """
+
+    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+        self._flow = flow
+        self._input = input_provider
+        self._screen = OptionsScreen()
+        self._applied_fullscreen = None
+
+    @property
+    def screen(self) -> OptionsScreen:
+        return self._screen
+
+    def restart(self) -> None:
+        self._screen = OptionsScreen()
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world, delta_time
+        progress, screen = self._flow.progress, self._screen
+
+        if self._input.is_action_pressed("menu_up"):
+            screen.move(-1)
+            self._flow.play(audio_ids.MENU_MOVE, 0.5)
+        if self._input.is_action_pressed("menu_down"):
+            screen.move(1)
+            self._flow.play(audio_ids.MENU_MOVE, 0.5)
+
+        if self._input.is_action_pressed("quit"):
+            self._flow.show_main()
+            return
+
+        step = 0
+        if self._input.is_action_pressed("move_left"):
+            step = -1
+        elif self._input.is_action_pressed("move_right"):
+            step = 1
+
+        if step and screen.selected == OPTION_VOLUME:
+            progress.volume = min(1.0, max(0.0, progress.volume + 0.1 * step))
+            self._flow.apply_audio_settings()
+            self._flow.play(audio_ids.MENU_PICK, 0.8)   # ouvir o que se ajusta
+            progress.save()
+            return
+        if step and screen.selected in (OPTION_SOUND, OPTION_FULLSCREEN):
+            self._toggle(screen.selected)
+            return
+
+        if self._input.is_action_pressed("jump"):
+            self._confirm(screen.selected)
+
+    def _toggle(self, row: int) -> None:
+        progress = self._flow.progress
+        if row == OPTION_SOUND:
+            progress.sound_on = not progress.sound_on
+            self._flow.apply_audio_settings()
+            self._flow.play(audio_ids.MENU_PICK, 0.7)
+        elif row == OPTION_FULLSCREEN:
+            progress.fullscreen = not progress.fullscreen
+        progress.save()
+
+    def _confirm(self, row: int) -> None:
+        screen = self._screen
+        if row == OPTION_ERASE:
+            if not screen.confirm_erase:
+                # Um menu que apaga trinta fases num toque e hostil. O
+                # segundo ESPAÇO existe pra que a intencao seja dita duas
+                # vezes, com o aviso na tela entre as duas.
+                screen.confirm_erase = True
+                self._flow.play(audio_ids.MENU_MOVE, 0.6)
+                return
+            screen.confirm_erase = False
+            self._flow.erase_progress()
+            self._flow.play(audio_ids.FAIL, 0.7)
+            return
+        self._toggle(row)
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        del world
+        progress = self._flow.progress
+        if self._applied_fullscreen != progress.fullscreen:
+            renderer.set_fullscreen(progress.fullscreen)
+            self._applied_fullscreen = progress.fullscreen
+        completed, _, total = self._flow.summary
+        self._screen.draw(renderer, progress.sound_on, progress.volume,
+                          progress.fullscreen, completed, total)
+
+
 class TitleScene(IScene):
     """
     Abertura: escolher entre um e dois jogadores, com dois botoes grandes.
@@ -256,9 +469,10 @@ class TitleScene(IScene):
         if self._input.is_action_pressed("switch"):
             self._flow.toggle_duo()
         if self._input.is_action_pressed("jump"):
+            self._flow.play(audio_ids.MENU_PICK, 0.7)
             self._flow.show_menu()
         elif self._input.is_action_pressed("quit"):
-            self._flow.quit()
+            self._flow.show_main()
 
     def render(self, world: World, renderer: IRenderer) -> None:
         del world

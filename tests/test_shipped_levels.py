@@ -457,7 +457,7 @@ class TestLevelFlow:
             preview_terrain=Terrain(GRID_COLS, GRID_ROWS, CELL_SIZE),
             progress=Progress(simulation.catalog.count, tmp_path / "progress.json"),
         )
-        flow.show_title()
+        flow.show_main()
         return flow
 
     def _drive(self, flow, simulation, input_provider, frames):
@@ -467,13 +467,14 @@ class TestLevelFlow:
 
     # ---------------- menu ----------------
 
-    def test_o_jogo_abre_na_tela_de_titulo(self, flow):
-        """A primeira pergunta do jogo e quantos jogadores -- nao qual fase.
-        Antes o modo era um atalho de TAB no canto do menu de fases: quem
-        nunca leu o rodape nunca descobriria que ha multiplayer local."""
-        assert isinstance(flow._game_loop.current_scene, TitleScene)
+    def test_o_jogo_abre_na_raiz(self, flow):
+        """Jogar, conquistas, opcoes, sair. Antes abria direto na escolha de
+        modo, e nao havia porta nenhuma pras outras tres -- ESC ali fechava a
+        janela, que era a unica saida e ninguem descobriria."""
+        assert flow._game_loop.current_scene is flow.main
 
     def test_o_titulo_escolhe_o_modo_com_as_setas(self, flow, simulation, input_provider):
+        flow.show_title()
         assert not flow.duo
         input_provider.set_action_held("move_right", True)
         self._drive(flow, simulation, input_provider, frames=1)
@@ -485,6 +486,7 @@ class TestLevelFlow:
         assert not flow.duo, "A volta para UM JOGADOR"
 
     def test_confirmar_no_titulo_leva_a_selecao_de_fase(self, flow, simulation, input_provider):
+        flow.show_title()
         input_provider.set_action_held("jump", True)
         self._drive(flow, simulation, input_provider, frames=1)
         assert isinstance(flow._game_loop.current_scene, MenuScene)
@@ -504,10 +506,41 @@ class TestLevelFlow:
         assert isinstance(flow._game_loop.current_scene, TitleScene)
         assert not flow._game_loop.stopped, "ESC recua uma tela; so o titulo encerra"
 
-    def test_esc_no_titulo_encerra_o_jogo(self, flow, simulation, input_provider):
+    def test_esc_na_escolha_de_modo_volta_pra_raiz(self, flow, simulation, input_provider):
+        """Antes o jogo ABRIA na escolha de modo, e ESC ali fechava a janela.
+        Uma tela que so pergunta "um ou dois?" nao e uma raiz: e um passo do
+        caminho, e agora e o passo seguinte a JOGAR."""
+        flow.show_title()
         input_provider.set_action_held("quit", True)
         self._drive(flow, simulation, input_provider, frames=1)
+
+        assert flow._game_loop.current_scene is flow.main
+        assert not flow._game_loop.stopped, "ESC ali nao fecha mais o jogo"
+
+    def test_esc_na_raiz_encerra_o_jogo(self, flow, simulation, input_provider):
+        flow.show_main()
+        input_provider.set_action_held("quit", True)
+        self._drive(flow, simulation, input_provider, frames=1)
+
         assert flow._game_loop.stopped
+
+    def test_a_raiz_tem_as_quatro_portas(self, flow, simulation, input_provider):
+        """Jogar, conquistas, opcoes e sair -- e cada uma leva a algum lugar.
+        Uma porta que nao abre nada e pior que porta nenhuma."""
+        from penumbra.menu import MAIN_ACHIEVEMENTS, MAIN_OPTIONS, MAIN_PLAY
+
+        for choice, expected in ((MAIN_PLAY, "title"),
+                                 (MAIN_ACHIEVEMENTS, "achievements"),
+                                 (MAIN_OPTIONS, "options")):
+            flow.show_main()
+            flow.main.screen.selected = choice
+            input_provider.set_action_held("jump", True)
+            self._drive(flow, simulation, input_provider, frames=1)
+            # Soltar precisa de um poll: `is_action_pressed` e borda, e sem
+            # ele o proximo "apertar" nao seria uma transicao.
+            input_provider.set_action_held("jump", False)
+            self._drive(flow, simulation, input_provider, frames=1)
+            assert flow._game_loop.current_scene is getattr(flow, expected), choice
 
     def test_o_menu_lista_todas_as_fases_e_nenhuma_esta_trancada(self, flow, simulation):
         flow.show_menu()

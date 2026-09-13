@@ -62,6 +62,12 @@ class Progress:
         self.achievements: Set[str] = set()
         self.ending_choice: Optional[str] = None
         self.duo = False
+        # Ajustes. Moram no mesmo arquivo do progresso porque sao a mesma
+        # pergunta pro jogador -- "como eu deixei isto da ultima vez?" -- e
+        # dois arquivos dobrariam as chances de um deles nao abrir.
+        self.volume = 0.7
+        self.sound_on = True
+        self.fullscreen = False
 
     @property
     def path(self) -> Path:
@@ -86,6 +92,9 @@ class Progress:
         choice = raw.get("ending_choice")
         self.ending_choice = str(choice) if isinstance(choice, str) else None
         self.duo = bool(raw.get("duo", False))
+        self.volume = _ratio(raw.get("volume"), 0.7)
+        self.sound_on = bool(raw.get("sound_on", True))
+        self.fullscreen = bool(raw.get("fullscreen", False))
         return self
 
     def save(self) -> bool:
@@ -98,6 +107,9 @@ class Progress:
             "achievements": sorted(self.achievements),
             "ending_choice": self.ending_choice,
             "duo": bool(self.duo),
+            "volume": float(self.volume),
+            "sound_on": bool(self.sound_on),
+            "fullscreen": bool(self.fullscreen),
         }
         temporary = self._path.with_suffix(".tmp")
         try:
@@ -113,6 +125,15 @@ class Progress:
             except OSError:
                 pass
             return False
+
+
+def _ratio(value, fallback: float) -> float:
+    """Um 0..1 vindo do disco, ou o padrao. Um volume fora de faixa num save
+    editado a mao nao pode virar audio estourado nem silencio misterioso."""
+    try:
+        return min(1.0, max(0.0, float(value)))
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _flags(value, count: int) -> List[bool]:
