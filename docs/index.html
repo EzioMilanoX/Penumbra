@@ -270,7 +270,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Manual de campo · v1.1 · 30 fases em três capítulos</p>
+    <p class="kicker">Manual de campo · v1.2 · 30 fases em três capítulos</p>
     <h1>Penumbra</h1>
     <p class="lede">
       Dois seres que não podem se tocar e não avançam separados. O mundo não tem
@@ -623,6 +623,33 @@
     </p>
   </section>
 
+  <section id="segredo">
+    <p class="eyebrow">Há algo que o jogo não conta</p>
+    <h2>O Instante</h2>
+    <p class="measure">
+      Penumbra tem <b>uma regra inviolável</b>: os dois não podem se tocar.
+      Trinta fases foram desenhadas em volta dela — pistas em andares
+      diferentes, corredores atravessados em turnos, portais afastados o
+      bastante para que chegar junto não anule os dois.
+    </p>
+    <p class="measure">
+      O segredo é o contrário disso: parar os dois lado a lado, no chão, <b>o
+      mais perto que dá sem se tocarem</b> — uma célula, 32 px contra os 23 que
+      aniquilam — e ficar quieto por 2,2 s. Um anel dourado cresce entre eles, e
+      a décima primeira conquista, que até então aparecia como
+      <span class="mono">???</span>, se revela.
+    </p>
+    <p class="note">
+      É o único momento do jogo em que a coisa certa a fazer é <b>não fazer
+      nada</b>. Não abre caminho, não dá fase, não vale ponto: só reconhece que
+      alguém entendeu o que o jogo é sobre e quis chegar perto mesmo assim.
+      Funciona desde a fase 1, de propósito — um segredo que só existisse no fim
+      seria um prêmio; este é um convite. E tem um lugar certo: a Lumen se apaga
+      no escuro em 1,3 s e a Umbra se dissolve perto de uma lâmpada, então os
+      dois precisam de um ponto com luz na medida. Achar o lugar é parte do gesto.
+    </p>
+  </section>
+
   <section id="fragmentos">
     <p class="eyebrow">Fragmentos e conquistas</p>
     <h2>Por que colecionar</h2>
@@ -778,7 +805,7 @@ git clone https://github.com/EzioMilanoX/Penumbra.git
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 212 testes headless
+pytest -q                      # 223 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
       <code>python -m</code> não é preferência de estilo: os imports são absolutos

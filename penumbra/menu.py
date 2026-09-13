@@ -746,8 +746,13 @@ class MainMenuScreen:
             f"{completed}/{total} fases      {unlocked}/{achievement_total} conquistas",
             13, _TEXT_DIM, anchor="center",
         )
-        renderer.draw_text(center, height - 50.0, "W/S escolher      ESPAÇO confirmar",
+        renderer.draw_text(center, height - 52.0, "W/S escolher      ESPAÇO confirmar",
                            12, _TEXT_FAINT, anchor="center")
+        # Creditos. A engine e MPL-2.0 e o jogo a usa inteira; nao credita-la
+        # dentro do proprio jogo seria uma omissao, nao uma economia de tela.
+        renderer.draw_text(center, height - 28.0,
+                           "sobre a OuroborosEngine  ·  EzioMilanoX", 10,
+                           _TEXT_FAINT, anchor="center")
 
 
 class AchievementsScreen:
@@ -771,17 +776,28 @@ class AchievementsScreen:
                            _GOLD if whole else _TEXT_DIM, anchor="center")
         renderer.draw_ui_rect(center - 320.0, 88.0, 640.0, 1.0, _RULE)
 
-        top = 104.0
-        row_height = 44.0
+        # Onze linhas tem de caber ACIMA do rodape. A decima primeira chegou
+        # com o segredo, e a altura antiga (44) punha o fundo dela por cima do
+        # texto de baixo -- o tipo de coisa que so aparece quando a lista
+        # cresce, que e sempre depois de a tela estar pronta.
+        top = 100.0
+        row_height = 40.0
         for index, achievement in enumerate(achievements.CATALOG):
             y = top + index * row_height
             has = achievement.key in unlocked
             if has:
                 renderer.draw_ui_rect(center - 320.0, y - 4.0, 640.0, row_height - 8.0, _CARD)
                 renderer.draw_ui_rect(center - 320.0, y - 4.0, 3.0, row_height - 8.0, _GOLD)
-            renderer.draw_text(center - 306.0, y, achievement.title, 15,
+            # A escondida so se revela depois de achada: uma lista que a
+            # mostrasse deixaria de haver segredo, e uma que nunca a
+            # mostrasse tiraria do jogador a chance de saber que achou algo
+            # que o jogo guardava.
+            secret = achievement.hidden and not has
+            title = "???" if secret else achievement.title
+            detail = "há algo que o jogo não conta." if secret else achievement.description
+            renderer.draw_text(center - 306.0, y, title, 15,
                                _GOLD if has else _TEXT_FAINT)
-            renderer.draw_text(center - 306.0, y + 19.0, achievement.description, 11,
+            renderer.draw_text(center - 306.0, y + 19.0, detail, 11,
                                _TEXT_DIM if has else _TEXT_FAINT)
             renderer.draw_text(center + 306.0, y + 7.0, "feito" if has else "-", 12,
                                _GOLD if has else _GOLD_DIM, anchor="topright")

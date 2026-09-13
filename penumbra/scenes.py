@@ -219,6 +219,16 @@ class PenumbraFlow:
         self._runtime.reset()
         self.resume()
 
+    def note_echo(self) -> None:
+        """O Instante. Concede a conquista escondida e grava na hora -- um
+        segredo que so valesse ao terminar a fase se perderia junto com a
+        primeira morte depois dele."""
+        fresh = achievements.ECHO not in self.progress.achievements
+        self.progress.achievements.add(achievements.ECHO)
+        if fresh:
+            self.progress.save()
+        self.play(audio_ids.ECHO, 1.0)
+
     def note_failure(self) -> None:
         """Morreu ou reiniciou: a tentativa deixa de ser limpa. Chamado pela
         cena, que e quem ve o desfecho."""
@@ -674,10 +684,12 @@ class PenumbraScene(IScene):
         self._input = input_provider
         self._gameplay = GameplayScene()
         self._frozen_seconds = 0.0
+        self._echo_noted = False
 
     def on_enter(self, world: World, renderer: IRenderer) -> None:
         del world, renderer
         self._frozen_seconds = 0.0
+        self._echo_noted = False
 
     def update(self, world: World, delta_time: float) -> None:
         if self._state.outcome != OUTCOME_PLAYING:
@@ -689,6 +701,12 @@ class PenumbraScene(IScene):
             return
 
         world.step(delta_time)
+
+        # O segredo e concedido no instante em que acontece, e nao no fim da
+        # fase: quem o encontrou parou de proposito e merece saber agora.
+        if self._state.echo_found and not self._echo_noted:
+            self._echo_noted = True
+            self._flow.note_echo()
 
         if self._state.restart_requested:
             self._flow.note_failure()

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from ouroboros.interfaces.renderer import IRenderer
 
+from penumbra import achievements
 from penumbra.state import (
     DualityState,
     LevelRuntime,
@@ -70,7 +71,9 @@ class PenumbraHud:
         transform_pool,
         viewport_size,
         visible=None,
+        unlocked=None,
     ) -> None:
+        self._unlocked = unlocked
         self._state = state
         self._runtime = runtime
         self._tuning = tuning
@@ -129,11 +132,16 @@ class PenumbraHud:
         renderer.draw_ui_rect(0.0, top, self._width, self._height - top, _PANEL)
         renderer.draw_ui_rect(0.0, top, self._width, 1.0, _RULE)
 
-        renderer.draw_text(
-            14.0, top + _LINE_1,
-            f"{state.level_index + 1}/{self._runtime.count}  {level.name}",
-            14, _TEXT,
-        )
+        title = f"{state.level_index + 1}/{self._runtime.count}  {level.name}"
+        renderer.draw_text(14.0, top + _LINE_1, title, 14, _TEXT)
+        # O fragmento DESTA tentativa. Antes so aparecia no menu, depois --
+        # tarde demais pra decidir se vale voltar buscar.
+        if self._runtime.terrain.shard_cell is not None:
+            renderer.draw_text(
+                14.0 + len(title) * 8.4 + 12.0, top + _LINE_1 + 2.0,
+                "fragmento" if state.shard_collected else "fragmento?", 12,
+                _GOLD if state.shard_collected else _GOLD_DIM,
+            )
         # No duo nao existe "quem esta sob comando": os dois estao. Dizer
         # "comando: LUMEN" ali seria mentira, e e a unica linha do rodape que
         # o jogador consulta pra saber de quem sao as teclas.
@@ -197,6 +205,16 @@ class PenumbraHud:
             20, _GOLD if won else _PERIL, anchor="center",
         )
         renderer.draw_text(center_x, y + 58.0, state.message, 13, _TEXT, anchor="center")
+        # As conquistas destravavam em SILENCIO: `flow.unlocked` era escrito
+        # e ninguem lia, entao o jogador so descobria indo ao menu depois.
+        unlocked = self._unlocked() if self._unlocked else ()
+        if won and unlocked:
+            names = "  ·  ".join(achievements.title_of(key) for key in unlocked)
+            renderer.draw_text(center_x, y + 84.0, f"conquista:  {names}", 11,
+                               _GOLD, anchor="center")
+            renderer.draw_text(center_x, y + 102.0,
+                               "ESPAÇO para continuar", 11, _TEXT_DIM, anchor="center")
+            return
         renderer.draw_text(
             center_x, y + 86.0,
             "ESPAÇO para continuar" if won else "ESPAÇO para tentar de novo",

@@ -83,6 +83,10 @@ class DualityState:
         ligado pra sempre)."""
         self.peril = np.zeros(2, dtype=np.float32)
         """Quanto falta pra polaridade errada matar cada ser, 0..1."""
+        self.echo_seconds = 0.0
+        """Quanto tempo os dois ja estao parados lado a lado, sem se tocar.
+        Ver `penumbra.systems.echo_system` -- e o segredo do jogo."""
+        self.echo_found = False
         self.coyote = np.zeros(2, dtype=np.float32)
         """Segundos de salto ainda validos depois de sair da beira."""
         self.jump_buffer = np.zeros(2, dtype=np.float32)
@@ -295,6 +299,8 @@ class LevelRuntime:
         state.peril[:] = 0.0
         state.coyote[:] = 0.0
         state.jump_buffer[:] = 0.0
+        state.echo_seconds = 0.0
+        state.echo_found = False
         state.reached_goal[:] = False
         state.shard_collected = False
         state.used_ability = False

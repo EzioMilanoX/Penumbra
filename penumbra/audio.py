@@ -51,6 +51,9 @@ BEACON = "beacon"
 COMPLETE = "complete"
 FAIL = "fail"
 
+# --- o segredo ---
+ECHO = "echo"
+
 # --- menu ---
 MENU_MOVE = "menu_move"
 MENU_PICK = "menu_pick"
@@ -70,6 +73,7 @@ _TONES = (
     (BEACON,      "square",   560.0, 0.06),
     (COMPLETE,    "sweep",    700.0, 0.42),
     (FAIL,        "sweep",    200.0, 0.38),
+    (ECHO,        "sweep",    540.0, 0.60),
     (MENU_MOVE,   "square",   640.0, 0.03),
     (MENU_PICK,   "square",   880.0, 0.07),
 )

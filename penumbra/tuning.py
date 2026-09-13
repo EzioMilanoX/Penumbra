@@ -119,6 +119,11 @@ class FlowTuning:
     source_period_seconds: float = 5.2
     source_min_intensity: float = 0.45
     source_max_intensity: float = 1.0
+    echo_seconds: float = 2.2
+    """Quanto tempo os dois precisam ficar parados lado a lado, sem se
+    tocar, pro Instante acontecer. Longo o bastante pra nao acontecer por
+    acaso, curto o bastante pra que quem tentou de proposito nao desista
+    achando que nao e nada."""
 
 
 @dataclass(frozen=True)
@@ -201,6 +206,8 @@ def _validate(tuning: DualityTuning, path: str) -> None:
         raise TuningDefinitionError(f"{path}: 'flow.eclipse_collapse_seconds' precisa ser positivo")
     if flow.wanderer_speed_cells <= 0.0:
         raise TuningDefinitionError(f"{path}: 'flow.wanderer_speed_cells' precisa ser positivo")
+    if flow.echo_seconds <= 0.0:
+        raise TuningDefinitionError(f"{path}: 'flow.echo_seconds' precisa ser positivo")
     if flow.source_period_seconds <= 0.0:
         raise TuningDefinitionError(f"{path}: 'flow.source_period_seconds' precisa ser positivo")
     if not (0.0 <= flow.source_min_intensity < flow.source_max_intensity):

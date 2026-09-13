@@ -14,9 +14,14 @@ que o realca.
 """
 from __future__ import annotations
 
+import itertools
+
 import pytest
 
-from penumbra.menu import MainMenuScreen, OptionsScreen, PauseScreen
+from penumbra import achievements
+from penumbra.menu import (
+    AchievementsScreen, MainMenuScreen, OptionsScreen, PauseScreen,
+)
 
 _CARD_SELECTED = (34, 32, 44, 255)
 
@@ -45,9 +50,18 @@ class _RecordingRenderer:
             top = float(y) - height / 2.0
         else:
             top = float(y)
+        # Largura estimada pelo glifo monoespacado do backend (~0,6 em).
+        width = len(text) * size * 0.6
+        if anchor == "center":
+            left = float(x) - width / 2.0
+        elif anchor == "topright":
+            left = float(x) - width
+        else:
+            left = float(x)
         self.texts.append({
             "text": text, "size": size, "anchor": anchor,
             "x": float(x), "top": top, "bottom": top + height,
+            "left": left, "right": left + width,
             "middle": top + height / 2.0,
         })
 
@@ -128,10 +142,15 @@ class TestNothingLeavesTheWindow:
         """Uma linha a mais numa lista empurra a ultima pra fora da tela, e
         headless ninguem ve. Vale pras tres telas novas."""
         width, height = 896, 616
+        every = {a.key for a in achievements.CATALOG}
         screens = (
             ("raiz", lambda r: MainMenuScreen().draw(r, 0, 30, 0, 10)),
             ("pausa", lambda r: PauseScreen().draw(r, "A Crosta", False)),
             ("opcoes", lambda r: OptionsScreen().draw(r, True, 0.7, False, 3, 30)),
+            # A lista de conquistas CRESCE: cada uma nova empurra a ultima pra
+            # baixo, e foi assim que a decima primeira encostou no rodape.
+            ("conquistas vazia", lambda r: AchievementsScreen().draw(r, set(), 0, 30)),
+            ("conquistas cheia", lambda r: AchievementsScreen().draw(r, every, 30, 30)),
         )
         for name, draw in screens:
             renderer = _RecordingRenderer(width, height)
@@ -142,3 +161,27 @@ class TestNothingLeavesTheWindow:
                 )
             for left, top, w, h, _ in renderer.rects:
                 assert top >= 0.0 and top + h <= height, f"{name}: retangulo fora da janela"
+
+    def test_nenhum_texto_cai_por_cima_de_outro(self):
+        """O defeito que o teste de limites NAO pegava.
+
+        A decima primeira conquista nao saiu da janela -- ela encostou no
+        rodape, e os dois textos ficaram no mesmo lugar. Uma lista que cresce
+        empurra a ultima linha pra cima da proxima coisa muito antes de
+        empurra-la pra fora da tela, e e a colisao que se ve, nao o limite."""
+        every = {a.key for a in achievements.CATALOG}
+        screens = (
+            ("raiz", lambda r: MainMenuScreen().draw(r, 0, 30, 0, 10)),
+            ("pausa", lambda r: PauseScreen().draw(r, "A Crosta", False)),
+            ("opcoes", lambda r: OptionsScreen().draw(r, True, 0.7, False, 3, 30)),
+            ("conquistas cheia", lambda r: AchievementsScreen().draw(r, every, 30, 30)),
+        )
+        for name, draw in screens:
+            renderer = _RecordingRenderer()
+            draw(renderer)
+            for first, second in itertools.combinations(renderer.texts, 2):
+                vertical = first["top"] < second["bottom"] and second["top"] < first["bottom"]
+                horizontal = first["left"] < second["right"] and second["left"] < first["right"]
+                assert not (vertical and horizontal), (
+                    f"{name}: {first['text']!r} e {second['text']!r} se sobrepoem"
+                )

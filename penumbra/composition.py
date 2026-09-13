@@ -53,6 +53,7 @@ from penumbra.scenes import PenumbraFlow
 from penumbra.state import DualityState, LevelRuntime, LUMEN, UMBRA
 from penumbra.systems.crust_break_system import CrustBreakSystem
 from penumbra.systems.duality_control_system import DualityControlSystem
+from penumbra.systems.echo_system import EchoSystem
 from penumbra.systems.form_altar_system import FormAltarSystem
 from penumbra.systems.light_field_system import LightFieldSystem
 from penumbra.systems.outcome_system import OutcomeSystem
@@ -172,6 +173,7 @@ def build_game(config: EngineConfig) -> GameLoop:
             simulation.state, simulation.runtime, tuning,
             world.get_pool("transform"), game_loop.renderer.get_viewport_size(),
             visible=lambda: flow.hud_visible,
+            unlocked=lambda: flow.unlocked,
         )
     )
     flow.show_main()
@@ -231,10 +233,11 @@ def _assemble(
     8. `WorldClockSystem`     -- farol, lanterna e eclipse; o que muda sozinho
     9. `CrustBreakSystem`     -- o verbo da Umbra; muta o terreno
     10. `FormAltarSystem`     -- a renuncia; muta o SER, e tambem le `state.cell`
-    11. `PolarityLeverSystem` -- troca eter por contra-eter no mapa inteiro
-    12. `PolarityDoorSystem`  -- le a luz deste frame
-    13. `OutcomeSystem`       -- le posicoes ja resolvidas
-    14. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
+    11. `EchoSystem`          -- o segredo: os dois parados lado a lado
+    12. `PolarityLeverSystem` -- troca eter por contra-eter no mapa inteiro
+    13. `PolarityDoorSystem`  -- le a luz deste frame
+    14. `OutcomeSystem`       -- le posicoes ja resolvidas
+    15. `PresentationSystem`  -- so pixels; removivel sem mudar o jogo
 
     Nao ha sistema de "sair": ESC e tratado nas CENAS (volta ao menu durante
     a fase, encerra no menu), porque um `ISystem` so roda dentro de
@@ -277,6 +280,7 @@ def _assemble(
         )
     )
     world.register_system(FormAltarSystem(terrain, state, tuning))
+    world.register_system(EchoSystem(state, tuning, tile_collision_systems))
     world.register_system(PolarityLeverSystem(terrain, state))
     world.register_system(PolarityDoorSystem(terrain, state))
     world.register_system(OutcomeSystem(terrain, state, tuning))

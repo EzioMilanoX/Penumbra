@@ -353,7 +353,7 @@ penumbra/
   scenes.py          fluxo título -> fases -> jogo -> pausa -> fim
   audio.py           a voz do jogo, sintetizada (nenhum arquivo de som)
   progress.py        o que sobrevive a fechar o jogo
-  achievements.py    dez conquistas, e o motivo dos fragmentos
+  achievements.py    onze conquistas, e o motivo dos fragmentos
   menu.py            tela de título, grade de cards, prévia do terreno
   hud.py             HUD e avisos de fim de fase
   systems/
@@ -368,7 +368,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              212 testes headless
+tests/              223 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -438,7 +438,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 212 testes, ~9 s, headless
+pytest -q                      # 223 testes, ~20 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -519,6 +519,38 @@ em vez de recusado — acrescentar fases não pode apagar o que você já fez.
 tentativa; não havia como só parar. Agora empilha um painel por cima
 (`push_scene`), o mundo congela onde estava, e dá para continuar, reiniciar ou
 sair.
+
+## Há algo que o jogo não conta
+
+Penumbra tem **uma regra inviolável**: os dois não podem se tocar. Trinta fases
+foram desenhadas em volta dela — pistas em andares diferentes, corredores
+atravessados em turnos, portais afastados o bastante para que chegar junto não
+anule os dois.
+
+O segredo é o contrário disso, e não está escrito em lugar nenhum. Quem quiser
+achar, acha; quem não quiser, joga o jogo inteiro sem saber que existe.
+
+*(Se preferir descobrir sozinho, pule o parágrafo seguinte.)*
+
+<details>
+<summary>O que é</summary>
+
+**O Instante.** Parar os dois lado a lado, no chão, **o mais perto que dá sem
+se tocarem** — uma célula de distância, 32 px contra os 23 que aniquilam — e
+ficar quieto por 2,2 s. Um anel dourado cresce entre eles e a conquista
+escondida se revela.
+
+É o único momento do jogo em que a coisa certa a fazer é **não fazer nada**.
+Não abre caminho, não dá fase, não vale ponto: só reconhece que alguém entendeu
+o que o jogo é sobre e quis chegar perto mesmo assim. Funciona desde a fase 1,
+de propósito — um segredo que só existisse no fim seria um prêmio; este é um
+convite.
+
+E tem um lugar certo: a Lumen se apaga no escuro em 1,3 s e a Umbra se dissolve
+perto de uma lâmpada, então os dois precisam de um ponto com luz na medida.
+Achar o lugar é parte do gesto.
+
+</details>
 
 ## Por que colecionar fragmentos
 
@@ -627,6 +659,16 @@ fase é a única coisa que o card precisa entregar.
 
 ## O que os testes não estavam olhando
 
+- **Conquistas destravavam em silêncio.** `flow.unlocked` era escrito e
+  ninguém lia — o jogador só descobria indo ao menu depois. Agora o painel de
+  fim de fase anuncia o que acabou de ser conquistado. E o **fragmento** passou
+  a aparecer no rodapé durante a fase: antes só no menu, tarde demais para
+  decidir se valia voltar buscar.
+- **O teste de layout que eu escrevi não pegava o defeito seguinte.** Ele
+  verificava se algo saía da janela; a décima primeira conquista **não saiu** —
+  encostou no rodapé, e os dois textos ficaram no mesmo lugar. Uma lista que
+  cresce colide com a próxima coisa muito antes de sair da tela. Agora há um
+  teste de **sobreposição** entre textos, e ele pega exatamente isso.
 - **A faixa de realce do menu ficava abaixo da palavra.** `draw_text` aceita um
   `anchor`, e a diferença não é cosmética: com `topleft` o `y` é o **topo** do
   texto; com `center`, o **centro vertical**. Posicionar a faixa a partir de `y`

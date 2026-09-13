@@ -33,6 +33,11 @@ class Achievement:
     key: str
     title: str
     description: str
+    hidden: bool = False
+    """Aparece como "???" ate ser conquistada. So o Instante e assim: uma
+    lista que revelasse o segredo deixaria de haver segredo, e um segredo
+    que nao aparecesse nem depois de achado nao daria ao jogador a chance de
+    saber que achou algo que o jogo guardava."""
 
 
 FIRST_LIGHT = "primeira_luz"
@@ -45,6 +50,7 @@ FIRST_TRY = "de_primeira"
 IN_TWO = "a_dois"
 ESCORT_IN_TWO = "escolta"
 BOTH_FORMS = "renuncia_dupla"
+ECHO = "o_instante"
 
 CATALOG: Tuple[Achievement, ...] = (
     Achievement(FIRST_LIGHT, "Primeira Luz", "Vencer a primeira fase."),
@@ -57,6 +63,9 @@ CATALOG: Tuple[Achievement, ...] = (
     Achievement(IN_TWO, "A Dois", "Vencer uma fase em dois jogadores."),
     Achievement(ESCORT_IN_TWO, "Escolta", "Vencer uma fase de escolta em dois jogadores."),
     Achievement(BOTH_FORMS, "Renúncia Dupla", "Deixar as duas formas na mesma fase."),
+    Achievement(ECHO, "O Instante",
+                "Ficar parado ao lado dela, o mais perto que dá sem se tocarem.",
+                hidden=True),
 )
 
 _BY_KEY = {achievement.key: achievement for achievement in CATALOG}

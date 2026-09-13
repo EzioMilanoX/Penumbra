@@ -64,6 +64,8 @@
     "_nota_fonte": "A fonte que respira: em vez de andar, o raio aceso dilata e contrai. Entre 0.45 e 1.0 o raio solido vai de 0,7 a 4,55 celulas -- e acima de 0.60 ela dissolve a Umbra, entao a cada respiracao ha um momento em que ficar perto deixa de ser possivel.",
     "source_period_seconds": 5.2,
     "source_min_intensity": 0.45,
-    "source_max_intensity": 1.0
+    "source_max_intensity": 1.0,
+    "_nota_instante": "Segredo: quanto tempo os dois precisam ficar parados lado a lado, a uma celula de distancia, sem se tocar. Ver penumbra/systems/echo_system.py.",
+    "echo_seconds": 2.2
   }
 }

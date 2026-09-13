@@ -244,6 +244,7 @@ class PresentationSystem(ISystem):
         self._size_by_role[ROLE_LEVER] = 0.7
         self._cell_scale = np.float32(terrain.cell_size / _CELL_SPRITE_UNIT)
         self._eclipse_seconds = tuning.flow.eclipse_collapse_seconds
+        self._echo_seconds = tuning.flow.echo_seconds
         self._source_min = tuning.flow.source_min_intensity
         self._source_max = tuning.flow.source_max_intensity
 
@@ -619,8 +620,22 @@ class PresentationSystem(ISystem):
                          UMBRA_RIM, 150.0 if absorb_on else 112.0,
                          transform_view, sprite_view)
 
-        # No duo nao existe "quem esta sob comando" -- os dois estao. O anel
-        # dourado desaparece em vez de mentir apontando um deles.
+        # O terceiro anel tem dois trabalhos, e o segundo tem prioridade.
+        #
+        # De costume ele marca quem esta sob comando (e some no duo, onde nao
+        # existe "quem" -- os dois estao). Mas enquanto o Instante carrega ele
+        # abandona os dois e vai pro MEIO deles, crescendo: o segredo precisa
+        # ser visto antes de ser entendido, senao e indistinguivel de nao
+        # existir. Ver `penumbra.systems.echo_system`.
+        echo = min(1.0, state.echo_seconds / max(1e-6, self._echo_seconds))
+        if echo > 0.0:
+            self._place_aura(
+                2, (lumen_x + umbra_x) / 2.0, (lumen_y + umbra_y) / 2.0,
+                (0.8 + 2.2 * echo) * cell_size, SHAPE_RING,
+                GOLD_BRIGHT, 90.0 + 165.0 * echo, transform_view, sprite_view,
+            )
+            return
+
         active_x, active_y = (lumen_x, lumen_y) if state.active == LUMEN else (umbra_x, umbra_y)
         self._place_aura(2, active_x, active_y, (1.55 + 0.18 * pulse) * cell_size, SHAPE_RING,
                          GOLD_BRIGHT, 0.0 if state.duo else 205.0, transform_view, sprite_view)
