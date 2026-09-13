@@ -659,7 +659,9 @@ class PauseScreen:
             y = top + 96.0 + index * 34.0
             chosen = index == self.selected
             if chosen:
-                renderer.draw_ui_rect(left + 18.0, y - 6.0, panel_w - 36.0, 28.0, _CARD_SELECTED)
+                # Mesma regra da raiz: texto centrado em `y`, faixa tambem.
+                renderer.draw_ui_rect(left + 18.0, y - 14.0, panel_w - 36.0, 28.0,
+                                      _CARD_SELECTED)
             renderer.draw_text(center, y, label, 15,
                                _GOLD if chosen else _TEXT_DIM, anchor="center")
 
@@ -671,6 +673,10 @@ class PauseScreen:
 # ======================================================================
 # A raiz do jogo: as quatro portas
 # ======================================================================
+
+_MAIN_ROW_HALF = 18.0
+"""Meia altura da faixa de realce da raiz. O texto dela e desenhado com
+`anchor="center"`, e a faixa e centrada no mesmo `y`."""
 
 MAIN_PLAY = 0
 MAIN_ACHIEVEMENTS = 1
@@ -720,11 +726,14 @@ class MainMenuScreen:
             y = top + index * 46.0
             chosen = index == self.selected
             if chosen:
-                # `draw_text` ancora o TOPO do texto, entao o realce nao pode
-                # ser simetrico em torno de `y` -- senao a palavra encosta na
-                # borda de cima da faixa.
-                renderer.draw_ui_rect(center - 150.0, y - 5.0, 300.0, 36.0, _CARD_SELECTED)
-                renderer.draw_ui_rect(center - 150.0, y - 5.0, 3.0, 36.0, _GOLD)
+                # `anchor="center"` ancora o CENTRO vertical do texto, nao o
+                # topo -- entao a faixa tem de ser centrada em `y` tambem.
+                # Posiciona-la a partir de `y` como se fosse topo a joga
+                # inteira pra baixo da palavra, que foi o que aconteceu.
+                renderer.draw_ui_rect(center - 150.0, y - _MAIN_ROW_HALF, 300.0,
+                                      2.0 * _MAIN_ROW_HALF, _CARD_SELECTED)
+                renderer.draw_ui_rect(center - 150.0, y - _MAIN_ROW_HALF, 3.0,
+                                      2.0 * _MAIN_ROW_HALF, _GOLD)
             renderer.draw_text(center, y, label, 22,
                                _GOLD if chosen else _TEXT_DIM, anchor="center")
 

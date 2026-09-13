@@ -778,7 +778,7 @@ git clone https://github.com/EzioMilanoX/Penumbra.git
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 207 testes headless
+pytest -q                      # 212 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
       <code>python -m</code> não é preferência de estilo: os imports são absolutos
@@ -828,6 +828,10 @@ python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
           <tr>
             <td><b>Uma chave de comentário no JSON de bindings derrubou o jogo na abertura.</b> O carregador de dificuldade descarta chaves <code>_</code>; o de bindings, não.</td>
             <td>Os testes usam o provider nulo, que ignora o arquivo. Agora um deles carrega o arquivo pelo <b>carregador real</b>, e outro confere que toda ação lida pelo código está lá.</td>
+          </tr>
+          <tr>
+            <td><b>A faixa de realce do menu ficava abaixo da palavra.</b> <code>draw_text</code> com <code>anchor="center"</code> ancora o <i>centro</i> vertical, não o topo — e a faixa foi posicionada como se fosse topo.</td>
+            <td>Nenhum teste olhava um pixel. Agora um renderer de mentira grava as chamadas de desenho, e três telas verificam que <b>o texto realçado cabe dentro do retângulo que o realça</b>.</td>
           </tr>
         </tbody>
       </table>

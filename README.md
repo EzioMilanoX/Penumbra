@@ -368,7 +368,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              207 testes headless
+tests/              212 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -438,7 +438,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 207 testes, ~14 s, headless
+pytest -q                      # 212 testes, ~9 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 
@@ -626,6 +626,17 @@ deliberadamente mais claras que no jogo: a 4 px por célula, o contraste real
 fase é a única coisa que o card precisa entregar.
 
 ## O que os testes não estavam olhando
+
+- **A faixa de realce do menu ficava abaixo da palavra.** `draw_text` aceita um
+  `anchor`, e a diferença não é cosmética: com `topleft` o `y` é o **topo** do
+  texto; com `center`, o **centro vertical**. Posicionar a faixa a partir de `y`
+  como se fosse topo, com o texto centrado, joga a faixa inteira para baixo.
+  Nenhum dos 207 testes viu — nenhum deles olhava um pixel. Agora um renderer
+  de mentira grava as chamadas de desenho e três telas verificam a única coisa
+  que importa: **o texto realçado cabe dentro do retângulo que o realça** (e um
+  quarto teste garante que nada saia da janela). Reintroduzi o defeito de
+  propósito para ver o teste falhar antes de confiar nele.
+
 
 Três falhas chegaram por alguém **jogando**, com a suíte inteira verde. Cada
 uma virou um teste, e as três são do mesmo tipo: o jogo abre, a fase carrega,
