@@ -48,6 +48,7 @@ from ouroboros.roguelite.entities.archetype_loader import ArchetypeLoader
 from penumbra.audio import AudioSystem, PenumbraAudio
 from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
+from penumbra.paths import resolve, resource
 from penumbra.progress import Progress
 from penumbra.scenes import PenumbraFlow
 from penumbra.state import DualityState, LevelRuntime, LUMEN, UMBRA
@@ -73,9 +74,8 @@ SHADOW_HITBOX_POOL = "hitbox_shadow"
 """Segunda pool de hitbox, com o MESMO `HITBOX_DTYPE` da generica. E o
 unico motivo pelo qual Umbra pode pisar onde Lumen cai."""
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ARCHETYPES_DIR = _PROJECT_ROOT / "data" / "archetypes" / "penumbra"
-LEVELS_DIR = _PROJECT_ROOT / "data" / "levels"
+ARCHETYPES_DIR = resource("data", "archetypes", "penumbra")
+LEVELS_DIR = resource("data", "levels")
 
 _CELL_SPRITE_UNIT = 8.0
 _LAYER_CELL = 5
@@ -312,7 +312,10 @@ def _load_data(config: EngineConfig):
     """Carrega e valida TODO o conteudo data-driven antes de qualquer
     entidade existir: balanceamento, dimensoes da grade e as quatro fases
     (cada uma parseada de verdade -- ver `LevelCatalog.validate_all`)."""
-    tuning = DualityTuning.from_json(config.difficulty_path)
+    # `resolve` ancora no bundle, nunca no diretorio atual: e o mesmo
+    # caminho relativo do `config.json` rodando do repositorio ou de
+    # dentro de um executavel clicado em qualquer pasta.
+    tuning = DualityTuning.from_json(resolve(config.difficulty_path))
     terrain = _make_terrain(tuning.world)
     catalog = LevelCatalog.load_from_directory(LEVELS_DIR)
     catalog.validate_all(terrain)

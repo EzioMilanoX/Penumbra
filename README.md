@@ -9,6 +9,20 @@ vive no repositório dela, não é vendorizada aqui.
 📖 **[Manual de campo](docs/index.html)** — a escala de luz, o alfabeto do
 terreno, as doze fases e como dois chãos convivem numa simulação só.
 
+### Só jogar
+
+```bash
+python -m tools.build_exe     # gera dist/Penumbra.exe (~26 MB)
+```
+
+Um arquivo só, sem Python e sem a engine — dá para mandar para alguém. O
+`build_exe` confere, **antes** de empacotar, as duas coisas que produzem um
+executável que abre e morre em silêncio (sem console não há traceback): os
+dados estão onde o spec espera, e o jogo monta com o diretório atual em outro
+lugar — que é exatamente a situação de um `.exe` clicado.
+
+### Desenvolver
+
 ```bash
 git clone https://github.com/EzioMilanoX/OuroborosEngine.git
 git clone https://github.com/EzioMilanoX/Penumbra.git
@@ -18,10 +32,16 @@ cd Penumbra && python -m penumbra.main  # rodar SEMPRE da raiz, como módulo
 ```
 
 `python -m` não é preferência de estilo: os imports são absolutos
-(`from penumbra...`) e os caminhos de `config.json` são relativos à raiz do
-projeto, então rodar `python penumbra/main.py` falha.
+(`from penumbra...`), então rodar `python penumbra/main.py` falha.
 
-O jogo abre numa **tela de título** que pergunta primeiro quantos jogadores —
+Os **dados**, esses, não dependem mais de onde você está. Os caminhos do
+`config.json` são relativos — e são resolvidos contra a raiz do *pacote*, nunca
+contra o diretório atual (`penumbra/paths.py`). Antes, abrir o jogo de qualquer
+outra pasta morria no boot reclamando de um arquivo que estava ali do lado; num
+executável, onde o diretório atual é onde a pessoa clicou, essa mesma falha
+seria a única coisa que acontece.
+
+O jogo abre no **menu principal**, e "JOGAR" pergunta quantos jogadores —
 dois botões grandes, **1 JOGADOR** e **2 JOGADORES**, com os controles de cada
 modo escritos embaixo. A/D escolhe, ESPAÇO confirma.
 
@@ -368,8 +388,9 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              223 testes headless
-tools/               audit_levels.py (balanceamento de luz), generate_icon.py
+tests/              232 testes headless
+tools/               audit_levels.py, build_exe.py, generate_icon.py
+penumbra.spec        receita do executável
 ```
 
 ### Dois chãos na mesma simulação
@@ -438,7 +459,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 223 testes, ~20 s, headless
+pytest -q                      # 232 testes, ~20 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 

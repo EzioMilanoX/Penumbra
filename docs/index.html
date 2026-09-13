@@ -270,7 +270,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Manual de campo · v1.2 · 30 fases em três capítulos</p>
+    <p class="kicker">Manual de campo · v1.3 · 30 fases em três capítulos</p>
     <h1>Penumbra</h1>
     <p class="lede">
       Dois seres que não podem se tocar e não avançam separados. O mundo não tem
@@ -799,18 +799,27 @@
   <section id="rodar">
     <p class="eyebrow">Rodar</p>
     <h2>A engine vive no repositório dela</h2>
+<p class="measure">
+      Para <b>só jogar</b>, <code>python -m tools.build_exe</code> gera um
+      <code>dist/Penumbra.exe</code> de ~26 MB — um arquivo só, sem Python e sem
+      a engine. Para desenvolver:
+    </p>
 <pre>git clone https://github.com/EzioMilanoX/OuroborosEngine.git
 git clone https://github.com/EzioMilanoX/Penumbra.git
 
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 223 testes headless
+pytest -q                      # 232 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
-      <code>python -m</code> não é preferência de estilo: os imports são absolutos
-      e os caminhos de <code>config.json</code> são relativos à raiz, então
-      <code>python penumbra/main.py</code> falha.
+      <code>python -m</code> não é preferência de estilo: os imports são
+      absolutos, então <code>python penumbra/main.py</code> falha. Os
+      <b>dados</b>, esses, não dependem mais de onde você está — os caminhos do
+      <code>config.json</code> são resolvidos contra a raiz do pacote, nunca
+      contra o diretório atual. Antes, abrir o jogo de outra pasta morria no
+      boot; num executável, onde o diretório atual é onde a pessoa clicou, essa
+      falha seria a <b>única</b> coisa que acontece.
     </p>
 
     <h3>Duas maneiras de uma fase ser insolúvel</h3>

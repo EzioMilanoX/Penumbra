@@ -15,17 +15,22 @@ da Umbra), TAB trocar de ser, R reiniciar a fase, ESC sair.
 """
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import replace
 
 from ouroboros.bootstrap.engine_config import EngineConfig
 
 from penumbra.composition import build_game
+from penumbra.paths import resolve, resource
 
-_CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
+_CONFIG_PATH = resource("penumbra", "config.json")
 
 
 def main() -> int:
     config = EngineConfig.from_json(str(_CONFIG_PATH))
+    # O `CompositionRoot` carrega os bindings sozinho, e faria isso contra o
+    # diretorio atual. Absolutizar aqui e o unico lugar possivel: e o ultimo
+    # ponto antes de o caminho sair das nossas maos.
+    config = replace(config, input_bindings_path=resolve(config.input_bindings_path))
     game_loop = build_game(config)
     game_loop.run()
     return 0
