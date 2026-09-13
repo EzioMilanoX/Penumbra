@@ -4,6 +4,21 @@
   "hint": "A luz atravessa o vidro. Ela caminha em cima e acende o chao da Umbra embaixo -- nenhum dos dois faz isso so.",
   "chapter": 1,
   "teaches": "vidro",
+  "duo": {
+    "note": "No duo as lampadas saem: a escolta e a travessia inteira, e so funciona com os dois andando juntos.",
+    "cells": [
+      [
+        8,
+        11,
+        "."
+      ],
+      [
+        18,
+        11,
+        "."
+      ]
+    ]
+  },
   "rows": [
     "............................",
     "............................",

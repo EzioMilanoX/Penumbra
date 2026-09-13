@@ -3,6 +3,16 @@
   "name": "A Fonte Aberta",
   "hint": "Ela caminha em cima e acende o chao da Umbra embaixo. No fim desce ao chao dela, e deixa a ultima luz numa pedra.",
   "chapter": 3,
+  "duo": {
+    "note": "No duo a lampada sai: a Lumen escolta a travessia inteira antes de descer pra pedra.",
+    "cells": [
+      [
+        15,
+        11,
+        "."
+      ]
+    ]
+  },
   "rows": [
     "............................",
     "............................",

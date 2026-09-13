@@ -31,12 +31,44 @@ class LevelDefinition:
     hint: str
     chapter: int
     rows: Tuple[str, ...]
+    duo_cells: Tuple[Tuple[int, int, str], ...] = ()
+    """Celulas que MUDAM no modo de dois jogadores, como `(col, linha, char)`.
+
+    E um diff e nao um segundo ASCII inteiro de proposito: a diferenca entre
+    os dois modos costuma ser de duas ou tres celulas, e escrever a fase duas
+    vezes faria um conserto numa das copias passar despercebido na outra.
+    Lendo o diff, da pra ver a decisao de desenho inteira numa linha."""
+    duo_note: str = ""
+    """O que muda, em uma frase, pro jogador. Aparece no rodape quando o modo
+    de dois jogadores esta ativo -- se a fase muda e nada diz, o jogador
+    aprende a fase errada e depois acha que o jogo mentiu."""
     teaches: str = ""
     """A mecanica que esta fase APRESENTA, quando ela apresenta alguma.
 
     E dado, e nao deducao do ASCII, porque duas das fases do primeiro
     capitulo ensinam HABILIDADES -- o facho e a absorcao -- e nenhuma delas
     traz um caractere de terreno que a fase anterior ja nao tivesse."""
+
+
+    @property
+    def has_duo_variant(self) -> bool:
+        return bool(self.duo_cells)
+
+    def rows_for(self, duo: bool) -> Tuple[str, ...]:
+        """O ASCII desta fase no modo pedido.
+
+        A mesma fase pode ser um problema diferente nos dois modos, e quase
+        sempre e: o que exige parar um ser e comandar o outro vira trivial
+        quando os dois andam ao mesmo tempo. As fases de escolta nasceram
+        desenhadas pro duo e tiveram de ser afrouxadas pra fechar no solo --
+        o diff devolve a versao dura a quem joga em dois.
+        """
+        if not duo or not self.duo_cells:
+            return self.rows
+        grid = [list(row) for row in self.rows]
+        for col, row, char in self.duo_cells:
+            grid[row][col] = char
+        return tuple("".join(row) for row in grid)
 
 
 @dataclass(frozen=True)
@@ -64,6 +96,35 @@ _CHAPTER_TITLES = {
     2: ("MISTURAR", "duas ou mais, ao mesmo tempo"),
     3: ("ESPECIAIS", "as que quebram a propria regra"),
 }
+
+
+def _parse_duo_cells(raw: dict, path) -> Tuple[Tuple[int, int, str], ...]:
+    """Le `duo.cells`, uma lista de `[coluna, linha, caractere]`.
+
+    Falha alto no carregamento: uma coordenada fora da grade ou um caractere
+    de dois digitos aqui nao daria erro em runtime, so uma fase diferente da
+    que o desenho pedia -- e apenas no modo que o desenvolvedor testa menos.
+    """
+    duo = raw.get("duo")
+    if duo is None:
+        return ()
+    if not isinstance(duo, dict):
+        raise LevelCatalogError(f"{path}: 'duo' precisa ser um objeto")
+    cells = duo.get("cells", ())
+    parsed = []
+    for entry in cells:
+        if not (isinstance(entry, list) and len(entry) == 3):
+            raise LevelCatalogError(f"{path}: cada celula de 'duo' e [coluna, linha, caractere]")
+        col, row, char = entry
+        if not isinstance(char, str) or len(char) != 1:
+            raise LevelCatalogError(f"{path}: {char!r} nao e um caractere de fase")
+        rows = raw["rows"]
+        if not (0 <= int(row) < len(rows) and 0 <= int(col) < len(rows[int(row)])):
+            raise LevelCatalogError(
+                f"{path}: a celula ({col},{row}) de 'duo' esta fora da grade"
+            )
+        parsed.append((int(col), int(row), char))
+    return tuple(parsed)
 
 
 def _build_chapters(levels: Tuple[LevelDefinition, ...]) -> Tuple[Chapter, ...]:
@@ -171,6 +232,8 @@ class LevelCatalog:
                     chapter=int(raw.get("chapter", 1)),
                     rows=tuple(raw["rows"]),
                     teaches=str(raw.get("teaches", "")),
+                    duo_cells=_parse_duo_cells(raw, path),
+                    duo_note=str(raw.get("duo", {}).get("note", "")),
                 )
             )
 
@@ -182,7 +245,13 @@ class LevelCatalog:
         fase -- o chamador e responsavel por carregar a fase inicial
         depois (ver `penumbra.state.LevelRuntime.load`)."""
         for level in self._levels:
-            try:
-                terrain.load_rows(level.rows)
-            except TerrainDefinitionError as exc:
-                raise LevelCatalogError(f"fase {level.level_id!r} invalida: {exc}") from exc
+            for duo in (False, True):
+                if duo and not level.has_duo_variant:
+                    continue
+                try:
+                    terrain.load_rows(level.rows_for(duo))
+                except TerrainDefinitionError as exc:
+                    mode = "no duo" if duo else "no solo"
+                    raise LevelCatalogError(
+                        f"fase {level.level_id!r} invalida {mode}: {exc}"
+                    ) from exc

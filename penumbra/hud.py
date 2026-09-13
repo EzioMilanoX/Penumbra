@@ -27,6 +27,9 @@ _RULE = (58, 56, 72, 255)
 _TEXT = (206, 208, 224, 255)
 _TEXT_DIM = (128, 130, 148, 255)
 _GOLD = (247, 214, 138, 255)
+_GOLD_DIM = (186, 158, 96, 255)
+"""Um dourado mais baixo: a nota do duo ocupa a linha da dica e nao pode
+competir com o dourado cheio dos medidores e do painel de fim."""
 _LUMEN_TONE = (250, 250, 255, 255)
 _UMBRA_TONE = (150, 146, 178, 255)
 _PERIL = (206, 88, 88, 255)
@@ -139,7 +142,13 @@ class PenumbraHud:
             "J1 LUMEN   J2 UMBRA" if state.duo else f"comando: {state.active_name.upper()}",
             14, _GOLD, anchor="topright",
         )
-        renderer.draw_text(14.0, top + _LINE_2, level.hint, 12, _TEXT_DIM)
+        # No duo, a fase que MUDA diz o que mudou -- no lugar da dica, e nao
+        # depois dela: sao duas frases sobre a mesma fase e so uma cabe na
+        # linha. A que importa e a do modo que esta sendo jogado.
+        if state.duo and level.duo_note:
+            renderer.draw_text(14.0, top + _LINE_2, level.duo_note, 12, _GOLD_DIM)
+        else:
+            renderer.draw_text(14.0, top + _LINE_2, level.hint, 12, _TEXT_DIM)
         self._draw_world_clock(renderer, top)
         controls = (
             "J1: A/D  ESPACO  S       J2: setas  CIMA  BAIXO       R reiniciar   ESC sair"

@@ -114,8 +114,11 @@ class PenumbraFlow:
                 len(self.completed))
 
     def start_level(self, level_index: int) -> None:
-        self._runtime.load(level_index)
+        # O modo entra ANTES do load: a mesma fase pode ser um problema
+        # diferente nos dois, e `LevelRuntime.load` escolhe a variante pelo
+        # `state.duo`. Na ordem inversa, o duo comecava na fase do solo.
         self._state.duo = self.duo
+        self._runtime.load(level_index)
         self._game_loop.reset_scenes(self.gameplay)
 
     def finish_level(self, level_index: int) -> None:
@@ -289,7 +292,7 @@ class MenuScene(IScene):
             renderer, self._flow.duo,
             sum(1 for got in self._flow.shards if got), len(self._flow.shards),
         )
-        self._grid.draw(renderer, self._flow.completed, self._flow.shards)
+        self._grid.draw(renderer, self._flow.completed, self._flow.shards, self._flow.duo)
 
 
 class PenumbraScene(IScene):

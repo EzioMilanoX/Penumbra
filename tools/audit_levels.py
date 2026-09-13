@@ -19,6 +19,9 @@ jogavel e que nao se enxergam olhando o ASCII:
 * **Autossuporte**: com o facho ligado, a Lumen acende o eter sob os
   proprios pes? Se nao, aquela ponte e intransponivel pra ela por qualquer
   caminho.
+* **Duo**: as fases que mudam no modo de dois jogadores sao auditadas duas
+  vezes, uma por versao -- a variante e a metade que se joga menos, e a que
+  quebraria sem ninguem ver.
 * **Alcance geometrico**: os pes chegam? Um degrau alto demais, ou um bloco
   exatamente sobre a cabeca, torna uma fase insolvel sem nenhuma relacao com
   luz -- e sem gerar erro nenhum. Inclui a checagem de mao unica: de toda
@@ -335,6 +338,20 @@ def main() -> int:
     )
     for level_index in range(simulation.catalog.count):
         audit_level(simulation, level_index)
+
+    # As fases que MUDAM no duo sao auditadas de novo na versao delas. Sem
+    # isto, metade de uma fase de variante nunca passaria por aqui -- e e
+    # justamente a metade que o desenvolvedor joga menos.
+    variants = [i for i in range(simulation.catalog.count)
+                if simulation.catalog.at(i).has_duo_variant]
+    if variants:
+        print("\n\n" + "#" * 78)
+        print("# AS MESMAS FASES, NA VERSAO DE DOIS JOGADORES")
+        print("#" * 78)
+        simulation.state.duo = True
+        for level_index in variants:
+            audit_level(simulation, level_index)
+        simulation.state.duo = False
     return 0
 
 

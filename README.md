@@ -192,6 +192,33 @@ Disso saem as situações que as fases exploram:
   barrava — e é a Umbra quem se dissolve na luz. Até aqui toda destruição de
   terreno ia da Lumen para a Umbra; esta vai da Umbra para ela mesma.
 
+## A mesma fase, dois problemas
+
+O que exige **parar um ser e comandar o outro** vira trivial quando os dois
+andam ao mesmo tempo. E o contrário também: as fases de escolta sob o vidro
+nasceram desenhadas para dois jogadores e tiveram de ser **afrouxadas** para
+fechar no solo — com as trocas de TAB, a carga do facho não cabia na
+travessia, e a fase ficava impossível.
+
+Em vez de escolher um dos dois modos, três fases **mudam** conforme quem está
+jogando. Cada uma carrega um *diff* de poucas células sobre o mesmo ASCII, e
+não um segundo mapa: a diferença costuma ser de duas ou três células, e
+escrever a fase duas vezes faria um conserto numa cópia passar despercebido na
+outra.
+
+| Fase | No solo | Em dois |
+|---|---|---|
+| **13 · Sob o Vidro** | duas lâmpadas acendem quase todo o contra-éter; sobra um vão de três células que só o facho preenche | as lâmpadas **saem**: a escolta é a travessia inteira, e só funciona com os dois andando juntos |
+| **27 · Sem Rocha** | a pista de baixo é éter, e a Umbra **foge** do buraco de três células que a lanterna abre | a pista de baixo é contra-éter: ela tem de andar **debaixo** da lanterna. A mesma luz, o mesmo trilho, a relação invertida |
+| **30 · A Fonte Aberta** | uma lâmpada encurta a escolta antes do altar final | a lâmpada sai: a escolta vai até a pedra |
+
+O card do menu mostra a versão do modo escolhido e leva uma marca **2P**; na
+fase, o rodapé troca a dica pela **nota do duo**. Se a fase muda e nada avisa,
+o jogador aprende a fase errada e depois acha que o jogo mentiu.
+
+A auditoria roda as três **duas vezes**, uma por versão — a variante é a
+metade que se joga menos, e a que quebraria sem ninguém ver.
+
 ## Os três capítulos
 
 As fases não são agrupadas por tema, e sim por **função**. O jogo tem trinta,
@@ -218,7 +245,7 @@ primeiro numa fase de mistura chegaria sem nome e sem lugar onde praticar.
 | 10 | **A Renúncia** | o altar: largar a habilidade numa pedra, para sempre |
 | 11 | **A Lanterna** | a luz que anda, e leva o chão junto |
 | 12 | **A Cortina** | o véu: sombra sem parede, e o único lugar onde o facho **não existe** |
-| 13 | **Sob o Vidro** | a luz de um serve ao outro: ela caminha em cima, o facho desce, o chão da Umbra acende |
+| 13 | **Sob o Vidro** | a luz de um serve ao outro: ela caminha em cima, o facho desce, o chão da Umbra acende · **muda em dois jogadores** |
 | 14 | **A Fonte Respira** | a fonte não anda: **incha**. O chão aceso dilata e contrai |
 | 15 | **A Alavanca** | trocar éter por contra-éter no mapa inteiro, com um passo |
 
@@ -247,10 +274,10 @@ As que quebram a própria regra.
 |---|---|---|
 | 25 | **Maré** | a mesma respiração monta uma metade e desmonta a outra, no mesmo instante |
 | 26 | **Abrigos** | no auge a fonte dissolve a Umbra a três células; só dentro do véu a luz não chega |
-| 27 | **Sem Rocha** | **nenhum chão neutro entre as margens.** A mesma lanterna: em cima é o chão da Lumen, embaixo é o buraco da Umbra — uma a segue, a outra foge |
+| 27 | **Sem Rocha** | **nenhum chão neutro entre as margens.** A mesma lanterna: em cima é o chão da Lumen, embaixo é o buraco da Umbra — uma a segue, a outra foge · **muda em dois jogadores** |
 | 28 | **A Fonte Desperta** | duas fontes em contratempo: a metade acesa da sala vai e vem sozinha |
 | 29 | **A Fonte Partida** | ponte dourada com prazo, lanterna que não para, e um altar no fim |
-| 30 | **A Fonte Aberta** | a escolta sob o vidro, e a Lumen **desce** ao chão dela para deixar a última luz numa pedra |
+| 30 | **A Fonte Aberta** | a escolta sob o vidro, e a Lumen **desce** ao chão dela para deixar a última luz numa pedra · **muda em dois jogadores** |
 
 Três princípios de desenho, todos aprendidos errando:
 
@@ -338,7 +365,7 @@ penumbra/
     quit_on_action_system.py
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              163 testes headless
+tests/              174 testes headless
 tools/               audit_levels.py (balanceamento de luz), generate_icon.py
 ```
 
@@ -408,7 +435,7 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 163 testes, ~11 s, headless
+pytest -q                      # 174 testes, ~12 s, headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
 ```
 

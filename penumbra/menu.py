@@ -115,8 +115,8 @@ class LevelPreview:
     7140 retangulos por frame pra mostrar sobretudo vazio.
     """
 
-    def __init__(self, level: LevelDefinition, terrain: Terrain) -> None:
-        terrain.load_rows(level.rows)
+    def __init__(self, level: LevelDefinition, terrain: Terrain, duo: bool = False) -> None:
+        terrain.load_rows(level.rows_for(duo))
         self.cols = terrain.cols
         self.rows = terrain.rows
         self.cells: List[Tuple[int, int, Tuple[int, int, int, int]]] = []
@@ -158,9 +158,14 @@ class LevelCardGrid:
 
     def __init__(self, catalog: LevelCatalog, preview_terrain: Terrain) -> None:
         self._catalog = catalog
-        self.previews = [
-            LevelPreview(catalog.at(index), preview_terrain) for index in range(catalog.count)
-        ]
+        # Duas miniaturas por fase, uma por modo. A fase que muda no duo tem
+        # de MOSTRAR que muda -- um card que desenhasse sempre a versao solo
+        # ensinaria a fase errada a metade dos jogadores.
+        self.previews = {
+            duo: [LevelPreview(catalog.at(index), preview_terrain, duo)
+                  for index in range(catalog.count)]
+            for duo in (False, True)
+        }
         self.selected = 0
         self._viewport_width = 896.0
 
@@ -231,12 +236,13 @@ class LevelCardGrid:
         renderer: IRenderer,
         completed: List[bool],
         shards: List[bool],
+        duo: bool = False,
     ) -> None:
         self._viewport_width, _ = renderer.get_viewport_size()
         self._draw_chapter_tabs(renderer, completed)
         chapter = self.chapter
         for index in range(chapter.first, chapter.last + 1):
-            self._draw_card(renderer, index, completed[index], shards[index])
+            self._draw_card(renderer, index, completed[index], shards[index], duo)
 
     def _draw_chapter_tabs(self, renderer: IRenderer, completed: List[bool]) -> None:
         """Os capitulos numa linha, com o progresso de cada um.
@@ -266,7 +272,8 @@ class LevelCardGrid:
                 renderer.draw_text(x, _CHAPTER_TAB_Y + 4.0, f"{done}/{chapter.count}", 11,
                                    _TEXT_FAINT, anchor="center")
 
-    def _draw_card(self, renderer: IRenderer, index: int, done: bool, shard: bool) -> None:
+    def _draw_card(self, renderer: IRenderer, index: int, done: bool, shard: bool,
+                   duo: bool = False) -> None:
         x, y, width, height = self.card_rect(index)
         selected = index == self.selected
         level = self._catalog.at(index)
@@ -286,7 +293,14 @@ class LevelCardGrid:
         preview_w = width - 53.0
         preview_h = height - 46.0
         renderer.draw_ui_rect(preview_x - 2.0, preview_y - 2.0, preview_w + 4.0, preview_h + 4.0, _VOID)
-        self.previews[index].draw(renderer, preview_x, preview_y, preview_w, preview_h)
+        self.previews[duo][index].draw(renderer, preview_x, preview_y, preview_w, preview_h)
+
+        # A marca de fase que muda no duo fica sobre a miniatura, e nao junto
+        # dos selos: ela e sobre o TERRENO desenhado ali, nao sobre o que voce
+        # ja fez nela.
+        if level.has_duo_variant:
+            renderer.draw_text(preview_x + preview_w - 3.0, preview_y + 2.0, "2P", 10,
+                               _GOLD if duo else _GOLD_DIM, anchor="topright")
 
         renderer.draw_text(x + 9.0, y + height - 32.0, level.name, 12,
                            _TEXT if selected else _TEXT_DIM)

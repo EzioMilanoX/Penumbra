@@ -241,9 +241,15 @@ class LevelRuntime:
         return self._state.level_index >= self._catalog.count - 1
 
     def load(self, level_index: int) -> None:
-        """Carrega a fase `level_index` e a coloca no estado inicial."""
+        """Carrega a fase `level_index`, na variante do modo corrente.
+
+        Le `state.duo` AQUI, e nao no `PenumbraFlow`, pra que recomecar (`R`)
+        e trocar de fase carreguem sempre a mesma versao que esta sendo
+        jogada -- um reset que voltasse pra variante do outro modo seria a
+        pior hora possivel pra fase mudar debaixo do jogador.
+        """
         self._state.level_index = level_index % self._catalog.count
-        self.load_rows(self.current.rows)
+        self.load_rows(self.current.rows_for(bool(self._state.duo)))
 
     def load_rows(self, rows: Tuple[str, ...]) -> None:
         """Carrega um ASCII arbitrario e o adota como o que `reset()` deve
