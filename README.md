@@ -591,7 +591,8 @@ faltam e refazer a escolha. É uma consequência.
 
 ### Conquistas
 
-Dez, e nenhuma premia repetição ou tempo de tela — todas reconhecem ter
+Onze: dez visíveis e uma escondida. Nenhuma premia repetição ou tempo de
+tela — todas reconhecem ter
 **entendido alguma coisa**, o tipo de coisa que se faz de propósito ou não se
 faz nunca.
 
@@ -632,7 +633,7 @@ MENU PRINCIPAL          jogar · conquistas · opções · sair
                  └─ FIM fundir ou seguir dois
 ```
 
-**Conquistas** mostra as dez com título e descrição **legíveis**, mesmo as que
+**Conquistas** mostra as onze com título e descrição **legíveis**, mesmo as que
 faltam — elas são a lista do que o jogo considera ter entendido alguma coisa.
 Escondidas, deixariam de ser um convite e virariam só um placar.
 
