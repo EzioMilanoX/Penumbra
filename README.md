@@ -396,7 +396,7 @@ penumbra/
     spark_system.py             as mesmas bordas do áudio, viradas em faísca
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              273 testes headless
+tests/              289 testes headless
 tools/               audit_levels.py, build_exe.py, generate_icon.py
 penumbra.spec        receita do executável
 ```
@@ -553,6 +553,87 @@ em vez de recusado — acrescentar fases não pode apagar o que você já fez.
 tentativa; não havia como só parar. Agora empilha um painel por cima
 (`push_scene`), o mundo congela onde estava, e dá para continuar, reiniciar ou
 sair.
+
+## A luz, desenhada como luz
+
+O jogo é sobre luz e desenhava luz como um **tabuleiro de xadrez**: uma grade
+de 28 × 17 quadrados de 32 px, cada um de um cinza chapado. O campo de luz já
+era contínuo — o que faltava era resolução no *desenho*.
+
+A pergunta não era "como suavizar", era **o que pode ser suavizado**. Ar e
+rocha são os dois únicos papéis da grade que não carregam decisão: o ar não é
+chão de ninguém, a rocha é chão dos dois, sempre. Todo o resto — éter,
+contra-éter, crosta, placa, portal — responde *"de quem é este chão, agora?"*,
+e essa resposta tem de ser lida na célula exata. Suavizar éter seria trocar
+atmosfera por erro, e nada na tela diria que foi isso que aconteceu.
+
+Então ar e rocha saíram das células e viraram um **fundo em resolução
+dobrada**, com a luz interpolada; todo o resto continua em quadrados duros,
+por cima. A silhueta da rocha também continua na aresta da célula — só a
+**luz** é interpolada, nunca o papel.
+
+### Por que 2× e não 4×
+
+Porque foi medido. `PygameRenderer.draw_batch` é um **laço Python** — sem
+instancing, sem batch de verdade — a **2,8 µs por entidade** (476 quads
+opacos: 1,35 ms). Então:
+
+| fator | sub-quadros | desenho | veredicto |
+|---|---|---|---|
+| 1× | 476 | 1,3 ms | lê como tabuleiro |
+| **2×** | **1904** | **~5 ms** | **já lê como luz** |
+| 4× | 7616 | 21 ms | lisa de verdade, e não cabe em 16,7 ms |
+
+O frame inteiro saiu de 2,17 ms para **4,19 ms** — menos que o pior caso,
+porque `_draw_shape` sai cedo com alpha zero e a maior parte de um nível está
+no escuro. A resolução do fundo é um **orçamento**, e um teste guarda a conta
+para quem dobrar o fator sem refazê-la.
+
+Com a grade fora do caminho, o brilho do ar subiu de **62 para 100** — ele era
+baixo *por causa* do xadrez, não por gosto. O teto é 140: acima disso o escuro
+perde profundidade e o bolsão de escuridão da Umbra deixa de se distinguir do
+fundo, e ele é a única coisa na tela que diz onde ela sobrevive.
+
+Um defeito meu pelo caminho: zerei os cantos do buffer acolchoado, o que punha
+uma mancha escura em cada canto da tela — pequena, permanente, e sem nada no
+jogo que a explicasse.
+
+## Os dois corpos
+
+A Lumen é ágil e frágil, a Umbra é pesada e resistente — e isso existia só em
+**número**. O jogador lia a diferença numa tabela de tuning que ele nunca abre,
+e via dois blocos deslizando igual. O único sinal no corpo era a cor, e ela já
+diz outra coisa (o medidor de perigo).
+
+Agora os dois **esticam no ar e amassam ao pousar**, com os números invertidos
+de propósito:
+
+| | estica no ar | amassa ao pousar | volta em |
+|---|---|---|---|
+| **Lumen** | 1,25× | 0,83× | 0,10 s — um quique |
+| **Umbra** | 1,12× | 0,74× | 0,28 s — um baque |
+
+Peso não flutua, então a Umbra mal se estica; peso chega com tudo, então ela
+amassa mais fundo e demora mais para voltar. É o mesmo fato dito nos dois
+momentos em que ele aparece — e **profundidade sozinha não bastaria**: uma
+amassada funda que some rápido lê como elástico, o contrário do que ela é.
+
+É puramente visual. A escala do `transform` é o que se *desenha*; quem colide
+é o `hitbox`, que este sistema não toca — a geometria das trinta fases foi
+medida com o corpo inteiro, e um teste garante que o hitbox nunca muda.
+
+Duas restrições reais saíram disso:
+
+- **O sprite escala em torno do centro**, e a posição é estado de jogo, que a
+  apresentação não move. Então toda amassada levanta o pé em
+  `half_height × (1 − escala)`. A 0,66 a Umbra flutuava 4,7 px sobre a rocha,
+  quase um sexto do corpo, e o baque lia como pulinho. O piso é 0,72: 3,7 px,
+  que é o borrão de um impacto em vez de um ser solto no ar.
+- **Parado no chão a gravidade do frame ainda escreve uns 18 px/s** antes de a
+  colisão zerar. Medindo o alongamento contra zero, os dois ficavam 1%
+  esticados e 1% estreitos em *todo* frame de todas as trinta fases — pequeno
+  demais para alguém apontar, e sempre errado. Um corpo em repouso tem de ter
+  o tamanho dele.
 
 ## O controle
 

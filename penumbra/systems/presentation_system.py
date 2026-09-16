@@ -74,7 +74,16 @@ ETHER_LIT_FULL = (244, 248, 255)
 
 # --- luz no ar: branco frio, translucido ---
 AIR_GLOW = (206, 218, 255)
-AIR_GLOW_MAX_ALPHA = 62.0
+AIR_GLOW_MAX_ALPHA = 100.0
+"""Quanto a luz no ar pode brilhar.
+
+Era 62, e era baixo POR CAUSA da grade: com a luz desenhada em quadrados de
+32 px, qualquer valor mais alto escancarava o tabuleiro. Com o fundo em
+resolucao dobrada essa amarra caiu, e o ar pode finalmente parecer aceso.
+
+O teto e 140: acima disso o escuro perde profundidade e o bolsao de escuridao
+que a Umbra carrega deixa de se distinguir do fundo -- e ele e a unica coisa
+na tela que diz onde ela sobrevive."""
 """O brilho no ar e atmosfera, nao informacao. A 118 ele era o elemento mais
 claro da tela e lia como neblina por cima do nivel, abafando justamente o
 terreno que o jogador precisa ver."""
@@ -154,6 +163,63 @@ _CELL_SPRITE_UNIT = 8.0
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
 de `cell_size` px pede, portanto, `scale = cell_size / 8`."""
 
+BACKDROP_FACTOR = 2
+"""Quantos sub-quadros por lado cada celula do fundo vira.
+
+Medido, nao escolhido: a 1x a luz le como um tabuleiro de xadrez, a 2x ela
+ja le como luz, e a 4x fica lisa de verdade -- e custa 21 ms so de desenho,
+contra os 16,7 ms que um frame inteiro tem. `PygameRenderer.draw_batch` e um
+laco Python a 2,8 us por entidade, entao a resolucao do fundo e um orcamento,
+nao um gosto. A 2x sao 1904 sub-quadros e ~5 ms no pior caso; na pratica bem
+menos, porque `_draw_shape` sai cedo com alpha zero e a maior parte de um
+nivel esta no escuro."""
+
+_AIR_STRETCH = (0.30, 0.12)
+"""Quanto cada ser se alonga no ar, por (Lumen, Umbra).
+
+A assimetria dos dois so existia em NUMERO -- velocidade, altura de salto,
+tempo de medidor. O jogador lia "agil" e "pesada" numa tabela de tuning e via
+dois blocos deslizando igual. A Lumen se estica no ar porque e leve; a Umbra
+quase nao, porque peso nao flutua."""
+
+_LAND_SQUASH = (0.22, 0.28)
+"""E quanto cada uma AMASSA ao pousar. Aqui a ordem se inverte de proposito:
+a que mal se estica no ar e a que chega ao chao com tudo. E o mesmo fato --
+massa -- dito nos dois momentos em que ele aparece."""
+
+_LAND_RECOVER = (0.13, 0.30)
+"""Segundos ate a amassada passar. A Umbra leva mais que o dobro: a diferenca
+entre um quique e um baque nao esta na profundidade, esta em quanto tempo o
+corpo leva pra voltar. Uma amassada funda que some rapido le como elastico,
+que e o contrario do que ela e."""
+
+_LAND_TRIGGER = 90.0
+"""Velocidade de queda (px/s) abaixo da qual o pouso nao merece amassada.
+Descer um degrau nao e um baque, e amassar a cada passo faria o corpo tremer
+sem parar -- o oposto de peso."""
+
+_STILL_FALL = _LAND_TRIGGER * 0.25
+"""Abaixo disto o ser conta como PARADO, na vertical.
+
+Nao e zero, e a diferenca importa: parado no chao, a gravidade do frame ainda
+escreve uns 18 px/s antes de a colisao zerar. Medindo contra zero, os dois
+ficavam permanentemente 1% esticados e 1% estreitos -- pequeno demais pra
+alguem apontar, e presente em todo frame de todas as trinta fases. Um corpo
+em repouso tem de ter o tamanho dele."""
+
+_STRETCH_LIMITS = (0.72, 1.34)
+"""Teto e piso do alongamento, e o piso tem uma razao exata.
+
+O sprite escala em torno do CENTRO -- a posicao da entidade e o centro dela, e
+posicao e estado de jogo, que a apresentacao nao move. Entao toda amassada
+levanta os pes do chao em `half_height * (1 - escala)`: a 0.66 a Umbra
+flutuaria 4,7 px sobre a rocha, quase um sexto do corpo, e o baque leria como
+pulinho. A 0.72 sao 3,9 px, e por baixo de 4 px isso e o borrao de um impacto
+em vez de um ser solto no ar.
+
+O teto e outra coisa: sem ele uma queda longa o bastante viraria um risco
+vertical, e a silhueta e a unica coisa que diz QUEM e cada um."""
+
 _PULSE_HZ = 1.15
 
 
@@ -173,12 +239,15 @@ class PresentationSystem(ISystem):
         tuning: DualityTuning,
         cell_entity_indices: np.ndarray,
         aura_entity_indices: np.ndarray,
+        backdrop_entity_indices: np.ndarray = None,
     ) -> None:
         self._terrain = terrain
         self._state = state
         self._tuning = tuning
         self._cell_entity_indices = cell_entity_indices
         self._aura_entity_indices = aura_entity_indices
+        self._backdrop_entity_indices = backdrop_entity_indices
+        self._backdrop_sprite_rows = None
         self._sprite_pool = None
         self._transform_pool = None
         self._cell_sprite_rows = None
@@ -194,6 +263,29 @@ class PresentationSystem(ISystem):
         self._channel = np.zeros(cell_count, dtype=np.float32)
         self._mask = np.zeros(cell_count, dtype=bool)
         self._mask_alt = np.zeros(cell_count, dtype=bool)
+
+        self._make_backdrop_buffers(terrain)
+
+        # Memoria de APRESENTACAO: nenhuma regra do jogo pergunta com que
+        # forca alguem pousou no frame passado.
+        self._velocity_pool = None
+        self._impact = np.zeros(2, dtype=np.float32)
+        self._last_fall = np.zeros(2, dtype=np.float32)
+        self._shaped_level = -1
+        self._base_scale = (
+            (tuning.lumen.half_width * 2.0 / _CELL_SPRITE_UNIT,
+             tuning.lumen.half_height * 2.0 / _CELL_SPRITE_UNIT),
+            (tuning.umbra.half_width * 2.0 / _CELL_SPRITE_UNIT,
+             tuning.umbra.half_height * 2.0 / _CELL_SPRITE_UNIT),
+        )
+        # A velocidade de salto e a escala natural do movimento vertical de
+        # cada um: cair mais rapido do que se consegue saltar e o que conta
+        # como queda de verdade. `abs` porque saltar e para CIMA, e para cima
+        # e negativo.
+        self._fall_reference = (
+            abs(float(tuning.lumen.jump_velocity_y)),
+            abs(float(tuning.umbra.jump_velocity_y)),
+        )
 
         # role -> forma primitiva / fracao de uma celula ocupada. Escritos
         # a cada frame por `np.take` (a fase pode trocar sem que este
@@ -252,8 +344,10 @@ class PresentationSystem(ISystem):
         if self._sprite_pool is None:
             self._resolve_pools(world)
         self._elapsed += delta_time
+        self._paint_backdrop()
         self._paint_cells()
         self._paint_characters()
+        self._shape_characters(delta_time)
         self._paint_auras()
 
     # ------------------------------------------------------------------
@@ -269,8 +363,142 @@ class PresentationSystem(ISystem):
         acontece. Trocar de fase recarrega mascaras, nao entidades."""
         self._sprite_pool = world.get_pool("sprite")
         self._transform_pool = world.get_pool("transform")
+        self._velocity_pool = world.get_pool("velocity")
         self._cell_sprite_rows = self._sprite_pool.dense_rows_of(self._cell_entity_indices)
         self._cell_transform_rows = self._transform_pool.dense_rows_of(self._cell_entity_indices)
+        if self._backdrop_entity_indices is not None:
+            self._backdrop_sprite_rows = self._sprite_pool.dense_rows_of(
+                self._backdrop_entity_indices)
+
+    # ------------------------------------------------------------------
+    # o fundo: ar e rocha, em resolucao dobrada
+    # ------------------------------------------------------------------
+
+    def _make_backdrop_buffers(self, terrain) -> None:
+        """Pre-aloca tudo que `_paint_backdrop` toca.
+
+        A interpolacao e SEPARAVEL -- uma passada vertical e uma horizontal,
+        em vez das quatro formulas de canto -- porque assim cada peso vira um
+        `np.multiply(..., out=)` sobre um buffer que ja existe, e o sistema
+        continua sem alocar nada por frame."""
+        factor = BACKDROP_FACTOR
+        rows, cols = terrain.rows, terrain.cols
+        fine_rows, fine_cols = rows * factor, cols * factor
+        fine_count = fine_rows * fine_cols
+
+        # Bordas repetidas (`mode="edge"`): fora da grade o mundo e solido,
+        # e repetir a borda evita uma orla escura falsa no limite da tela.
+        self._pad = np.zeros((rows + 2, cols + 2), dtype=np.float32)
+        self._tall = np.zeros((fine_rows, cols + 2), dtype=np.float32)
+        self._tall_a = np.zeros((rows, cols + 2), dtype=np.float32)
+        self._tall_b = np.zeros((rows, cols + 2), dtype=np.float32)
+        self._fine = np.zeros((fine_rows, fine_cols), dtype=np.float32)
+        self._fine_a = np.zeros((fine_rows, cols), dtype=np.float32)
+        self._fine_b = np.zeros((fine_rows, cols), dtype=np.float32)
+        self._fine_role = np.zeros((fine_rows, fine_cols), dtype=np.uint8)
+
+        self._bd_red = np.zeros(fine_count, dtype=np.float32)
+        self._bd_green = np.zeros(fine_count, dtype=np.float32)
+        self._bd_blue = np.zeros(fine_count, dtype=np.float32)
+        self._bd_alpha = np.zeros(fine_count, dtype=np.float32)
+        self._bd_ramp = np.zeros(fine_count, dtype=np.float32)
+        self._bd_channel = np.zeros(fine_count, dtype=np.float32)
+        self._bd_mask = np.zeros(fine_count, dtype=bool)
+
+    def _refine(self, field: np.ndarray) -> np.ndarray:
+        """Interpola `field` (uma grade de celulas) para a grade fina.
+
+        O valor de uma celula vale no CENTRO dela, entao o centro de cada
+        sub-quadro cai a um quarto de celula do centro -- pesos 0.75 e 0.25.
+        E so isso que separa uma luz que parece luz de um tabuleiro de
+        xadrez: sem interpolar, cada celula e um degrau de 32 px."""
+        pad = self._pad
+        pad[1:-1, 1:-1] = field
+        pad[0, 1:-1] = field[0]
+        pad[-1, 1:-1] = field[-1]
+        pad[1:-1, 0] = field[:, 0]
+        pad[1:-1, -1] = field[:, -1]
+        # Os quatro cantos tambem: zera-los punha uma mancha escura em cada
+        # canto da tela -- pequena, permanente, e sem nada no jogo que a
+        # explicasse.
+        pad[0, 0] = field[0, 0]
+        pad[0, -1] = field[0, -1]
+        pad[-1, 0] = field[-1, 0]
+        pad[-1, -1] = field[-1, -1]
+
+        center, above, below = pad[1:-1], pad[:-2], pad[2:]
+        np.multiply(center, 0.75, out=self._tall_a)
+        np.multiply(above, 0.25, out=self._tall_b)
+        np.add(self._tall_a, self._tall_b, out=self._tall[0::2])
+        np.multiply(below, 0.25, out=self._tall_b)
+        np.add(self._tall_a, self._tall_b, out=self._tall[1::2])
+
+        middle, left, right = self._tall[:, 1:-1], self._tall[:, :-2], self._tall[:, 2:]
+        np.multiply(middle, 0.75, out=self._fine_a)
+        np.multiply(left, 0.25, out=self._fine_b)
+        np.add(self._fine_a, self._fine_b, out=self._fine[:, 0::2])
+        np.multiply(right, 0.25, out=self._fine_b)
+        np.add(self._fine_a, self._fine_b, out=self._fine[:, 1::2])
+        return self._fine
+
+    def _paint_backdrop(self) -> None:
+        """Ar e rocha, e mais nada.
+
+        Sao os DOIS unicos papeis da grade que nao carregam decisao: o ar nao
+        e chao de ninguem, a rocha e chao dos dois, sempre. Todo o resto --
+        eter, contra-eter, crosta, placa, portal -- responde "de quem e este
+        chao, agora?", e essa resposta tem de ser lida na celula exata. Por
+        isso o fundo interpola e as celulas nao: suavizar o que o jogador
+        precisa medir seria trocar atmosfera por erro.
+
+        O papel e repetido sem interpolar (a silhueta da rocha continua na
+        aresta da celula); so a LUZ e interpolada."""
+        if self._backdrop_sprite_rows is None:
+            return
+        terrain, state = self._terrain, self._state
+
+        fine = self._refine(state.display_light).reshape(-1)
+        role_grid = terrain.role
+        self._fine_role[0::2, 0::2] = role_grid
+        self._fine_role[0::2, 1::2] = role_grid
+        self._fine_role[1::2, 0::2] = role_grid
+        self._fine_role[1::2, 1::2] = role_grid
+        role = self._fine_role.reshape(-1)
+
+        np.clip(fine, 0.0, 1.0, out=self._bd_ramp)
+        self._bd_alpha[:] = 0.0
+
+        # rocha: opaca, revelada pela luz que a banha
+        np.equal(role, ROLE_ROCK, out=self._bd_mask)
+        self._bd_fill(ROCK_UNLIT, ROCK_LIT)
+        np.copyto(self._bd_alpha, 255.0, where=self._bd_mask)
+
+        # ar: a luz em si, translucida sobre o vazio
+        np.equal(role, ROLE_EMPTY, out=self._bd_mask)
+        self._bd_fill(AIR_GLOW, AIR_GLOW)
+        np.multiply(self._bd_ramp, AIR_GLOW_MAX_ALPHA, out=self._bd_channel)
+        np.copyto(self._bd_alpha, self._bd_channel, where=self._bd_mask)
+
+        sprite_view = self._sprite_pool.active_view()
+        rows = self._backdrop_sprite_rows
+        sprite_view["tint_r"][rows] = self._bd_red
+        sprite_view["tint_g"][rows] = self._bd_green
+        sprite_view["tint_b"][rows] = self._bd_blue
+        sprite_view["tint_a"][rows] = self._bd_alpha
+
+    def _bd_fill(self, color_low, color_high) -> None:
+        """`_fill` da grade fina -- mesma conta, outros buffers."""
+        for channel, low, high in (
+            (self._bd_red, color_low[0], color_high[0]),
+            (self._bd_green, color_low[1], color_high[1]),
+            (self._bd_blue, color_low[2], color_high[2]),
+        ):
+            if low == high:
+                np.copyto(channel, float(low), where=self._bd_mask)
+                continue
+            np.multiply(self._bd_ramp, float(high - low), out=self._bd_channel)
+            np.add(self._bd_channel, float(low), out=self._bd_channel)
+            np.copyto(channel, self._bd_channel, where=self._bd_mask)
 
     # ------------------------------------------------------------------
     # celulas
@@ -288,18 +516,9 @@ class PresentationSystem(ISystem):
         self._blue[:] = 0.0
         self._alpha[:] = 0.0
 
-        # ar: a luz em si, translucida sobre o fundo
-        np.equal(role, ROLE_EMPTY, out=self._mask)
-        np.clip(light, 0.0, 1.0, out=self._ramp)
-        self._fill(self._mask, AIR_GLOW, AIR_GLOW)
-        np.multiply(self._ramp, AIR_GLOW_MAX_ALPHA, out=self._channel)
-        np.copyto(self._alpha, self._channel, where=self._mask)
-
-        # rocha: opaca, revelada pela luz que a banha
-        np.equal(role, ROLE_ROCK, out=self._mask)
-        np.clip(light, 0.0, 1.0, out=self._ramp)
-        self._fill(self._mask, ROCK_UNLIT, ROCK_LIT)
-        np.copyto(self._alpha, 255.0, where=self._mask)
+        # Ar e rocha nao sao pintados aqui: sao o FUNDO, desenhado em
+        # resolucao dobrada por `_paint_backdrop`. Ficam com alpha zero, e
+        # `_draw_shape` sai cedo sem desenhar nada.
 
         # eter aceso: chao da Lumen
         np.equal(role, ROLE_ETHER, out=self._mask)
@@ -577,6 +796,58 @@ class PresentationSystem(ISystem):
             sprite_view["tint_r"][row] = _mix(dark[0], bright[0], ratio)
             sprite_view["tint_g"][row] = _mix(dark[1], bright[1], ratio)
             sprite_view["tint_b"][row] = _mix(dark[2], bright[2], ratio)
+
+    def _shape_characters(self, delta_time: float) -> None:
+        """Estica no ar, amassa ao pousar -- e nada mais que isso.
+
+        Puramente visual: a escala do `transform` e o que se DESENHA; quem
+        colide e o `hitbox`, que este sistema nao toca. Um ser amassado ocupa
+        na simulacao exatamente o mesmo espaco de sempre, e tem de ser assim
+        -- a geometria das trinta fases foi medida com o corpo inteiro.
+
+        Nao ha consulta de "esta no chao": o `TileCollisionSystem` zera a
+        velocidade vertical ao encostar, entao vinha-caindo-e-parou E o
+        pouso, e ler isso do proprio movimento evita uma dependencia deste
+        sistema para com os dois sistemas de colisao."""
+        if self._velocity_pool is None:
+            return
+        state = self._state
+        if state.level_index != self._shaped_level:
+            # Trocar de fase teleporta os dois. Sem zerar aqui, a queda do
+            # frame anterior viraria uma amassada no primeiro frame da fase
+            # seguinte -- um baque que nunca aconteceu.
+            self._shaped_level = state.level_index
+            self._impact[:] = 0.0
+            self._last_fall[:] = 0.0
+
+        velocity = self._velocity_pool.active_view()
+        transform = self._transform_pool.active_view()
+
+        for side in (LUMEN, UMBRA):
+            entity_index = int(state.entity_index[side])
+            velocity_row = self._velocity_pool.dense_row_of(entity_index)
+            fall = float(velocity["linear_y"][velocity_row])
+
+            if self._last_fall[side] > _LAND_TRIGGER and fall <= _STILL_FALL:
+                impact = min(1.0, self._last_fall[side] / self._fall_reference[side])
+                self._impact[side] = max(self._impact[side], impact)
+            self._last_fall[side] = fall
+
+            recover = _LAND_RECOVER[side]
+            self._impact[side] = max(0.0, self._impact[side] - delta_time / recover)
+
+            air = max(0.0, abs(fall) - _STILL_FALL) / self._fall_reference[side]
+            air = min(1.0, air)
+            stretch = 1.0 + _AIR_STRETCH[side] * air - _LAND_SQUASH[side] * self._impact[side]
+            stretch = min(_STRETCH_LIMITS[1], max(_STRETCH_LIMITS[0], stretch))
+
+            base_x, base_y = self._base_scale[side]
+            transform_row = self._transform_pool.dense_row_of(entity_index)
+            transform["scale_y"][transform_row] = base_y * stretch
+            # A largura espelha a altura: esticado afina, amassado espalha.
+            # Sem isso o ser so cresce e encolhe, que le como zoom e nao como
+            # corpo.
+            transform["scale_x"][transform_row] = base_x * (2.0 - stretch)
 
     def _paint_auras(self) -> None:
         """

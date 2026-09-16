@@ -63,7 +63,7 @@ from penumbra.systems.light_field_system import LightFieldSystem
 from penumbra.systems.outcome_system import OutcomeSystem
 from penumbra.systems.polarity_door_system import PolarityDoorSystem
 from penumbra.systems.polarity_lever_system import PolarityLeverSystem
-from penumbra.systems.presentation_system import PresentationSystem
+from penumbra.systems.presentation_system import BACKDROP_FACTOR, PresentationSystem
 from penumbra.systems.world_clock_system import WorldClockSystem
 from penumbra.terrain import Terrain
 from penumbra.tuning import DualityTuning
@@ -81,6 +81,10 @@ ARCHETYPES_DIR = resource("data", "archetypes", "penumbra")
 LEVELS_DIR = resource("data", "levels")
 
 _CELL_SPRITE_UNIT = 8.0
+_LAYER_BACKDROP = 1
+"""O fundo desenha ANTES das celulas. Ele so mostra luz; quem carrega
+decisao e desenhado por cima, e por cima significa depois."""
+
 _LAYER_CELL = 5
 _LAYER_CHARACTER = 20
 _AURA_LAYERS = (15, 15, 25)
@@ -286,6 +290,9 @@ def _assemble(
     state.entity_index[UMBRA] = _spawn_character(
         world, UMBRA_ARCHETYPE, tuning.umbra, SHADOW_HITBOX_POOL, SHAPE_RECT
     )
+    # O fundo nasce ANTES das celulas so por clareza de leitura -- a ordem
+    # de criacao nao decide a de desenho, que e `layer_z`.
+    backdrop_entity_indices = _spawn_backdrop(world, terrain)
     cell_entity_indices = _spawn_cells(world, terrain)
     aura_entity_indices = _spawn_auras(world)
 
@@ -319,7 +326,8 @@ def _assemble(
     world.register_system(PolarityDoorSystem(terrain, state))
     world.register_system(OutcomeSystem(terrain, state, tuning))
     world.register_system(
-        PresentationSystem(terrain, state, tuning, cell_entity_indices, aura_entity_indices)
+        PresentationSystem(terrain, state, tuning, cell_entity_indices, aura_entity_indices,
+                           backdrop_entity_indices)
     )
 
     runtime = LevelRuntime(world, terrain, catalog, state, tuning)
@@ -432,6 +440,41 @@ def _spawn_cells(world: World, terrain: Terrain) -> np.ndarray:
             transform_view["position_y"][transform_row] = center_y
 
             sprite_pool.active_view()["layer_z"][sprite_pool.dense_row_of(index)] = _LAYER_CELL
+
+    return entity_indices
+
+
+def _spawn_backdrop(world: World, terrain: Terrain,
+                    factor: int = BACKDROP_FACTOR) -> np.ndarray:
+    """Uma entidade por SUB-celula, em ordem row-major da grade fina.
+
+    Posicao e escala sao escritas aqui e nunca mais: o fundo nao se move nem
+    muda de tamanho, so de cor. Isso deixa `_paint_backdrop` escrevendo um
+    unico campo por frame."""
+    rows, cols = terrain.rows * factor, terrain.cols * factor
+    step = terrain.cell_size / float(factor)
+    entity_indices = np.zeros(rows * cols, dtype=np.int64)
+    transform_pool = world.get_pool("transform")
+    sprite_pool = world.get_pool("sprite")
+    scale = step / 8.0
+
+    slot = 0
+    for row in range(rows):
+        for col in range(cols):
+            index = unpack_index(world.create_entity(CELL_ARCHETYPE, clear=True))
+            entity_indices[slot] = index
+            slot += 1
+
+            transform_row = transform_pool.dense_row_of(index)
+            transform_view = transform_pool.active_view()
+            transform_view["position_x"][transform_row] = (col + 0.5) * step
+            transform_view["position_y"][transform_row] = (row + 0.5) * step
+            transform_view["scale_x"][transform_row] = scale
+            transform_view["scale_y"][transform_row] = scale
+
+            sprite_view = sprite_pool.active_view()
+            sprite_row = sprite_pool.dense_row_of(index)
+            sprite_view["layer_z"][sprite_row] = _LAYER_BACKDROP
 
     return entity_indices
 
