@@ -1,16 +1,58 @@
 {
-  "move_left": "KEY_A",
-  "move_right": "KEY_D",
-  "jump": "KEY_SPACE",
-  "ability": "KEY_S",
-  "switch": "KEY_TAB",
-  "restart": "KEY_R",
-  "menu_up": "KEY_W",
-  "menu_down": "KEY_S",
-  "quit": "KEY_ESCAPE",
-  "p2_move_left": "KEY_LEFT",
-  "p2_move_right": "KEY_RIGHT",
-  "p2_jump": "KEY_UP",
-  "p2_ability": "KEY_DOWN",
-  "p2_restart": "KEY_END"
+  "move_left": [
+    "KEY_A",
+    "PAD_LEFT"
+  ],
+  "move_right": [
+    "KEY_D",
+    "PAD_RIGHT"
+  ],
+  "jump": [
+    "KEY_SPACE",
+    "PAD_A"
+  ],
+  "ability": [
+    "KEY_S",
+    "PAD_X"
+  ],
+  "switch": [
+    "KEY_TAB",
+    "PAD_RB"
+  ],
+  "restart": [
+    "KEY_R",
+    "PAD_BACK"
+  ],
+  "menu_up": [
+    "KEY_W",
+    "PAD_UP"
+  ],
+  "menu_down": [
+    "KEY_S",
+    "PAD_DOWN"
+  ],
+  "quit": [
+    "KEY_ESCAPE",
+    "PAD_START"
+  ],
+  "p2_move_left": [
+    "KEY_LEFT",
+    "PAD2_LEFT"
+  ],
+  "p2_move_right": [
+    "KEY_RIGHT",
+    "PAD2_RIGHT"
+  ],
+  "p2_jump": [
+    "KEY_UP",
+    "PAD2_A"
+  ],
+  "p2_ability": [
+    "KEY_DOWN",
+    "PAD2_X"
+  ],
+  "p2_restart": [
+    "KEY_END",
+    "PAD2_BACK"
+  ]
 }

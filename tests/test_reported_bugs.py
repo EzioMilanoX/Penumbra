@@ -52,17 +52,20 @@ class TestAbilityOnTheDownKey:
     def test_a_habilidade_espelha_o_baixo_do_jogador_dois(self):
         """Os dois lados do teclado passam a ter o mesmo formato. Sem isso o
         jogador 1 tinha de aprender um layout e o 2, outro."""
+        # Cada acao carrega uma LISTA (tecla e botao) desde que o controle
+        # passou a ser resolvido pela propria engine; a tecla e a primeira.
         bindings = json.loads(_BINDINGS.read_text(encoding="utf-8"))
-        assert bindings["ability"] == "KEY_S"
-        assert bindings["p2_ability"] == "KEY_DOWN"
-        assert bindings["jump"] == "KEY_SPACE" and bindings["p2_jump"] == "KEY_UP"
+        assert bindings["ability"][0] == "KEY_S"
+        assert bindings["p2_ability"][0] == "KEY_DOWN"
+        assert bindings["jump"][0] == "KEY_SPACE"
+        assert bindings["p2_jump"][0] == "KEY_UP"
 
     def test_o_s_da_habilidade_e_o_do_menu_nunca_valem_juntos(self):
         """Eles compartilham a tecla de proposito: `menu_down` so e lido no
         menu e `ability` so na fase. Se um dia os dois forem lidos na mesma
         cena, descer um card passaria a acender o facho."""
         bindings = json.loads(_BINDINGS.read_text(encoding="utf-8"))
-        assert bindings["menu_down"] == bindings["ability"] == "KEY_S"
+        assert bindings["menu_down"][0] == bindings["ability"][0] == "KEY_S"
 
         menu_scene = Path(__file__).resolve().parents[1] / "penumbra" / "scenes.py"
         source = menu_scene.read_text(encoding="utf-8")

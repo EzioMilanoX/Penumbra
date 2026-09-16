@@ -163,17 +163,6 @@ _CELL_SPRITE_UNIT = 8.0
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
 de `cell_size` px pede, portanto, `scale = cell_size / 8`."""
 
-BACKDROP_FACTOR = 2
-"""Quantos sub-quadros por lado cada celula do fundo vira.
-
-Medido, nao escolhido: a 1x a luz le como um tabuleiro de xadrez, a 2x ela
-ja le como luz, e a 4x fica lisa de verdade -- e custa 21 ms so de desenho,
-contra os 16,7 ms que um frame inteiro tem. `PygameRenderer.draw_batch` e um
-laco Python a 2,8 us por entidade, entao a resolucao do fundo e um orcamento,
-nao um gosto. A 2x sao 1904 sub-quadros e ~5 ms no pior caso; na pratica bem
-menos, porque `_draw_shape` sai cedo com alpha zero e a maior parte de um
-nivel esta no escuro."""
-
 _AIR_STRETCH = (0.30, 0.12)
 """Quanto cada ser se alonga no ar, por (Lumen, Umbra).
 
@@ -239,15 +228,17 @@ class PresentationSystem(ISystem):
         tuning: DualityTuning,
         cell_entity_indices: np.ndarray,
         aura_entity_indices: np.ndarray,
-        backdrop_entity_indices: np.ndarray = None,
+        backdrop=None,
     ) -> None:
         self._terrain = terrain
         self._state = state
         self._tuning = tuning
         self._cell_entity_indices = cell_entity_indices
         self._aura_entity_indices = aura_entity_indices
-        self._backdrop_entity_indices = backdrop_entity_indices
-        self._backdrop_sprite_rows = None
+        # O fundo nao e entidade: e um campo de 28 x 17 desenhado pela
+        # cena, antes do mundo, por `IRenderer.draw_field`. Aqui ele so e
+        # mantido em dia -- este sistema ja tem estado e terreno na mao.
+        self._backdrop = backdrop
         self._sprite_pool = None
         self._transform_pool = None
         self._cell_sprite_rows = None
@@ -263,8 +254,6 @@ class PresentationSystem(ISystem):
         self._channel = np.zeros(cell_count, dtype=np.float32)
         self._mask = np.zeros(cell_count, dtype=bool)
         self._mask_alt = np.zeros(cell_count, dtype=bool)
-
-        self._make_backdrop_buffers(terrain)
 
         # Memoria de APRESENTACAO: nenhuma regra do jogo pergunta com que
         # forca alguem pousou no frame passado.
@@ -344,7 +333,8 @@ class PresentationSystem(ISystem):
         if self._sprite_pool is None:
             self._resolve_pools(world)
         self._elapsed += delta_time
-        self._paint_backdrop()
+        if self._backdrop is not None:
+            self._backdrop.update()
         self._paint_cells()
         self._paint_characters()
         self._shape_characters(delta_time)
@@ -366,139 +356,6 @@ class PresentationSystem(ISystem):
         self._velocity_pool = world.get_pool("velocity")
         self._cell_sprite_rows = self._sprite_pool.dense_rows_of(self._cell_entity_indices)
         self._cell_transform_rows = self._transform_pool.dense_rows_of(self._cell_entity_indices)
-        if self._backdrop_entity_indices is not None:
-            self._backdrop_sprite_rows = self._sprite_pool.dense_rows_of(
-                self._backdrop_entity_indices)
-
-    # ------------------------------------------------------------------
-    # o fundo: ar e rocha, em resolucao dobrada
-    # ------------------------------------------------------------------
-
-    def _make_backdrop_buffers(self, terrain) -> None:
-        """Pre-aloca tudo que `_paint_backdrop` toca.
-
-        A interpolacao e SEPARAVEL -- uma passada vertical e uma horizontal,
-        em vez das quatro formulas de canto -- porque assim cada peso vira um
-        `np.multiply(..., out=)` sobre um buffer que ja existe, e o sistema
-        continua sem alocar nada por frame."""
-        factor = BACKDROP_FACTOR
-        rows, cols = terrain.rows, terrain.cols
-        fine_rows, fine_cols = rows * factor, cols * factor
-        fine_count = fine_rows * fine_cols
-
-        # Bordas repetidas (`mode="edge"`): fora da grade o mundo e solido,
-        # e repetir a borda evita uma orla escura falsa no limite da tela.
-        self._pad = np.zeros((rows + 2, cols + 2), dtype=np.float32)
-        self._tall = np.zeros((fine_rows, cols + 2), dtype=np.float32)
-        self._tall_a = np.zeros((rows, cols + 2), dtype=np.float32)
-        self._tall_b = np.zeros((rows, cols + 2), dtype=np.float32)
-        self._fine = np.zeros((fine_rows, fine_cols), dtype=np.float32)
-        self._fine_a = np.zeros((fine_rows, cols), dtype=np.float32)
-        self._fine_b = np.zeros((fine_rows, cols), dtype=np.float32)
-        self._fine_role = np.zeros((fine_rows, fine_cols), dtype=np.uint8)
-
-        self._bd_red = np.zeros(fine_count, dtype=np.float32)
-        self._bd_green = np.zeros(fine_count, dtype=np.float32)
-        self._bd_blue = np.zeros(fine_count, dtype=np.float32)
-        self._bd_alpha = np.zeros(fine_count, dtype=np.float32)
-        self._bd_ramp = np.zeros(fine_count, dtype=np.float32)
-        self._bd_channel = np.zeros(fine_count, dtype=np.float32)
-        self._bd_mask = np.zeros(fine_count, dtype=bool)
-
-    def _refine(self, field: np.ndarray) -> np.ndarray:
-        """Interpola `field` (uma grade de celulas) para a grade fina.
-
-        O valor de uma celula vale no CENTRO dela, entao o centro de cada
-        sub-quadro cai a um quarto de celula do centro -- pesos 0.75 e 0.25.
-        E so isso que separa uma luz que parece luz de um tabuleiro de
-        xadrez: sem interpolar, cada celula e um degrau de 32 px."""
-        pad = self._pad
-        pad[1:-1, 1:-1] = field
-        pad[0, 1:-1] = field[0]
-        pad[-1, 1:-1] = field[-1]
-        pad[1:-1, 0] = field[:, 0]
-        pad[1:-1, -1] = field[:, -1]
-        # Os quatro cantos tambem: zera-los punha uma mancha escura em cada
-        # canto da tela -- pequena, permanente, e sem nada no jogo que a
-        # explicasse.
-        pad[0, 0] = field[0, 0]
-        pad[0, -1] = field[0, -1]
-        pad[-1, 0] = field[-1, 0]
-        pad[-1, -1] = field[-1, -1]
-
-        center, above, below = pad[1:-1], pad[:-2], pad[2:]
-        np.multiply(center, 0.75, out=self._tall_a)
-        np.multiply(above, 0.25, out=self._tall_b)
-        np.add(self._tall_a, self._tall_b, out=self._tall[0::2])
-        np.multiply(below, 0.25, out=self._tall_b)
-        np.add(self._tall_a, self._tall_b, out=self._tall[1::2])
-
-        middle, left, right = self._tall[:, 1:-1], self._tall[:, :-2], self._tall[:, 2:]
-        np.multiply(middle, 0.75, out=self._fine_a)
-        np.multiply(left, 0.25, out=self._fine_b)
-        np.add(self._fine_a, self._fine_b, out=self._fine[:, 0::2])
-        np.multiply(right, 0.25, out=self._fine_b)
-        np.add(self._fine_a, self._fine_b, out=self._fine[:, 1::2])
-        return self._fine
-
-    def _paint_backdrop(self) -> None:
-        """Ar e rocha, e mais nada.
-
-        Sao os DOIS unicos papeis da grade que nao carregam decisao: o ar nao
-        e chao de ninguem, a rocha e chao dos dois, sempre. Todo o resto --
-        eter, contra-eter, crosta, placa, portal -- responde "de quem e este
-        chao, agora?", e essa resposta tem de ser lida na celula exata. Por
-        isso o fundo interpola e as celulas nao: suavizar o que o jogador
-        precisa medir seria trocar atmosfera por erro.
-
-        O papel e repetido sem interpolar (a silhueta da rocha continua na
-        aresta da celula); so a LUZ e interpolada."""
-        if self._backdrop_sprite_rows is None:
-            return
-        terrain, state = self._terrain, self._state
-
-        fine = self._refine(state.display_light).reshape(-1)
-        role_grid = terrain.role
-        self._fine_role[0::2, 0::2] = role_grid
-        self._fine_role[0::2, 1::2] = role_grid
-        self._fine_role[1::2, 0::2] = role_grid
-        self._fine_role[1::2, 1::2] = role_grid
-        role = self._fine_role.reshape(-1)
-
-        np.clip(fine, 0.0, 1.0, out=self._bd_ramp)
-        self._bd_alpha[:] = 0.0
-
-        # rocha: opaca, revelada pela luz que a banha
-        np.equal(role, ROLE_ROCK, out=self._bd_mask)
-        self._bd_fill(ROCK_UNLIT, ROCK_LIT)
-        np.copyto(self._bd_alpha, 255.0, where=self._bd_mask)
-
-        # ar: a luz em si, translucida sobre o vazio
-        np.equal(role, ROLE_EMPTY, out=self._bd_mask)
-        self._bd_fill(AIR_GLOW, AIR_GLOW)
-        np.multiply(self._bd_ramp, AIR_GLOW_MAX_ALPHA, out=self._bd_channel)
-        np.copyto(self._bd_alpha, self._bd_channel, where=self._bd_mask)
-
-        sprite_view = self._sprite_pool.active_view()
-        rows = self._backdrop_sprite_rows
-        sprite_view["tint_r"][rows] = self._bd_red
-        sprite_view["tint_g"][rows] = self._bd_green
-        sprite_view["tint_b"][rows] = self._bd_blue
-        sprite_view["tint_a"][rows] = self._bd_alpha
-
-    def _bd_fill(self, color_low, color_high) -> None:
-        """`_fill` da grade fina -- mesma conta, outros buffers."""
-        for channel, low, high in (
-            (self._bd_red, color_low[0], color_high[0]),
-            (self._bd_green, color_low[1], color_high[1]),
-            (self._bd_blue, color_low[2], color_high[2]),
-        ):
-            if low == high:
-                np.copyto(channel, float(low), where=self._bd_mask)
-                continue
-            np.multiply(self._bd_ramp, float(high - low), out=self._bd_channel)
-            np.add(self._bd_channel, float(low), out=self._bd_channel)
-            np.copyto(channel, self._bd_channel, where=self._bd_mask)
 
     # ------------------------------------------------------------------
     # celulas
@@ -516,8 +373,8 @@ class PresentationSystem(ISystem):
         self._blue[:] = 0.0
         self._alpha[:] = 0.0
 
-        # Ar e rocha nao sao pintados aqui: sao o FUNDO, desenhado em
-        # resolucao dobrada por `_paint_backdrop`. Ficam com alpha zero, e
+        # Ar e rocha nao sao pintados aqui: sao o FUNDO, um campo continuo
+        # desenhado pela cena antes do mundo. Ficam com alpha zero, e
         # `_draw_shape` sai cedo sem desenhar nada.
 
         # eter aceso: chao da Lumen

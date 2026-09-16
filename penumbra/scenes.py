@@ -73,6 +73,7 @@ class PenumbraFlow:
         input_provider: IInputProvider,
         preview_terrain: Terrain,
         audio=None,
+        backdrop=None,
         progress: Optional[Progress] = None,
     ) -> None:
         self._game_loop = game_loop
@@ -91,6 +92,10 @@ class PenumbraFlow:
         # lido pelas telas que ENSINAM os controles, e elas perguntam ao
         # fluxo, nao ao provider.
         self._input = input_provider
+        # O fundo e um campo continuo desenhado ANTES do mundo. Mora no fluxo
+        # porque DUAS cenas desenham o mundo -- a fase e a pausa por cima dela
+        # -- e a ordem "fundo, depois mundo" tem de existir num lugar so.
+        self.backdrop = backdrop
         self.title = TitleScene(self, input_provider)
         self.menu = MenuScene(self, catalog, preview_terrain, input_provider)
         self.gameplay = PenumbraScene(self, runtime, state, tuning, input_provider)
@@ -188,16 +193,26 @@ class PenumbraFlow:
         de fase nao devia devolver o jogador ao modo solo."""
         return self.title.duo
 
+    def draw_world(self, world: World, renderer: IRenderer, gameplay) -> None:
+        """Fundo, depois mundo. O fundo e o unico desenho de Penumbra que nao
+        sai de uma entidade: e um campo de 28 x 17 que a engine estica com
+        filtragem bilinear, e ele tem de ir por baixo de tudo."""
+        if self.backdrop is not None:
+            self.backdrop.draw(renderer)
+        gameplay.render(world, renderer)
+
     @property
     def pads(self) -> int:
-        """Quantos controles estao ligados -- 0 quando o provider e o do
-        teclado puro, que e o caso de todo teste headless.
+        """Quantos controles estao ligados agora.
 
-        As telas que ENSINAM os controles leem isto. E a unica hora em que o
-        jogador ainda esta decidindo o que fazer com as maos, e alguem com o
-        controle na mao lendo "ESPACO pular" conclui que o controle nao
-        funciona -- quando ele funciona."""
-        return getattr(self._input, "pad_count", 0)
+        As telas que ENSINAM os controles leem isto: e a unica hora em que
+        quem joga ainda esta decidindo o que fazer com as maos, e alguem com
+        o controle na mao lendo "ESPACO pular" conclui que o controle nao
+        funciona -- quando ele funciona.
+
+        `IInputProvider.connected_pads` responde 0 por default, entao o
+        provider nulo dos testes headless nao precisa saber de nada."""
+        return self._input.connected_pads()
 
     def toggle_duo(self) -> None:
         self.title.duo = not self.title.duo
@@ -562,7 +577,7 @@ class PauseScene(IScene):
             self._flow.show_menu()
 
     def render(self, world: World, renderer: IRenderer) -> None:
-        self._gameplay.render(world, renderer)
+        self._flow.draw_world(world, renderer, self._gameplay)
         self._screen.draw(renderer, self._flow.current_level_name, self._flow.duo)
 
 
@@ -737,7 +752,7 @@ class PenumbraScene(IScene):
             self._frozen_seconds = 0.0
 
     def render(self, world: World, renderer: IRenderer) -> None:
-        self._gameplay.render(world, renderer)
+        self._flow.draw_world(world, renderer, self._gameplay)
 
     # ------------------------------------------------------------------
 

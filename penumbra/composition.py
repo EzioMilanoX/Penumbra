@@ -46,7 +46,7 @@ from ouroboros.interfaces.renderer import SHAPE_CIRCLE, SHAPE_RECT
 from ouroboros.roguelite.entities.archetype_loader import ArchetypeLoader
 
 from penumbra.audio import AudioSystem, PenumbraAudio
-from penumbra.gamepad import GamepadInput, load_gamepad_bindings
+from penumbra.backdrop import Backdrop
 from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
 from penumbra.paths import resolve, resource
@@ -63,7 +63,7 @@ from penumbra.systems.light_field_system import LightFieldSystem
 from penumbra.systems.outcome_system import OutcomeSystem
 from penumbra.systems.polarity_door_system import PolarityDoorSystem
 from penumbra.systems.polarity_lever_system import PolarityLeverSystem
-from penumbra.systems.presentation_system import BACKDROP_FACTOR, PresentationSystem
+from penumbra.systems.presentation_system import PresentationSystem
 from penumbra.systems.world_clock_system import WorldClockSystem
 from penumbra.terrain import Terrain
 from penumbra.tuning import DualityTuning
@@ -81,10 +81,6 @@ ARCHETYPES_DIR = resource("data", "archetypes", "penumbra")
 LEVELS_DIR = resource("data", "levels")
 
 _CELL_SPRITE_UNIT = 8.0
-_LAYER_BACKDROP = 1
-"""O fundo desenha ANTES das celulas. Ele so mostra luz; quem carrega
-decisao e desenhado por cima, e por cima significa depois."""
-
 _LAYER_CELL = 5
 _LAYER_CHARACTER = 20
 _AURA_LAYERS = (15, 15, 25)
@@ -108,6 +104,7 @@ class Simulation:
     runtime: LevelRuntime
     lumen_grid: Grid2D
     umbra_grid: Grid2D
+    backdrop: "Backdrop"
     tile_collision_systems: Tuple[TileCollisionSystem, TileCollisionSystem]
 
 
@@ -149,19 +146,9 @@ def build_game(config: EngineConfig) -> GameLoop:
     # possa ser registrado depois do segundo TileCollisionSystem.
     game_loop = CompositionRoot(config).build(tile_grid=lumen_grid)
 
-    # O controle entra AQUI, embrulhando o provider do teclado -- e nao dentro
-    # de `_assemble`, que e a simulacao e nao pode conhecer um backend. Tudo a
-    # partir daqui (cenas, controle dos seres, menus) recebe o embrulho no
-    # lugar de `game_loop.input_provider`; o laco da engine continua com o de
-    # dentro, e `end_frame` e o que prende a amostragem ao frame.
-    game_input = GamepadInput(
-        game_loop.input_provider,
-        load_gamepad_bindings(resource("data", "input_bindings", "penumbra_gamepad.json")),
-    )
-
     simulation = _assemble(
         game_loop.world, config, tuning, terrain, catalog,
-        lumen_grid, umbra_grid, game_input,
+        lumen_grid, umbra_grid, game_loop.input_provider,
     )
 
     world = simulation.world
@@ -180,9 +167,10 @@ def build_game(config: EngineConfig) -> GameLoop:
     # composicao sobrescreveria a fase carregada.
     flow = PenumbraFlow(
         game_loop, simulation.runtime, simulation.state,
-        simulation.catalog, tuning, game_input,
+        simulation.catalog, tuning, game_loop.input_provider,
         preview_terrain=_make_terrain(tuning.world),
         audio=audio,
+        backdrop=simulation.backdrop,
         progress=Progress(catalog.count).load(),
     )
     # O HUD e um callback GLOBAL (roda independente da cena no topo), entao
@@ -193,7 +181,7 @@ def build_game(config: EngineConfig) -> GameLoop:
         world.get_pool("transform"), game_loop.renderer.get_viewport_size(),
         visible=lambda: flow.hud_visible,
         unlocked=lambda: flow.unlocked,
-        pads=lambda: game_input.pad_count,
+        pads=lambda: game_loop.input_provider.connected_pads(),
     )
 
     def draw_overlay(renderer) -> None:
@@ -208,10 +196,6 @@ def build_game(config: EngineConfig) -> GameLoop:
         if flow.hud_visible:
             sparks.draw(renderer)
         hud(renderer)
-        # Fim do frame: so MARCA o controle como velho. Quem amostra e a
-        # primeira consulta do frame seguinte, ja dentro do update da cena --
-        # amostrar aqui custaria um frame de atraso (ver `penumbra.gamepad`).
-        game_input.end_frame()
 
     game_loop.set_on_draw_ui(draw_overlay)
     flow.show_main()
@@ -290,9 +274,6 @@ def _assemble(
     state.entity_index[UMBRA] = _spawn_character(
         world, UMBRA_ARCHETYPE, tuning.umbra, SHADOW_HITBOX_POOL, SHAPE_RECT
     )
-    # O fundo nasce ANTES das celulas so por clareza de leitura -- a ordem
-    # de criacao nao decide a de desenho, que e `layer_z`.
-    backdrop_entity_indices = _spawn_backdrop(world, terrain)
     cell_entity_indices = _spawn_cells(world, terrain)
     aura_entity_indices = _spawn_auras(world)
 
@@ -325,9 +306,12 @@ def _assemble(
     world.register_system(PolarityLeverSystem(terrain, state))
     world.register_system(PolarityDoorSystem(terrain, state))
     world.register_system(OutcomeSystem(terrain, state, tuning))
+    # O fundo e presentacao pura e nao e entidade de nada: o
+    # `PresentationSystem` o mantem em dia, a cena o desenha ANTES do mundo.
+    backdrop = Backdrop(state, terrain, tuning)
     world.register_system(
         PresentationSystem(terrain, state, tuning, cell_entity_indices, aura_entity_indices,
-                           backdrop_entity_indices)
+                           backdrop)
     )
 
     runtime = LevelRuntime(world, terrain, catalog, state, tuning)
@@ -343,6 +327,7 @@ def _assemble(
         lumen_grid=lumen_grid,
         umbra_grid=umbra_grid,
         tile_collision_systems=tile_collision_systems,
+        backdrop=backdrop,
     )
 
 
@@ -440,41 +425,6 @@ def _spawn_cells(world: World, terrain: Terrain) -> np.ndarray:
             transform_view["position_y"][transform_row] = center_y
 
             sprite_pool.active_view()["layer_z"][sprite_pool.dense_row_of(index)] = _LAYER_CELL
-
-    return entity_indices
-
-
-def _spawn_backdrop(world: World, terrain: Terrain,
-                    factor: int = BACKDROP_FACTOR) -> np.ndarray:
-    """Uma entidade por SUB-celula, em ordem row-major da grade fina.
-
-    Posicao e escala sao escritas aqui e nunca mais: o fundo nao se move nem
-    muda de tamanho, so de cor. Isso deixa `_paint_backdrop` escrevendo um
-    unico campo por frame."""
-    rows, cols = terrain.rows * factor, terrain.cols * factor
-    step = terrain.cell_size / float(factor)
-    entity_indices = np.zeros(rows * cols, dtype=np.int64)
-    transform_pool = world.get_pool("transform")
-    sprite_pool = world.get_pool("sprite")
-    scale = step / 8.0
-
-    slot = 0
-    for row in range(rows):
-        for col in range(cols):
-            index = unpack_index(world.create_entity(CELL_ARCHETYPE, clear=True))
-            entity_indices[slot] = index
-            slot += 1
-
-            transform_row = transform_pool.dense_row_of(index)
-            transform_view = transform_pool.active_view()
-            transform_view["position_x"][transform_row] = (col + 0.5) * step
-            transform_view["position_y"][transform_row] = (row + 0.5) * step
-            transform_view["scale_x"][transform_row] = scale
-            transform_view["scale_y"][transform_row] = scale
-
-            sprite_view = sprite_pool.active_view()
-            sprite_row = sprite_pool.dense_row_of(index)
-            sprite_view["layer_z"][sprite_row] = _LAYER_BACKDROP
 
     return entity_indices
 

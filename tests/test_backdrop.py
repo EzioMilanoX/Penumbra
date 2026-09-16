@@ -1,59 +1,57 @@
 """
-O fundo: ar e rocha em resolucao dobrada.
+O fundo, agora que a engine faz o trabalho.
 
-O jogo e sobre luz e desenhava luz como um tabuleiro de xadrez -- uma grade de
-28 x 17 quadrados de 32 px, cada um de um cinza chapado. O campo de luz ja era
-continuo; o que faltava era resolucao no DESENHO.
+A primeira versao subdividia a grade a mao: 1904 sub-quadros, interpolacao
+escrita aqui, 2 ms por frame, e ainda assim degraus de 16 px. Ela existia
+porque `draw_batch` cobra por entidade. A resposta certa nao era um sistema
+mais esperto do lado do jogo, era a engine ganhar `IRenderer.draw_field` -- e
+com ela o fundo virou dois arrays de 28 x 17 e uma chamada.
 
-Duas decisoes ficam guardadas aqui, e as duas quebram em silencio:
+O que estes testes guardam:
 
 1. **Quais papeis podem ser suavizados.** Ar e rocha sao os dois unicos que
-   nao carregam decisao -- o ar nao e chao de ninguem, a rocha e chao dos dois,
-   sempre. Todo o resto responde "de quem e este chao, agora?", e essa resposta
-   tem de ser lida na celula exata. Suavizar eter seria trocar atmosfera por
-   erro, e nada na tela diria que foi isso que aconteceu.
+   nao carregam decisao. Todo o resto responde "de quem e este chao, agora?",
+   e essa resposta tem de ser lida na celula exata.
 
-2. **Quanto o fundo pode custar.** `PygameRenderer.draw_batch` e um laco
-   Python, medido a 2,8 us por entidade. A resolucao do fundo e um orcamento,
-   nao um gosto -- e quem dobrar o fator sem refazer a conta descobre pelo
-   jogo travando.
+2. **A orientacao dos arrays.** `draw_field` recebe (colunas, linhas), que e a
+   convencao de superficie; as mascaras do terreno sao (linhas, colunas). Uma
+   transposicao esquecida passa em qualquer teste que so olhe totais, e na
+   tela vira o nivel inteiro embaralhado.
 """
 from __future__ import annotations
-
-import json
-from pathlib import Path
 
 import numpy as np
 import pytest
 
-from penumbra.systems.presentation_system import BACKDROP_FACTOR, PresentationSystem
+from penumbra.backdrop import Backdrop
+from penumbra.backdrop import VOID
+from penumbra.systems.presentation_system import (
+    AIR_GLOW, AIR_GLOW_MAX_ALPHA, ROCK_LIT, ROCK_UNLIT)
 from penumbra.terrain import ROLE_EMPTY, ROLE_ROCK
 
 from tests.conftest import advance, load_custom
 
-_CONFIG = Path(__file__).resolve().parents[1] / "penumbra" / "config.json"
 
-_MICROSECONDS_PER_ENTITY = 2.8
-"""Custo medido de UMA entidade em `draw_batch`, neste backend, nesta maquina.
+class _FieldRecorder:
+    """Guarda o que foi entregue a `draw_field`, e mais nada."""
 
-`PygameRenderer.draw_batch` percorre as entidades num laco Python e chama
-`_draw_shape` em cada uma -- nao ha instancing, nao ha batch de verdade. Medido
-com 476 quads opacos: 1,35 ms. Nao e estimativa."""
+    def __init__(self) -> None:
+        self.fields = []
 
-_FRAME_BUDGET_MS = 8.0
-"""Metade dos 16,7 ms de um frame a 60 fps. O fundo e atmosfera: gastar mais
-da metade do frame com o que nao decide nada deixaria o jogo sem folga para a
-maquina de quem joga, que nao e esta."""
+    def draw_field(self, rgb, x, y, width, height, alpha=None):
+        self.fields.append((rgb.copy(), x, y, width, height,
+                            None if alpha is None else alpha.copy()))
 
 
-def _presentation(simulation) -> PresentationSystem:
-    for system in simulation.world._systems:
-        if isinstance(system, PresentationSystem):
-            return system
-    raise AssertionError("o PresentationSystem sumiu da composicao")
+class TestTwoFieldsAndWhyTwo:
+    """Um campo so nao consegue cobrir a tela E recortar a parede.
 
+    O alpha e um canal. Ou ele vale 255 em tudo -- e a cor da rocha vaza pra
+    fora dela, borrando a silhueta -- ou ele recorta a rocha, e entao o brilho
+    do ar tem de morar no alpha, que por contrato NAO interpola, e o ar sai
+    quadriculado. As duas tentativas foram feitas, e as duas apareceram na
+    tela antes de aparecer em qualquer teste."""
 
-class TestOnlyTheRolesWithoutADecision:
     _ROOM = {
         10: "..........#####.............",
         11: "....*.....#####.............",
@@ -62,118 +60,191 @@ class TestOnlyTheRolesWithoutADecision:
         14: "#####~~~~~~~~~~~~~~~~~~#####",
     }
 
-    def test_o_fundo_desenha_ar_e_rocha_e_mais_nada(self, simulation, input_provider):
-        """A regra do arquivo. Se alguem acrescentar um papel aqui, o jogador
-        passa a ver um degrau de meia celula onde precisa ler uma celula
-        inteira -- e o jogo continua rodando, mais bonito e mentindo."""
+    def test_a_luz_do_ar_vai_na_cor_e_o_campo_dele_nao_tem_mascara(
+            self, simulation, input_provider):
+        """Luz e VALOR, e valor mora na cor. A primeira versao punha o brilho
+        do ar no alpha e o ar saiu mais quadriculado do que antes de tudo."""
         load_custom(simulation, self._ROOM)
         advance(simulation, input_provider, frames=2)
-        pres = _presentation(simulation)
 
-        role = pres._fine_role.reshape(-1)
-        alpha = pres._bd_alpha
-        suavizavel = np.logical_or(role == ROLE_EMPTY, role == ROLE_ROCK)
+        recorder = _FieldRecorder()
+        simulation.backdrop.draw(recorder)
+        ar = recorder.fields[0]
+        assert ar[5] is None, "o campo do ar nao pode ter mascara"
 
-        assert not alpha[~suavizavel].any(), (
-            "o fundo pintou um papel que carrega decisao"
+        azul = simulation.backdrop._air[:, :, 2].astype(np.int32)
+        assert azul.max() > azul.min(), "a luz tem de variar na cor"
+        assert azul.min() == VOID[2], (
+            "ar no escuro total tem de sair igual ao vazio atras dele"
         )
-        assert alpha[role == ROLE_ROCK].all(), "a rocha e opaca"
+
+    def test_a_rocha_e_recortada_seca_e_so_ela(self, simulation, input_provider):
+        """A regra do que pode ser suavizado. Ar e rocha sao os dois unicos
+        papeis que nao carregam decisao; todo o resto responde "de quem e este
+        chao, agora?", e essa resposta tem de ser lida na celula exata."""
+        load_custom(simulation, self._ROOM)
+        advance(simulation, input_provider, frames=2)
+
+        role = simulation.terrain.role.T
+        alpha = simulation.backdrop._rock_alpha
+        assert (alpha[role == ROLE_ROCK] == 255).all(), "a rocha e opaca"
+        assert not alpha[role != ROLE_ROCK].any(), "e so a rocha"
+
+    def test_a_cor_da_rocha_e_calculada_fora_dela_tambem(self, simulation, input_provider):
+        """Senao a bilinear da borda leria preto do lado de fora e cada
+        silhueta ganharia uma orla escura que nada no jogo explica."""
+        load_custom(simulation, self._ROOM)
+        advance(simulation, input_provider, frames=2)
+
+        role = simulation.terrain.role.T
+        fora = simulation.backdrop._rock[:, :, 0][role != ROLE_ROCK]
+        assert fora.min() > 0, "a cor da rocha fora dela nao pode ser preta"
+
+    def test_o_ar_vai_primeiro(self, simulation, input_provider):
+        """A ordem e a propria definicao de fundo: o ar e o que se ve onde nao
+        ha pedra. Invertida, a rocha some sob o ar."""
+        load_custom(simulation, self._ROOM)
+        advance(simulation, input_provider, frames=2)
+        recorder = _FieldRecorder()
+        simulation.backdrop.draw(recorder)
+        assert len(recorder.fields) == 2
+        assert recorder.fields[0][5] is None and recorder.fields[1][5] is not None
 
     def test_as_celulas_de_ar_e_rocha_nao_sao_desenhadas_duas_vezes(
             self, simulation, input_provider):
         """Elas continuam existindo como entidade (nenhuma entidade deste jogo
-        e destruida), so param de ser pintadas. Desenhar as duas camadas
-        somaria alpha e a rocha ficaria mais clara que a propria cor dela."""
+        e destruida), so param de ser pintadas."""
+        from penumbra.systems.presentation_system import PresentationSystem
+
         load_custom(simulation, self._ROOM)
         advance(simulation, input_provider, frames=2)
-        pres = _presentation(simulation)
+        pres = next(s for s in simulation.world._systems
+                    if isinstance(s, PresentationSystem))
 
         role = simulation.terrain.role.reshape(-1)
-        alpha = pres._alpha
         for papel, nome in ((ROLE_EMPTY, "ar"), (ROLE_ROCK, "rocha")):
-            assert not alpha[role == papel].any(), f"{nome} pintado nas duas camadas"
+            assert not pres._alpha[role == papel].any(), f"{nome} nas duas camadas"
 
 
-class TestTheInterpolationIsHonest:
-    def test_a_grade_fina_expressa_niveis_que_a_grade_de_celulas_nao_tem(self):
-        """O ponto inteiro do fundo, e a forma certa de afirma-lo.
+class TestTheArraysAreTheShapeTheEngineWants:
+    """`draw_field` recebe (colunas, linhas); o terreno e (linhas, colunas).
 
-        Uma celula acesa sozinha tem os quatro sub-quadros IGUAIS -- por
-        simetria, e nao por defeito: os vizinhos valem zero dos dois lados.
-        O que a interpolacao compra nao esta dentro da celula acesa, esta na
-        borda dela: degraus intermediarios que uma grade de celulas nao sabe
-        representar. Era isso que fazia a luz ler como tabuleiro."""
-        campo = np.zeros((5, 5), dtype=np.float32)
-        campo[2, 2] = 1.0
-        pres = PresentationSystem.__new__(PresentationSystem)
-        pres._make_backdrop_buffers(_FakeTerrain(5, 5))
+    Uma transposicao esquecida nao levanta erro nenhum numa grade de 28 x 17 --
+    os dois arrays existem, os dois tem o mesmo numero de celulas, e todo teste
+    que some ou conte continua verde. Na tela o nivel sai embaralhado."""
 
-        fino = pres._refine(campo)
-        assert len(np.unique(campo)) == 2, "o campo so tem aceso e apagado"
-        assert len(np.unique(fino)) > 3, "e a grade fina tem meios-tons"
-        # E a queda e monotonica saindo do centro: luz que sobe ao se afastar
-        # da fonte seria um peso trocado.
-        linha = fino[5, 4:]
-        assert all(a >= b for a, b in zip(linha, linha[1:])), "a luz sobe ao se afastar"
+    def test_uma_parede_vertical_sai_como_parede_vertical(self, simulation, input_provider):
+        """Transposta, ela viraria uma faixa horizontal -- e nada mais no
+        codigo diria qual das duas orientacoes esta certa."""
+        load_custom(simulation, {
+            9:  ".........#..................",
+            10: ".........#..................",
+            11: ".........#..................",
+            12: "..A....B.#........X......Y..",
+            13: "############################",
+        })
+        advance(simulation, input_provider, frames=2)
+        alpha = simulation.backdrop._rock_alpha
 
-    def test_a_interpolacao_nao_inventa_luz(self):
-        """Pesos 0.75/0.25 somam 1: nenhum sub-quadro pode passar do maior
-        valor do campo nem cair abaixo do menor. Um peso errado acenderia o
-        escuro, e num jogo em que a luz decide de quem e o chao isso seria
-        visivel antes de ser explicavel."""
-        gerador = np.random.default_rng(20260916)
-        campo = gerador.uniform(0.0, 1.0, (17, 28)).astype(np.float32)
-        pres = PresentationSystem.__new__(PresentationSystem)
-        pres._make_backdrop_buffers(_FakeTerrain(17, 28))
-
-        fino = pres._refine(campo)
-        assert fino.min() >= campo.min() - 1e-5
-        assert fino.max() <= campo.max() + 1e-5
-
-    def test_um_campo_chapado_continua_chapado(self):
-        campo = np.full((17, 28), 0.42, dtype=np.float32)
-        pres = PresentationSystem.__new__(PresentationSystem)
-        pres._make_backdrop_buffers(_FakeTerrain(17, 28))
-        assert np.allclose(pres._refine(campo), 0.42, atol=1e-5)
-
-    def test_refinar_nao_aloca_nada_por_frame(self):
-        """O sistema roda dentro de `World.step()`, onde a constituicao da
-        engine pede zero alocacao. `_refine` devolve SEMPRE o mesmo buffer --
-        se alguem trocar um `out=` por uma expressao, isto pega."""
-        pres = PresentationSystem.__new__(PresentationSystem)
-        pres._make_backdrop_buffers(_FakeTerrain(17, 28))
-        campo = np.zeros((17, 28), dtype=np.float32)
-        assert pres._refine(campo) is pres._refine(campo)
-
-
-class TestTheBudgetIsMeasured:
-    def test_o_fundo_cabe_em_metade_de_um_frame(self):
-        """A resolucao do fundo e um ORCAMENTO. A 4x a luz fica lisa de
-        verdade e custa 21 ms so de desenho, contra os 16,7 ms que um frame
-        inteiro tem -- foi por isso que ela e 2x, e nao porque 2x e bonito."""
-        cols, rows = 28, 17
-        sub_quadros = rows * cols * BACKDROP_FACTOR * BACKDROP_FACTOR
-        custo = sub_quadros * _MICROSECONDS_PER_ENTITY / 1000.0
-        assert custo <= _FRAME_BUDGET_MS, (
-            f"fator {BACKDROP_FACTOR}: {sub_quadros} sub-quadros, {custo:.1f} ms"
+        assert (alpha[9, 9:13] == 255).all(), "a parede vertical sumiu"
+        assert not (alpha[0:9, 9] == 255).any(), (
+            "ha uma faixa horizontal onde deveria haver uma parede vertical "
+            "-- os arrays estao transpostos"
         )
 
-    def test_cabe_entidade_pra_todo_mundo(self):
-        """Sem isto, subir o fator derruba o jogo na abertura -- e so na
-        abertura DO JOGO, porque a suite headless monta a mesma composicao e
-        cairia junto, mas quem roda o .exe descobre primeiro."""
-        config = json.loads(_CONFIG.read_text(encoding="utf-8"))
-        cols, rows = 28, 17
-        preciso = rows * cols * (1 + BACKDROP_FACTOR * BACKDROP_FACTOR) + 3 + 2
-        assert config["entity_capacity"] >= preciso, (
-            f"capacidade {config['entity_capacity']} < {preciso} necessarias"
+    def test_os_campos_tem_as_dimensoes_da_grade(self, simulation):
+        backdrop = simulation.backdrop
+        cols, rows = simulation.terrain.cols, simulation.terrain.rows
+        assert backdrop._air.shape == (cols, rows, 3)
+        assert backdrop._rock.shape == (cols, rows, 3)
+        assert backdrop._rock_alpha.shape == (cols, rows)
+
+    def test_o_retangulo_cobre_o_campo_de_jogo_inteiro(self, simulation):
+        """Nem mais nem menos: sobrando, o fundo invade o rodape; faltando,
+        aparece uma tira preta onde deveria haver chao."""
+        recorder = _FieldRecorder()
+        simulation.backdrop.draw(recorder)
+        terrain = simulation.terrain
+        for _, x, y, width, height, _ in recorder.fields:
+            assert (x, y) == (0.0, 0.0)
+            assert width == terrain.cols * terrain.cell_size
+            assert height == terrain.rows * terrain.cell_size
+
+
+class TestItCostsNothingPerFrame:
+    def test_atualizar_nao_aloca_array_novo(self, simulation, input_provider):
+        """O fundo e reescrito todo frame dentro de `World.step()`, onde a
+        constituicao da engine pede zero alocacao."""
+        load_custom(simulation, {12: "..A....B..........X......Y..",
+                                 13: "############################"})
+        backdrop = simulation.backdrop
+        campos = (backdrop._air, backdrop._rock, backdrop._rock_alpha)
+        advance(simulation, input_provider, frames=5)
+        assert (backdrop._air, backdrop._rock, backdrop._rock_alpha) == campos
+
+    def test_o_fundo_nao_gasta_entidade_nenhuma(self):
+        """A versao anterior gastava 1904, e exigia subir `entity_capacity` de
+        640 para 2560. O numero no `config.json` e a prova de que a engine
+        passou a fazer o trabalho."""
+        import json
+        from pathlib import Path
+
+        config = json.loads(
+            (Path(__file__).resolve().parents[1] / "penumbra" / "config.json")
+            .read_text(encoding="utf-8"))
+        assert config["entity_capacity"] <= 640
+
+
+class TestItReachesTheScreenBehindTheWorld:
+    def test_a_cena_desenha_o_fundo_antes_do_mundo(self, simulation, input_provider, tmp_path):
+        """Fundo desenhado DEPOIS do mundo apagaria os dois seres. A ordem
+        mora em `PenumbraFlow.draw_world` justamente porque duas cenas
+        diferentes desenham o mundo."""
+        from penumbra.progress import Progress
+        from penumbra.scenes import PenumbraFlow
+        from penumbra.terrain import Terrain
+        from tests.conftest import CELL_SIZE, GRID_COLS, GRID_ROWS
+        from tests.test_shipped_levels import _FakeGameLoop
+
+        ordem = []
+
+        class _Ordem:
+            def draw_field(self, *a, **k): ordem.append("fundo")
+
+        class _Mundo:
+            def render(self, world, renderer): ordem.append("mundo")
+
+        flow = PenumbraFlow(
+            _FakeGameLoop(), simulation.runtime, simulation.state,
+            simulation.catalog, simulation.tuning, input_provider,
+            preview_terrain=Terrain(GRID_COLS, GRID_ROWS, CELL_SIZE),
+            progress=Progress(simulation.catalog.count, tmp_path / "p.json"),
+            backdrop=simulation.backdrop,
         )
+        flow.draw_world(simulation.world, _Ordem(), _Mundo())
+        assert ordem[-1] == "mundo", "o mundo tem de vir por ultimo"
+        assert set(ordem[:-1]) == {"fundo"}, "e todo o fundo antes dele"
 
+    def test_sem_fundo_o_mundo_ainda_desenha(self, simulation, input_provider, tmp_path):
+        """Todo teste headless monta o fluxo sem fundo. Se `draw_world`
+        exigisse um, a suite inteira cairia -- e o fundo e apresentacao, que
+        por definicao pode faltar."""
+        from penumbra.progress import Progress
+        from penumbra.scenes import PenumbraFlow
+        from penumbra.terrain import Terrain
+        from tests.conftest import CELL_SIZE, GRID_COLS, GRID_ROWS
+        from tests.test_shipped_levels import _FakeGameLoop
 
-class _FakeTerrain:
-    """Só as três medidas que `_make_backdrop_buffers` lê."""
+        desenhou = []
 
-    def __init__(self, rows: int, cols: int) -> None:
-        self.rows = rows
-        self.cols = cols
-        self.cell_size = 32.0
+        class _Mundo:
+            def render(self, world, renderer): desenhou.append(True)
+
+        flow = PenumbraFlow(
+            _FakeGameLoop(), simulation.runtime, simulation.state,
+            simulation.catalog, simulation.tuning, input_provider,
+            preview_terrain=Terrain(GRID_COLS, GRID_ROWS, CELL_SIZE),
+            progress=Progress(simulation.catalog.count, tmp_path / "p.json"),
+        )
+        flow.draw_world(simulation.world, object(), _Mundo())
+        assert desenhou == [True]
