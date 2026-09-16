@@ -6,42 +6,34 @@ e trinta fragmentos apanhados evaporavam ao fechar a janela. Num jogo de
 trinta fases isso deixa de ser um detalhe e vira uma falha de projeto -- e a
 parte mais cara nao e perder o progresso, e descobrir que se perdeu.
 
-Tres decisoes, todas pela mesma razao (um arquivo de save nunca pode ser o
-motivo de o jogo nao abrir):
+O **mecanismo** -- ler sem nunca levantar, escrever de forma atomica, falhar
+em silencio -- nao tem nada de Penumbra e vive em
+`ouroboros.bootstrap.save_file`: todo produto da engine que guarde qualquer
+coisa entre sessoes escreve o mesmo par de funcoes, e erra nos mesmos lugares,
+porque os erros so aparecem em maquina de outra pessoa.
 
-* **Ler nunca levanta.** Arquivo ausente, JSON corrompido, campo com o tipo
-  errado, save de uma versao com outro numero de fases -- tudo cai no
-  progresso vazio, e o jogo comeca do zero em vez de morrer no boot.
-* **Escrever e atomico.** Grava num `.tmp` ao lado e renomeia por cima; um
-  desligamento no meio da escrita deixa o save ANTERIOR intacto, nunca meio
-  arquivo.
-* **Escrever falhado e silencioso.** Disco cheio ou pasta somente-leitura
-  custam o progresso daquela sessao, e nao a sessao.
+O que fica aqui e o **formato**, que e o que muda de jogo para jogo: quais
+campos existem, que tipos tem, e o que fazer com um save gravado por uma
+versao com outro numero de fases. A resposta de Penumbra a essa ultima e
+`_flags`, que AJUSTA em vez de recusar -- acrescentar fases nao pode apagar o
+que alguem ja fez.
 """
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
 from typing import List, Optional, Set
+
+from ouroboros.bootstrap.save_file import SaveFile, default_save_path
 
 _SCHEMA = 1
 _FILE_NAME = "progress.json"
 
 
 def default_path() -> Path:
-    """O lugar do save, por plataforma.
-
-    Nao fica ao lado do codigo de proposito: o repositorio e clonavel e
-    somente-leitura em muitas maquinas, e um save dentro dele apareceria no
-    `git status` a cada fase vencida.
-    """
-    appdata = os.environ.get("APPDATA")
-    if appdata:
-        return Path(appdata) / "Penumbra" / _FILE_NAME
-    xdg = os.environ.get("XDG_DATA_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
-    return base / "Penumbra" / _FILE_NAME
+    """`%APPDATA%/Penumbra/progress.json`, ou o equivalente XDG fora do
+    Windows. Nunca ao lado do codigo: o repositorio e clonavel e
+    somente-leitura em muitas maquinas."""
+    return default_save_path("Penumbra", _FILE_NAME)
 
 
 class Progress:
@@ -56,6 +48,7 @@ class Progress:
 
     def __init__(self, level_count: int, path: Optional[Path] = None) -> None:
         self._path = Path(path) if path is not None else default_path()
+        self._file = SaveFile(self._path)
         self.level_count = int(level_count)
         self.completed: List[bool] = [False] * self.level_count
         self.shards: List[bool] = [False] * self.level_count
@@ -76,13 +69,10 @@ class Progress:
     # ------------------------------------------------------------------
 
     def load(self) -> "Progress":
-        """Le o save, ou fica no vazio. Nunca levanta."""
-        try:
-            raw = json.loads(self._path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return self
-        if not isinstance(raw, dict):
-            return self
+        """Le o save, ou fica no vazio. `SaveFile.read` nunca levanta --
+        arquivo ausente, JSON corrompido ou raiz que nao e objeto viram `{}`,
+        e cada campo abaixo tem o proprio default."""
+        raw = self._file.read()
 
         self.completed = _flags(raw.get("completed"), self.level_count)
         self.shards = _flags(raw.get("shards"), self.level_count)
@@ -111,20 +101,7 @@ class Progress:
             "sound_on": bool(self.sound_on),
             "fullscreen": bool(self.fullscreen),
         }
-        temporary = self._path.with_suffix(".tmp")
-        try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            temporary.write_text(
-                json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-            )
-            os.replace(temporary, self._path)
-            return True
-        except OSError:
-            try:
-                temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
-            return False
+        return self._file.write(payload)
 
 
 def _ratio(value, fallback: float) -> float:

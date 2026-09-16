@@ -42,9 +42,13 @@ acendiam doze pixels no total -- existiam, custavam frame, e eram invisiveis.
 Medido, nao estimado."""
 
 _GRAVITY = 520.0
-"""Queda das faiscas, em px/s^2. `ParticleStorage.update` so integra posicao
-por velocidade -- a gravidade e nossa, e e o que faz o estilhaco da crosta
-cair como pedra em vez de flutuar como fumaca."""
+"""Queda das faiscas, em px/s^2 -- o que faz o estilhaco da crosta cair como
+pedra em vez de flutuar como fumaca.
+
+O NUMERO e nosso (e uma decisao de peso, como a gravidade dos dois seres); a
+conta e da engine, desde que `ParticleStorage.update` passou a aceitar
+`gravity_y`. Era o unico produto escrevendo a aceleracao por fora, no buffer
+certo e na ordem certa."""
 
 # --- as cores sao as do jogo, nao novas ---
 CRUST = (198, 172, 146)
@@ -88,12 +92,8 @@ class SparkField:
         self._storage.update(1e9)
 
     def update(self, delta_time: float) -> None:
-        """Integra e mata as velhas. A gravidade e aplicada aqui porque o
-        storage so integra posicao por velocidade."""
-        view = self._storage.active_view()
-        if view.shape[0]:
-            view["velocity_y"] += _GRAVITY * delta_time
-        self._storage.update(delta_time)
+        """Integra e mata as velhas."""
+        self._storage.update(delta_time, gravity_y=_GRAVITY)
 
     def draw(self, renderer) -> None:
         view = self._storage.active_view()

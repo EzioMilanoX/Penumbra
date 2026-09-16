@@ -376,8 +376,8 @@ penumbra/
   scenes.py          fluxo título -> fases -> jogo -> pausa -> fim
   audio.py           a voz do jogo, sintetizada (nenhum arquivo de som)
   sparks.py          a poeira dos instantes em que alguma coisa cede
-  gamepad.py         o controle -- o unico adaptador de backend daqui
-  paths.py           onde estao os dados, rodando do repo ou do .exe
+  backdrop.py        ar e rocha, num campo continuo
+  paths.py           a raiz dos dados -- so isso; a mecanica e da engine
   progress.py        o que sobrevive a fechar o jogo
   achievements.py    onze conquistas, e o motivo dos fragmentos
   menu.py            tela de título, grade de cards, prévia do terreno
@@ -396,7 +396,7 @@ penumbra/
     spark_system.py             as mesmas bordas do áudio, viradas em faísca
 data/                dificuldade, bindings, arquétipos, fases
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              289 testes headless
+tests/              281 testes headless
 tools/               audit_levels.py, build_exe.py, generate_icon.py
 penumbra.spec        receita do executável
 ```
@@ -564,39 +564,37 @@ A pergunta não era "como suavizar", era **o que pode ser suavizado**. Ar e
 rocha são os dois únicos papéis da grade que não carregam decisão: o ar não é
 chão de ninguém, a rocha é chão dos dois, sempre. Todo o resto — éter,
 contra-éter, crosta, placa, portal — responde *"de quem é este chão, agora?"*,
-e essa resposta tem de ser lida na célula exata. Suavizar éter seria trocar
-atmosfera por erro, e nada na tela diria que foi isso que aconteceu.
+e essa resposta tem de ser lida na célula exata.
 
-Então ar e rocha saíram das células e viraram um **fundo em resolução
-dobrada**, com a luz interpolada; todo o resto continua em quadrados duros,
-por cima. A silhueta da rocha também continua na aresta da célula — só a
-**luz** é interpolada, nunca o papel.
+A primeira resposta foi subdividir a grade à mão: 1904 sub-quadros, 2 ms por
+frame, e ainda assim degraus de 16 px. **Ela existia por uma lacuna da
+engine** — `draw_batch` cobra por entidade — e virou
+[`IRenderer.draw_field`](#o-que-foi-parar-na-engine). Hoje o fundo é
+[backdrop.py](penumbra/backdrop.py): dois arrays de 28 × 17 e duas chamadas.
 
-### Por que 2× e não 4×
+### Por que dois campos
 
-Porque foi medido. `PygameRenderer.draw_batch` é um **laço Python** — sem
-instancing, sem batch de verdade — a **2,8 µs por entidade** (476 quads
-opacos: 1,35 ms). Então:
+Porque um só não consegue ao mesmo tempo **cobrir a tela** e **recortar a
+parede** — o alpha é um canal. As duas alternativas foram tentadas, e as duas
+apareceram na tela antes de aparecer em qualquer teste:
 
-| fator | sub-quadros | desenho | veredicto |
-|---|---|---|---|
-| 1× | 476 | 1,3 ms | lê como tabuleiro |
-| **2×** | **1904** | **~5 ms** | **já lê como luz** |
-| 4× | 7616 | 21 ms | lisa de verdade, e não cabe em 16,7 ms |
+| tentativa | o que quebrou |
+|---|---|
+| tudo num campo, alpha 255 | a cor da rocha vaza pra fora dela: a silhueta borra no tamanho de uma célula |
+| brilho do ar no alpha | `draw_field` **não** interpola alpha, porque alpha é forma — o ar saiu mais quadriculado que antes de tudo |
 
-O frame inteiro saiu de 2,17 ms para **4,19 ms** — menos que o pior caso,
-porque `_draw_shape` sai cedo com alpha zero e a maior parte de um nível está
-no escuro. A resolução do fundo é um **orçamento**, e um teste guarda a conta
-para quem dobrar o fator sem refazê-la.
+Luz é **valor**, e valor mora na cor. Então o ar é um campo opaco de tela
+cheia sem máscara, e a rocha é um campo recortado seco — com a cor calculada
+também *fora* dela, para que a bilinear das bordas leia pedra iluminada e não
+preto.
+
+O frame ficou em **4,04 ms** (era 4,19 com os 1904 sub-quadros), e o
+`entity_capacity` voltou de 2560 para 640.
 
 Com a grade fora do caminho, o brilho do ar subiu de **62 para 100** — ele era
-baixo *por causa* do xadrez, não por gosto. O teto é 140: acima disso o escuro
-perde profundidade e o bolsão de escuridão da Umbra deixa de se distinguir do
-fundo, e ele é a única coisa na tela que diz onde ela sobrevive.
-
-Um defeito meu pelo caminho: zerei os cantos do buffer acolchoado, o que punha
-uma mancha escura em cada canto da tela — pequena, permanente, e sem nada no
-jogo que a explicasse.
+baixo *por causa* do xadrez. O teto é 140: acima disso o escuro perde
+profundidade e o bolsão de escuridão da Umbra deixa de se distinguir do fundo,
+e ele é a única coisa na tela que diz onde ela sobrevive.
 
 ## Os dois corpos
 
@@ -639,61 +637,35 @@ Duas restrições reais saíram disso:
 
 Penumbra é um jogo de sofá para dois, e até aqui os dois dividiam **um
 teclado**: o jogador 1 em WASD+ESPAÇO, o jogador 2 nas setas. Funciona, e é
-apertado — dois pares de mãos a trinta centímetros um do outro, e ninguém pode
-se levantar.
+apertado — dois pares de mãos a trinta centímetros um do outro.
 
-A engine não resolvia isso: `PygameInputProvider` entende `KEY_*` e `MOUSE_*` e
-mais nada, e o único uso que ela faz de joystick é `set_rumble`. Então o
-adaptador vive em `penumbra/gamepad.py` — não dentro da engine, cujos arquivos
-este projeto nunca modificou, e não dentro do núcleo, que nunca importa um
-backend. É registrado só em `build_game`: removido, o jogo continua idêntico e
-só com teclado.
+O adaptador morava aqui, e não devia: ele importava pygame, num produto. Hoje
+é a engine que resolve `PAD_*` nos próprios bindings, e o que sobrou em
+Penumbra é **um arquivo de dados e o que as telas prometem**.
 
-Ele **não substitui** nada. Toda consulta vai primeiro ao provider do teclado e
-só depois olha o controle, então os dois arranjos se misturam: no duo, um
-jogador no controle e o outro nas setas, na mesma partida. Um controle por
-jogador — o 0 dirige as ações do jogador 1, o 1 as `p2_*`.
+Cada ação tem uma lista — uma tecla *e* um botão:
 
-### Onde ele é amostrado, e por que essa é a parte difícil
+```json
+"jump":    ["KEY_SPACE", "PAD_A"],
+"p2_jump": ["KEY_UP",    "PAD2_A"]
+```
 
-`GameLoop.run()` chama `poll()` no provider que o `CompositionRoot` construiu, e
-`GameLoop.input_provider` é uma propriedade **somente-leitura** — documentada
-como tal. Entregar um embrulho ao laço exigiria escrever em `_input_provider`, e
-contrariar uma decisão explícita de API da engine para ganhar um wrapper não
-vale o precedente.
+O `PAD2_` é o segundo controle. Os dois arranjos convivem na mesma partida:
+com **um** controle só, o jogador 1 está no controle e o 2 nas setas, que é o
+arranjo real de um sofá com um controle.
 
-Então a amostragem se prende ao frame por outro caminho, todo público:
-`set_on_draw_ui` roda uma vez por frame, no fim, e ali o controle só é marcado
-como **velho**. Quem amostra é a **primeira consulta do frame seguinte**, dentro
-do `update()` da cena — no mesmo ponto em que o teclado acabou de ser amostrado.
-As bordas saem exatas e sem atraso; amostrar dentro do próprio `set_on_draw_ui`
-custaria os ~16 ms entre um frame e outro, que num jogo de plataforma é a
-diferença entre o coyote time perdoar e não perdoar.
+E as telas dizem isso. Uma dica de controle que **mente** é pior que dica
+nenhuma: quem está com o controle na mão lendo "ESPAÇO pular" conclui que o
+controle não funciona — e ele funciona. O rodapé da fase, a tela de modo e a
+grade trocam de rótulo conforme `connected_pads()`, e no duo cada jogador lê a
+sua metade.
 
-### Duas soleiras, não uma
-
-Um analógico em repouso não para em zero: fica tremendo perto dele. Com uma
-soleira só, um polegar parado na fronteira manda dezenas de bordas por segundo —
-na fase o ser vibra no lugar, e no menu o cursor atravessa a lista sozinho. A
-direção **engata** em 0.55 e só **solta** abaixo de 0.30, e o tremor inteiro
-acontece dentro do vão. O direcional e o analógico entram pelo mesmo código:
-para o jogo são a mesma intenção.
-
-### E as telas passam a dizer a verdade
-
-Uma dica de controle que **mente** é pior que dica nenhuma: quem está com o
-controle na mão lendo "ESPAÇO pular" conclui que o controle não funciona — e ele
-funciona. Então o rodapé da fase, a tela de escolha de modo e a grade de fases
-trocam de rótulo conforme quantos controles estão ligados, e no duo cada jogador
-lê a sua metade: com **um** controle só, o jogador 1 lê o controle e o 2 lê as
-setas, que é o arranjo real de um sofá com um controle.
-
-Isso custou o terceiro caso do mesmo defeito neste projeto — **estado escrito e
-nunca lido**. A contagem existia no provider, as telas sabiam desenhá-la, e no
-meio o `PenumbraFlow` não guardava o provider: `flow.pads` levantava
+Isso custou o terceiro caso do mesmo defeito neste projeto — **estado escrito
+e nunca lido**. A contagem existia, as telas sabiam desenhá-la, e no meio o
+`PenumbraFlow` não guardava o provider: `flow.pads` levantava
 `AttributeError` no primeiro frame da tela de título, com 271 testes verdes.
-Nenhum deles passava por ali, porque todos desenhavam as telas **direto**, com o
-número na mão. Os testes novos desenham pelo caminho de verdade.
+Nenhum passava por ali, porque todos desenhavam as telas **direto**, com o
+número na mão.
 
 ## A poeira
 
@@ -908,6 +880,38 @@ e nada avisa.
   carrega o arquivo pelo **carregador real**, e outro confere que toda ação
   lida pelo código está lá.
 
+## O que foi parar na engine
+
+Quatro coisas nasceram aqui e não eram deste repositório. Nenhuma é mecânica
+de Penumbra: todas eram **lacunas da OuroborosEngine que este jogo estava
+contornando**, e cada contorno teria de ser reescrito pelo próximo produto.
+
+| o que | por que não era daqui |
+|---|---|
+| **`IRenderer.draw_field`** | `draw_batch` cobra por entidade (2,8 µs cada, laço Python). Um campo contínuo custava 1904 entidades e ainda saía em degraus |
+| **`PAD_*` nos bindings** | `PygameInputProvider` só resolvia `KEY_*`/`MOUSE_*`. Sem isso, o produto escreve o próprio adaptador — e passa a importar pygame |
+| **`ResourceRoot`** | caminho relativo deixa de funcionar no dia em que o produto vira `.exe`. Todo produto descobre isso empacotando o primeiro |
+| **`SaveFile`** | ler sem levantar, escrever atômico, falhar em silêncio. O *formato* do save continua sendo do produto |
+| **`ParticleStorage(gravity_y=)`** | a storage já integrava velocidade em posição e deixava só a aceleração de fora |
+
+O caso do controle merece ser dito por inteiro, porque foi **erro meu**: a
+constituição da engine diz que só o `CompositionRoot` importa backend
+concreto, e o import-linter a verifica — mas Penumbra vive fora de
+`root_package = ouroboros`, então o linter não via. Eu escrevi um adaptador
+pygame dentro do produto e uma justificativa para ele. A justificativa não se
+sustenta: a resposta certa era a engine aprender `PAD_*`.
+
+Isso também apagou um truque feio. O antigo `gamepad.py` prendia a amostragem
+ao frame por `set_on_draw_ui`, porque `GameLoop.input_provider` é somente
+leitura e eu não podia ser o provider. Com `PAD_*` nativo, o `run()` da engine
+chama `poll()` na hora certa e o truque some junto com o arquivo.
+
+**O que ficou aqui, e está certo onde está:** as duas grades
+(`hitbox`/`hitbox_shadow`, conseguidas parametrizando nomes de pool, sem uma
+linha de engine), o campo de luz geodésico, o *squash* e *stretch* dos dois
+seres (os números **são** a caracterização deles), e todo o conteúdo —
+terreno, fases, menus, conquistas.
+
 ## Escopo
 
 Este é o vertical slice das mecânicas centrais. Ficaram **fora**, do documento
@@ -919,6 +923,8 @@ de design original:
 - **Música** — a engine expõe `load_track`/`play_track` e ninguém chama. O
   jogo tem voz e não tem fundo
 - **Editor de fases**, **estatísticas**, **localização**
+- **A voz do jogo** — trinta fases sem que ele diga uma vez do que é sobre, e
+  a pergunta do fim chega sem preparo
 
 Já **não** estão fora, e estiveram: o **controle simultâneo** (modo duo, e o
 mesmo mapa muda de forma quando há dois jogadores), a **escolha da fusão** (o

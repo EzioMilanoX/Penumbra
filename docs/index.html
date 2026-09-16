@@ -270,7 +270,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Manual de campo · v1.6 · 30 fases em três capítulos</p>
+    <p class="kicker">Manual de campo · v1.7 · 30 fases em três capítulos</p>
     <h1>Penumbra</h1>
     <p class="lede">
       Dois seres que não podem se tocar e não avançam separados. O mundo não tem
@@ -711,29 +711,34 @@
     </p>
 
     <div class="panel">
-      <p class="panel-title">Por que 2× e não 4× — a resolução é um orçamento</p>
+      <p class="panel-title">Duas tentativas, e por que são dois campos</p>
       <p class="measure" style="max-width:none">
-        <code>PygameRenderer.draw_batch</code> é um <b>laço Python</b>: sem
-        instancing, sem batch de verdade. Medido em 2,8 µs por entidade.
+        A primeira resposta foi subdividir a grade à mão — 1904 sub-quadros,
+        2 ms por frame, degraus de 16 px. Ela existia por uma lacuna da
+        engine (<code>draw_batch</code> cobra por entidade) e virou
+        <code>IRenderer.draw_field</code>. Mas um campo só não consegue ao
+        mesmo tempo <b>cobrir a tela</b> e <b>recortar a parede</b>: o alpha é
+        um canal.
       </p>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>Fator</th><th>Sub-quadros</th><th>Só o desenho</th><th></th></tr></thead>
+          <thead><tr><th>Tentativa</th><th>O que quebrou na tela</th></tr></thead>
           <tbody>
-            <tr><td class="n">1×</td><td class="n">476</td><td class="n">1,3 ms</td><td>lê como tabuleiro</td></tr>
-            <tr><td class="n"><b>2×</b></td><td class="n"><b>1904</b></td><td class="n"><b>~5 ms</b></td><td><b>já lê como luz</b></td></tr>
-            <tr><td class="n">4×</td><td class="n">7616</td><td class="n">21 ms</td><td>lisa de verdade, e não cabe nos 16,7 ms de um frame</td></tr>
+            <tr><td>tudo num campo, alpha 255</td><td>a cor da rocha vaza pra fora dela: a silhueta borra no tamanho de uma célula</td></tr>
+            <tr><td>brilho do ar no alpha</td><td><code>draw_field</code> <b>não</b> interpola alpha, porque alpha é forma — o ar saiu mais quadriculado que antes de tudo</td></tr>
+            <tr><td><b>ar opaco + rocha recortada</b></td><td><b>as duas coisas ao mesmo tempo</b></td></tr>
           </tbody>
         </table>
       </div>
     </div>
     <p class="note">
-      O frame inteiro saiu de 2,17 ms para <b>4,19 ms</b> — menos que o pior
-      caso, porque o backend sai cedo com alpha zero e a maior parte de um
-      nível está no escuro. Com a grade fora do caminho, o brilho do ar subiu
-      de 62 para 100: ele era baixo <i>por causa</i> do xadrez. O teto é 140 —
-      acima disso o bolsão de escuridão da Umbra deixa de se distinguir do
-      fundo, e ele é a única coisa na tela que diz onde ela sobrevive.
+      Luz é <b>valor</b>, e valor mora na cor. O ar é um campo opaco de tela
+      cheia sem máscara; a rocha é um campo recortado seco, com a cor
+      calculada também <i>fora</i> dela para que a bilinear das bordas leia
+      pedra iluminada e não preto. O frame ficou em <b>4,04 ms</b> (era 4,19
+      com os sub-quadros) e o <span class="mono">entity_capacity</span> voltou
+      de 2560 para 640. Com a grade fora do caminho, o brilho do ar subiu de
+      62 para 100 — ele era baixo <i>por causa</i> do xadrez.
     </p>
 
     <h3>E os dois corpos passaram a ter peso</h3>
@@ -774,64 +779,37 @@
     <h2>Dois no sofá, e um teclado só</h2>
     <p class="measure">
       Penumbra é um jogo de sofá para dois, e até aqui os dois dividiam um
-      teclado: o jogador 1 em WASD+ESPAÇO, o jogador 2 nas setas. Funciona, e é
-      apertado — dois pares de mãos a trinta centímetros um do outro, e ninguém
-      pode se levantar.
+      teclado: o jogador 1 em WASD+ESPAÇO, o jogador 2 nas setas. Funciona, e
+      é apertado — dois pares de mãos a trinta centímetros um do outro.
     </p>
     <p class="measure">
-      A engine não resolvia isso: <code>PygameInputProvider</code> entende
-      <span class="mono">KEY_*</span> e <span class="mono">MOUSE_*</span> e mais
-      nada, e o único uso que ela faz de joystick é <code>set_rumble</code>. O
-      adaptador vive então em <code>penumbra/gamepad.py</code> — <b>não</b> dentro
-      da engine, cujos arquivos este projeto nunca modificou, e não dentro do
-      núcleo, que nunca importa um backend. Ele não <i>substitui</i> nada: toda
-      consulta vai primeiro ao teclado e só depois olha o controle, então no duo
-      um jogador pode estar no controle e o outro nas setas, na mesma partida.
+      O adaptador de controle chegou a morar aqui, e não devia: ele importava
+      pygame, dentro de um produto. Hoje é a engine que resolve
+      <span class="mono">PAD_*</span> nos próprios bindings, e o que sobrou em
+      Penumbra é <b>um arquivo de dados e o que as telas prometem</b>.
     </p>
-
-    <h3>Onde ele é amostrado, e por que essa é a parte difícil</h3>
+<pre>"jump":    ["KEY_SPACE", "PAD_A"],
+"p2_jump": ["KEY_UP",    "PAD2_A"]</pre>
     <p class="measure">
-      <code>GameLoop.run()</code> chama <code>poll()</code> no provider que o
-      <code>CompositionRoot</code> construiu, e <code>input_provider</code> é uma
-      propriedade <b>somente-leitura</b>, documentada como tal. Entregar um
-      embrulho ao laço exigiria escrever no atributo privado, e contrariar uma
-      decisão explícita de API da engine para ganhar um wrapper não vale o
-      precedente.
-    </p>
-    <p class="measure">
-      Então a amostragem se prende ao frame por outro caminho, todo público:
-      <code>set_on_draw_ui</code> roda uma vez por frame, no fim, e ali o controle
-      só é marcado como <b>velho</b>. Quem amostra é a <b>primeira consulta do
-      frame seguinte</b>, dentro do <code>update()</code> da cena — no mesmo
-      ponto em que o teclado acabou de ser amostrado. Amostrar dentro do próprio
-      <code>set_on_draw_ui</code> custaria os ~16 ms entre um frame e outro, que
-      num jogo de plataforma é a diferença entre o coyote time perdoar e não
-      perdoar.
-    </p>
-
-    <h3>Duas soleiras, não uma</h3>
-    <p class="measure">
-      Um analógico em repouso não para em zero: fica tremendo perto dele. Com uma
-      soleira só, um polegar parado na fronteira manda dezenas de bordas por
-      segundo — na fase o ser vibra no lugar, e no menu o cursor atravessa a
-      lista sozinho. A direção <b>engata</b> em <span class="mono">0.55</span> e
-      só <b>solta</b> abaixo de <span class="mono">0.30</span>, e o tremor inteiro
-      acontece dentro do vão.
+      Cada ação tem uma lista: uma tecla <b>e</b> um botão. O
+      <span class="mono">PAD2_</span> é o segundo controle. Os dois arranjos
+      convivem na mesma partida — com <b>um</b> controle só, o jogador 1 está
+      no controle e o 2 nas setas, que é o arranjo real de um sofá com um
+      controle.
     </p>
     <p class="note">
-      <b>E as telas passam a dizer a verdade.</b> Uma dica de controle que
-      <i>mente</i> é pior que dica nenhuma: quem está com o controle na mão lendo
-      "ESPAÇO pular" conclui que o controle não funciona — e ele funciona. O
-      rodapé da fase, a tela de modo e a grade trocam de rótulo conforme quantos
-      controles estão ligados, e no duo cada jogador lê a sua metade: com
-      <b>um</b> controle só, o jogador 1 lê o controle e o 2 lê as setas.
+      <b>E as telas dizem isso.</b> Uma dica de controle que <i>mente</i> é
+      pior que dica nenhuma: quem está com o controle na mão lendo "ESPAÇO
+      pular" conclui que o controle não funciona — e ele funciona. O rodapé da
+      fase, a tela de modo e a grade trocam de rótulo conforme
+      <code>connected_pads()</code>, e no duo cada jogador lê a sua metade.
     </p>
     <p class="note">
-      Isso custou o <b>terceiro</b> caso do mesmo defeito neste projeto: estado
-      escrito e nunca lido. A contagem existia no provider, as telas sabiam
+      Isso custou o <b>terceiro</b> caso do mesmo defeito neste projeto:
+      estado escrito e nunca lido. A contagem existia, as telas sabiam
       desenhá-la, e no meio o fluxo não guardava o provider — a tela de título
       levantava <code>AttributeError</code> no primeiro frame, com 271 testes
-      verdes. Nenhum deles passava por ali: todos desenhavam as telas
+      verdes. Nenhum passava por ali: todos desenhavam as telas
       <b>direto</b>, com o número na mão.
     </p>
   </section>
@@ -976,6 +954,48 @@
     </p>
   </section>
 
+  <section id="fronteira">
+    <p class="eyebrow">A fronteira</p>
+    <h2>O que foi parar na engine</h2>
+    <p class="measure">
+      Quatro coisas nasceram neste jogo e não eram dele. Nenhuma é mecânica de
+      Penumbra: todas eram <b>lacunas da OuroborosEngine que o jogo estava
+      contornando</b> — e cada contorno teria de ser reescrito pelo próximo
+      produto que a usasse.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>O que subiu</th><th>Por que não era do jogo</th></tr></thead>
+        <tbody>
+          <tr><td><code>IRenderer.draw_field</code></td><td><code>draw_batch</code> cobra por entidade — 2,8 µs cada, num laço Python. Um campo contínuo custava 1904 entidades <i>e ainda saía em degraus</i></td></tr>
+          <tr><td><span class="mono">PAD_*</span> nos bindings</td><td><code>PygameInputProvider</code> só resolvia <span class="mono">KEY_*</span>/<span class="mono">MOUSE_*</span>. Sem isso o produto escreve o próprio adaptador — e passa a importar pygame</td></tr>
+          <tr><td><code>ResourceRoot</code></td><td>caminho relativo deixa de funcionar no dia em que o produto vira <span class="mono">.exe</span>. Todo produto descobre empacotando o primeiro</td></tr>
+          <tr><td><code>SaveFile</code></td><td>ler sem levantar, escrever atômico, falhar em silêncio. O <i>formato</i> do save continua sendo do produto</td></tr>
+          <tr><td><code>ParticleStorage</code> · gravidade</td><td>a storage já integrava velocidade em posição e deixava só a aceleração de fora</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      O caso do controle merece ser dito por inteiro, porque foi <b>erro de
+      quem escreveu</b>: a constituição da engine diz que só o
+      <code>CompositionRoot</code> importa backend concreto, e o import-linter
+      a verifica — mas Penumbra vive fora de
+      <span class="mono">root_package = ouroboros</span>, então o linter não
+      via. O adaptador pygame foi escrito dentro do produto, com uma
+      justificativa que não se sustenta: a resposta certa era a engine
+      aprender <span class="mono">PAD_*</span>. Isso apagou junto um truque
+      feio — o adaptador prendia a amostragem ao frame por
+      <code>set_on_draw_ui</code>, que só existia porque ele não podia <i>ser</i>
+      o provider.
+    </p>
+    <p class="measure">
+      <b>O que ficou, e está certo onde está:</b> as duas grades de colisão
+      (conseguidas parametrizando nomes de pool, sem uma linha de engine), o
+      campo de luz geodésico, o <i>squash</i> e <i>stretch</i> dos dois seres
+      — os números <b>são</b> a caracterização deles — e todo o conteúdo.
+    </p>
+  </section>
+
   <section id="rodar">
     <p class="eyebrow">Rodar</p>
     <h2>A engine vive no repositório dela</h2>
@@ -990,7 +1010,7 @@ git clone https://github.com/EzioMilanoX/Penumbra.git
 pip install -e ./OuroborosEngine        # numpy + pygame-ce vêm com ela
 cd Penumbra &amp;&amp; python -m penumbra.main  # sempre da raiz, como módulo
 
-pytest -q                      # 289 testes headless
+pytest -q                      # 281 testes headless
 python -m tools.audit_levels   # luz, sobrevivência e alcance por fase</pre>
     <p class="measure">
       <code>python -m</code> não é preferência de estilo: os imports são
