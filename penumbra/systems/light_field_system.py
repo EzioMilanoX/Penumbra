@@ -131,6 +131,13 @@ class LightFieldSystem(ISystem):
 
         # --- sombra da Umbra (antes da luz: ela apaga as fontes) ---
         np.copyto(self._seed, state.altar_shadow)
+        if terrain.has_shade:
+            # A mancha: o espelho da lampada, e a unica fonte FIXA de
+            # escuridao do jogo. Semeia com a mesma intensidade do bolsao que
+            # a Umbra carrega, entao o raio dela e o mesmo `absorb_radius_cells`
+            # -- uma lei de propagacao, nao duas.
+            np.multiply(terrain.shade, self._absorb_seed, out=self._mask_b_float)
+            np.maximum(self._seed, self._mask_b_float, out=self._seed)
         if state.ability_on[UMBRA]:
             col, row = int(state.cell[UMBRA, 0]), int(state.cell[UMBRA, 1])
             self._seed[row, col] = max(float(self._seed[row, col]), self._absorb_seed)
@@ -163,6 +170,15 @@ class LightFieldSystem(ISystem):
         if state.ability_on[LUMEN]:
             col, row = int(state.cell[LUMEN, 0]), int(state.cell[LUMEN, 1])
             self._seed[row, col] = max(float(self._seed[row, col]), light_tuning.beam_intensity)
+        if state.ambient > 0.0:
+            # A luz do MUNDO. Semeada em toda celula aberta, e nao propagada
+            # de uma borda: ambiente e um piso, nao uma fonte.
+            #
+            # Entra ANTES do recorte por `_open_light`, e e isso que faz a
+            # mancha funcionar: uma celula absorvida sai do recorte, entao ela
+            # fica escura mesmo num mundo aceso. Sem essa ordem, o ambiente
+            # apagaria a propria sombra que o capitulo existe pra ter.
+            np.maximum(self._seed, np.float32(state.ambient), out=self._seed)
         np.multiply(self._seed, self._open_light, out=self._seed)
         self._relax(state.light, self._open_light)
 

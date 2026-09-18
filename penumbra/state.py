@@ -62,6 +62,9 @@ class DualityState:
         """Intensidade de luz por celula (0..1), ja occluida por rocha e
         porta trancada e ja suprimida pela absorcao da Umbra."""
         self.display_light = np.zeros(shape, dtype=np.float32)
+        self.ambient = 0.0
+        """A luz de fundo do MUNDO, vinda do capitulo. Zero nos tres
+        primeiros; acima de `solid_threshold` num capitulo que inverte."""
         """Como `light`, mas com as celulas que BLOQUEIAM luz recebendo o
         maximo dos vizinhos -- so apresentacao (uma parede iluminada de um
         lado precisa parecer iluminada), nunca usado por regra de jogo."""
@@ -261,6 +264,10 @@ class LevelRuntime:
         pior hora possivel pra fase mudar debaixo do jogador.
         """
         self._state.level_index = level_index % self._catalog.count
+        # O mundo vem do capitulo, e e escrito AQUI e nao em `load_rows`:
+        # carregar um ASCII avulso (teste, ferramenta, previa do menu) adota
+        # geometria, nao mundo.
+        self._state.ambient = float(self.current.ambient)
         self.load_rows(self.current.rows_for(bool(self._state.duo)))
 
     def load_rows(self, rows: Tuple[str, ...]) -> None:

@@ -79,7 +79,13 @@ class TestTheGameLoadsFromAnywhere:
         config = EngineConfig.from_json(str(_CONFIG))
         simulation = build_simulation(config)
 
-        assert simulation.catalog.count == 30
+        # Conta o que esta em disco, e nao um numero cravado: o teste e
+        # sobre MONTAR de outro diretorio, e um numero aqui so faz a suite
+        # cair toda vez que alguem acrescenta uma fase.
+        from penumbra.paths import resource
+
+        esperado = len(list(resource("data", "levels").glob("*.json")))
+        assert simulation.catalog.count == esperado
         assert simulation.terrain.cols > 0
 
     def test_a_dificuldade_do_config_e_relativa_de_proposito(self):

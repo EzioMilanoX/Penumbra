@@ -35,6 +35,7 @@ SOURCE_ALT_CHAR = "&"
 LEVER_CHAR = "!"
 SHARD_CHAR = "+"
 LAMP_CHAR = "*"
+SHADE_CHAR = "x"
 DOOR_CHAR = "D"
 ZONE_LIGHT_CHAR = "L"
 ZONE_SHADOW_CHAR = "S"
@@ -69,6 +70,7 @@ ROLE_GLASS = 18
 ROLE_SOURCE = 19
 ROLE_SOURCE_ALT = 20
 ROLE_LEVER = 21
+ROLE_SHADE = 22
 
 _MARKER_CHARS = frozenset(
     {LUMEN_SPAWN_CHAR, UMBRA_SPAWN_CHAR, LUMEN_GOAL_CHAR, UMBRA_GOAL_CHAR}
@@ -188,6 +190,13 @@ class Terrain:
         self.altar = np.zeros(shape, dtype=bool)
         self.wander = np.zeros(shape, dtype=bool)
         self.veil = np.zeros(shape, dtype=bool)
+        # A mancha: o espelho da lampada.
+        #
+        # Existe porque um mundo de luz ambiente nao produz sombra nenhuma
+        # sozinho -- o ambiente e um piso uniforme, e um piso nao tem borda.
+        # Sem uma fonte FIXA de escuridao, um capitulo claro seria so uma
+        # fase inteira acesa, e a Umbra nao teria onde pisar.
+        self.shade = np.zeros(shape, dtype=bool)
         self.glass = np.zeros(shape, dtype=bool)
         self.source = np.zeros(shape, dtype=np.float32)
         self.source_alt = np.zeros(shape, dtype=np.float32)
@@ -220,6 +229,7 @@ class Terrain:
         self.has_altar = False
         self.has_wanderer = False
         self.has_source = False
+        self.has_shade = False
         self.has_lever = False
         self.wander_row = -1
         self.wander_min_col = -1
@@ -266,6 +276,7 @@ class Terrain:
         self.altar[:] = False
         self.wander[:] = False
         self.veil[:] = False
+        self.shade[:] = False
         self.glass[:] = False
         self.source[:] = 0.0
         self.source_alt[:] = 0.0
@@ -334,6 +345,9 @@ class Terrain:
                 elif char == LAMP_CHAR:
                     self.lamp[row_index, col_index] = 1.0
                     self.role[row_index, col_index] = ROLE_LAMP
+                elif char == SHADE_CHAR:
+                    self.shade[row_index, col_index] = True
+                    self.role[row_index, col_index] = ROLE_SHADE
                 elif char == DOOR_CHAR:
                     self.door[row_index, col_index] = True
                     self.role[row_index, col_index] = ROLE_DOOR
@@ -370,6 +384,7 @@ class Terrain:
         self.has_plate = bool(self.plate.any())
         self.has_altar = bool(self.altar.any())
         self.has_source = bool(self.source.any() or self.source_alt.any())
+        self.has_shade = bool(self.shade.any())
         self.has_lever = bool(self.lever.any())
         self._resolve_rail()
 

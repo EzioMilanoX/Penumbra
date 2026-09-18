@@ -31,6 +31,25 @@ class LevelDefinition:
     hint: str
     chapter: int
     rows: Tuple[str, ...]
+    ambient: float = 0.0
+    """A luz de fundo do MUNDO em que esta fase se passa.
+
+    Zero em vinte e nove das trinta e duas: o jogo e escuro por padrao e a
+    luz e o recurso escasso. As faixas uteis nao foram inventadas -- saem das
+    tres soleiras que ja existem (`extinguish_below` 0.12 <
+    `solid_threshold` 0.35 < `dissolve_above` 0.60):
+
+    * `0.12..0.35` -- crepusculo: a Lumen nunca mais se apaga, mas o chao
+      continua sendo da Umbra por padrao.
+    * `0.35..0.60` -- **inverte**: todo eter ja e chao da Lumen, e a Umbra so
+      pisa onde alguma coisa faz sombra. E o unico lugar onde a mancha (`x`)
+      deixa de ser enfeite e vira a estrada dela.
+    * `>= 0.60` -- a Umbra se dissolve em qualquer lugar. Inviavel.
+
+    Fica na FASE e nao no capitulo, apesar de "mundo" soar como capitulo:
+    os capitulos deste jogo sao uma FUNCAO (aprender, misturar, quebrar) e
+    nao um lugar, e a propria docstring de `Chapter` diz isso. Um eixo de
+    mundo de verdade seria um conceito novo, ortogonal ao capitulo."""
     duo_cells: Tuple[Tuple[int, int, str], ...] = ()
     """Celulas que MUDAM no modo de dois jogadores, como `(col, linha, char)`.
 
@@ -91,7 +110,7 @@ class Chapter:
         return self.first + self.count - 1
 
 
-_CHAPTER_TITLES = {
+_CHAPTERS = {
     1: ("APRENDER", "uma mecânica de cada vez"),
     2: ("MISTURAR", "duas ou mais, ao mesmo tempo"),
     3: ("ESPECIAIS", "as que quebram a própria regra"),
@@ -143,8 +162,8 @@ def _build_chapters(levels: Tuple[LevelDefinition, ...]) -> Tuple[Chapter, ...]:
     return tuple(
         Chapter(
             number=number,
-            title=_CHAPTER_TITLES.get(number, (f"CAPITULO {number}", ""))[0],
-            subtitle=_CHAPTER_TITLES.get(number, ("", ""))[1],
+            title=_CHAPTERS.get(number, (f"CAPITULO {number}", ""))[0],
+            subtitle=_CHAPTERS.get(number, ("", ""))[1],
             first=first,
             count=count,
         )
@@ -234,6 +253,7 @@ class LevelCatalog:
                     teaches=str(raw.get("teaches", "")),
                     duo_cells=_parse_duo_cells(raw, path),
                     duo_note=str(raw.get("duo", {}).get("note", "")),
+                    ambient=float(raw.get("ambient", 0.0)),
                 )
             )
 

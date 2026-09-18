@@ -31,6 +31,7 @@ from penumbra.terrain import (
     ROLE_LAMP,
     ROLE_LUMEN_GOAL,
     ROLE_PLATE,
+    ROLE_SHADE,
     ROLE_SHARD,
     ROLE_ROCK,
     ROLE_BEACON,
@@ -100,6 +101,18 @@ cinza-azulado da rocha se le mesmo com pouca luz."""
 
 LAMP_ON = (255, 250, 232)
 LAMP_SNUFFED = (74, 70, 86)
+
+SHADE_CORE = (18, 16, 30)
+SHADE_RIM = (96, 88, 132)
+"""A mancha: o espelho da lampada.
+
+Desenhada com a MESMA forma e o MESMO tamanho da lampada, e de proposito --
+as duas sao fontes fixas, e o jogador tem de ler "isto irradia" antes de ler
+o que irradia. O que separa as duas e so a cor: a lampada e um miolo claro,
+a mancha e um miolo escuro com uma orla violeta, que e a familia da Umbra.
+
+A orla existe porque um circulo preto sobre um mundo aceso ainda le como
+buraco; sobre o mundo escuro dos tres primeiros capitulos ele sumiria."""
 BEACON_OFF = (92, 88, 104)
 
 PLATE_IDLE = (108, 88, 46)
@@ -157,7 +170,7 @@ redor: eter e contra-eter trocados continuam sendo eter e contra-eter. Ela
 mesma tem de dizer de que lado esta, e por isso muda de cor em vez de so
 pulsar."""
 
-_ROLE_COUNT = 22
+_ROLE_COUNT = 23
 _CELL_SPRITE_UNIT = 8.0
 """`PygameRenderer.draw_batch` converte `transform.scale` em pixels
 multiplicando por 8 (a unidade de forma primitiva do Pilar 2) -- uma celula
@@ -281,6 +294,7 @@ class PresentationSystem(ISystem):
         # sistema saiba: nao existe gancho de "fase carregada" aqui).
         self._shape_by_role = np.full(_ROLE_COUNT, SHAPE_RECT, dtype=np.uint32)
         self._shape_by_role[ROLE_LAMP] = SHAPE_CIRCLE
+        self._shape_by_role[ROLE_SHADE] = SHAPE_CIRCLE
         self._shape_by_role[ROLE_LUMEN_GOAL] = SHAPE_RING
         self._shape_by_role[ROLE_UMBRA_GOAL] = SHAPE_RING
         # Zonas ficam RECT (placa no chao), portais ficam RING (destino).
@@ -288,6 +302,7 @@ class PresentationSystem(ISystem):
         # na tela dizia qual era onde pisar e qual era onde terminar.
         self._size_by_role = np.ones(_ROLE_COUNT, dtype=np.float32)
         self._size_by_role[ROLE_LAMP] = 0.62
+        self._size_by_role[ROLE_SHADE] = 0.62
         self._size_by_role[ROLE_LUMEN_GOAL] = 0.92
         self._size_by_role[ROLE_UMBRA_GOAL] = 0.92
         self._size_by_role[ROLE_ZONE_LIGHT] = 0.8
@@ -398,6 +413,12 @@ class PresentationSystem(ISystem):
         np.logical_and(self._mask, state.absorbed.reshape(-1), out=self._mask_alt)
         self._fill(self._mask_alt, LAMP_SNUFFED, LAMP_SNUFFED)
         np.copyto(self._alpha, 190.0, where=self._mask_alt)
+
+        # a mancha: escura no miolo, com orla violeta pra nao virar buraco
+        np.equal(role, ROLE_SHADE, out=self._mask)
+        np.clip(light, 0.0, 1.0, out=self._ramp)
+        self._fill(self._mask, SHADE_CORE, SHADE_RIM)
+        np.copyto(self._alpha, 255.0, where=self._mask)
 
         # crosta: quente, e encolhendo enquanto a Umbra a empurra
         np.equal(role, ROLE_CRUST, out=self._mask)

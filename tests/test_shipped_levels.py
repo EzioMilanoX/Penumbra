@@ -91,7 +91,13 @@ class TestEveryLevelIsPlayable:
     def test_a_lumen_acende_todo_eter_sob_os_proprios_pes(self, simulation, input_provider):
         """Com o facho ligado, cada celula de eter tem que ficar solida pra
         ela. Uma celula que nao acenda e uma ponte intransponivel por
-        qualquer caminho -- nao ha outra fonte de luz portatil no jogo."""
+        qualquer caminho -- nao ha outra fonte de luz portatil no jogo.
+
+        A UNICA excecao e a mancha (`x`), e ela nao afrouxa a regra: troca o
+        dono. Dentro de um pocao de sombra o eter e escuro POR PROJETO, e o
+        que a invariante passa a exigir ali e o espelho -- que aquele chao
+        seja da Umbra. O que nao pode existir e celula que nao e de ninguem.
+        """
         state = simulation.state
         for level_index in _level_indices(simulation):
             simulation.runtime.load(level_index)
@@ -103,10 +109,33 @@ class TestEveryLevelIsPlayable:
                 place(simulation, LUMEN, col, row - 1)
                 state.charge[LUMEN] = 1.0
                 advance(simulation, input_provider, frames=2)
-                assert bool(state.lit[row, col]), (
-                    f"fase {level_index + 1}: o facho nao acende o eter em (col={col}, row={row})"
+                if bool(state.lit[row, col]):
+                    continue
+                assert bool(state.absorbed[row, col]), (
+                    f"fase {level_index + 1}: o facho nao acende o eter em "
+                    f"(col={col}, row={row}), e nao ha mancha que explique"
                 )
             state.ability_on[LUMEN] = False
+
+    def test_toda_ilha_de_sombra_e_chao_de_alguem(self, simulation, input_provider):
+        """A contrapartida da excecao acima, e a lei que a mancha introduz.
+
+        Uma mancha sobre eter faz chao da Umbra -- essa e a ideia. Uma mancha
+        sobre CONTRA-eter faz o contrario, e uma mancha sobre o vazio nao faz
+        nada. O perigo e a celula que a sombra apaga sem entregar a ninguem:
+        ela parece chao, nao e, e nada na tela diz por que."""
+        for level_index in _level_indices(simulation):
+            simulation.runtime.load(level_index)
+            terrain = simulation.terrain
+            if not terrain.has_shade:
+                continue
+            advance(simulation, input_provider, frames=2)
+            escuro = simulation.state.absorbed
+            orfas = escuro & terrain.counter_ether
+            assert not orfas.any(), (
+                f"fase {level_index + 1}: a mancha apaga contra-eter em "
+                f"{list(zip(*np.nonzero(orfas)))[:3]} -- ali ela some pros dois"
+            )
 
     def test_o_eter_de_cada_fase_pertence_a_exatamente_um_ser(self, simulation, input_provider):
         for level_index in _level_indices(simulation):

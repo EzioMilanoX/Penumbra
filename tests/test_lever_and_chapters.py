@@ -225,6 +225,22 @@ class TestChapters:
         # pode estrea-la: e a reviravolta dela sobre algo ja ensinado.
         family = {"&": "@"}
 
+        # A mancha (`x`) e uma excecao PROVISORIA, e o motivo dela e um achado
+        # de projeto, nao uma conveniencia.
+        #
+        # Ela so significa alguma coisa num mundo de luz ambiente: no escuro
+        # dos capitulos 1 e 2, uma fonte fixa de sombra e redundante -- ja esta
+        # tudo escuro. Entao ela NAO PODE ser apresentada no tutorial sem que o
+        # tutorial tenha uma fase acesa, e uma fase acesa no capitulo 1 seria
+        # ensinar duas coisas de uma vez (o ambiente e a mancha), que e
+        # exatamente o que o capitulo 1 promete nao fazer.
+        #
+        # Ou seja: **o mundo do avesso nao se parafusa no fim**. Ou o ambiente
+        # entra no tutorial como mecanica propria, com a mancha logo depois, ou
+        # ele vira um segundo eixo (mundo x capitulo) que este jogo ainda nao
+        # tem. As duas fases que usam `x` hoje sao SONDAS do conceito.
+        provisional = {"x"}
+
         taught = set()
         for index in range(catalog.count):
             level = catalog.at(index)
@@ -235,7 +251,7 @@ class TestChapters:
         for index in range(catalog.count):
             level = catalog.at(index)
             glyphs = {family.get(ch, ch) for row in level.rows for ch in row} - skeleton
-            unexplained = glyphs - taught
+            unexplained = glyphs - taught - provisional
             assert not unexplained, (
                 f"{level.name} (cap {level.chapter}) usa {sorted(unexplained)}, "
                 f"que nenhuma fase do capitulo 1 apresenta"
