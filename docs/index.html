@@ -1000,9 +1000,24 @@
     <p class="eyebrow">Rodar</p>
     <h2>A engine vive no repositório dela</h2>
 <p class="measure">
-      Para <b>só jogar</b>, <code>python -m tools.build_exe</code> gera um
-      <code>dist/Penumbra.exe</code> de ~26 MB — um arquivo só, sem Python e sem
+      Para <b>só jogar</b>, <code>python -m tools.build_exe</code> gera a pasta
+      <code>dist/Penumbra/</code> de ~63 MB — sem Python e sem
       a engine. Para desenvolver:
+    </p>
+    <p class="note">
+      <b>É uma pasta, e não um arquivo só</b> — mande a pasta inteira, porque
+      as bibliotecas e os dados ficam ao lado do <span class="mono">.exe</span>.
+      Era um arquivo só até o <b>Controle Inteligente de Aplicativos</b> do
+      Windows 11 barrar o jogo, e o motivo não é arbitrário: um bundle
+      <span class="mono">onefile</span> se auto-extrai no
+      <span class="mono">%TEMP%</span> e executa de lá, que é exatamente o que
+      um dropper faz. Somado a não ter assinatura e a ter hash novo, ele falha
+      nos dois critérios do SAC — <i>assinado por alguém confiável</i> ou
+      <i>previsto como seguro</i>. <span class="mono">onedir</span> não resolve
+      a falta de assinatura: só tira a parte mais parecida com um empacotador.
+      A correção de verdade é um certificado OV ou EV, e autoassinado não
+      serve. E o SAC <b>não volta a ligar depois de desligado</b>, só
+      reinstalando o Windows.
     </p>
 <pre>git clone https://github.com/EzioMilanoX/OuroborosEngine.git
 git clone https://github.com/EzioMilanoX/Penumbra.git

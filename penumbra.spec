@@ -16,10 +16,23 @@ Tres coisas precisam entrar no bundle, e as tres estao fora do pacote
   editavel. Para quem clona os dois repositorios isso e o certo; para quem
   recebe um executavel, ela simplesmente precisa estar dentro.
 
-`onefile` de proposito: um unico `.exe` e o que da pra mandar pra alguem.
-`resource_root()` (ver `penumbra/paths.py`) resolve `sys._MEIPASS`, que e a
-pasta temporaria onde o bundle se descompacta -- e e por isso que o jogo nao
-pode depender do diretorio atual.
+`onedir`, e nao `onefile` -- um arquivo so era mais bonito de mandar, e o
+Windows 11 nao deixou.
+
+O Controle Inteligente de Aplicativos barrou o `onefile`, e o motivo nao e
+arbitrario: um `onefile` se auto-extrai no `%TEMP%` e executa de la, que e
+exatamente o que um dropper faz. Somado a nao ter assinatura e a ter hash
+novo (reputacao zero), ele falha nos dois criterios que o SAC usa -- assinado
+por alguem confiavel OU previsto como seguro.
+
+`onedir` **nao resolve a falta de assinatura**; so tira a parte mais parecida
+com um empacotador. A correcao de verdade e um certificado de assinatura de
+codigo (OV ou EV) -- e autoassinado nao serve, porque o SAC exige cadeia ate
+uma raiz em que ele confia.
+
+`ResourceRoot` (`ouroboros.bootstrap.resources`) ja trata os dois casos: no
+onefile a raiz e `sys._MEIPASS`, no onedir e a pasta do proprio executavel.
+Nenhum dos dois e o diretorio atual, que e o ponto.
 """
 from pathlib import Path
 
@@ -74,9 +87,11 @@ pyz = PYZ(analysis.pure)
 exe = EXE(
     pyz,
     analysis.scripts,
-    analysis.binaries,
-    analysis.datas,
     [],
+    # `exclude_binaries=True` e o que separa onedir de onefile: as bibliotecas
+    # e os dados saem para a pasta ao lado, em vez de serem costurados dentro
+    # do executavel para se auto-extraerem no `%TEMP%` a cada abertura.
+    exclude_binaries=True,
     name="Penumbra",
     debug=False,
     bootloader_ignore_signals=False,
@@ -87,4 +102,13 @@ exe = EXE(
     # seria a primeira coisa que quem recebe o arquivo veria.
     console=False,
     icon=str(icon_path) if icon_path.is_file() else None,
+)
+
+collected = COLLECT(
+    exe,
+    analysis.binaries,
+    analysis.datas,
+    strip=False,
+    upx=False,
+    name="Penumbra",
 )

@@ -12,10 +12,25 @@ terreno, as doze fases e como dois chãos convivem numa simulação só.
 ### Só jogar
 
 ```bash
-python -m tools.build_exe     # gera dist/Penumbra.exe (~26 MB)
+python -m tools.build_exe     # gera a pasta dist/Penumbra/ (~63 MB)
 ```
 
 Um arquivo só, sem Python e sem a engine — dá para mandar para alguém. O
+**É uma pasta, e não um arquivo só** — mande a pasta inteira, porque as
+bibliotecas e os dados ficam ao lado do `.exe`. Era um arquivo só até o
+**Controle Inteligente de Aplicativos** do Windows 11 barrar o jogo, e o
+motivo não é arbitrário: um bundle `onefile` se auto-extrai no `%TEMP%` e
+executa de lá, que é exatamente o que um dropper faz. Somado a não ter
+assinatura e a ter hash novo — reputação zero —, ele falha nos dois critérios
+que o SAC usa: *assinado por alguém confiável* **ou** *previsto como seguro*.
+
+`onedir` **não resolve a falta de assinatura**; só tira a parte mais parecida
+com um empacotador. A correção de verdade é um certificado de assinatura de
+código (OV ou EV) — e autoassinado não serve, porque o SAC exige cadeia até
+uma raiz em que ele confia. Vale saber também que o SAC **não volta a ligar
+depois de desligado**, só reinstalando o Windows: desligar não é um teste, é
+uma decisão.
+
 `build_exe` confere, **antes** de empacotar, as duas coisas que produzem um
 executável que abre e morre em silêncio (sem console não há traceback): os
 dados estão onde o spec espera, e o jogo monta com o diretório atual em outro

@@ -77,9 +77,22 @@ def build() -> Path:
         [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", str(_SPEC)],
         cwd=str(_ROOT), check=True,
     )
-    produced = _ROOT / "dist" / ("Penumbra.exe" if sys.platform == "win32" else "Penumbra")
+    # `onedir`: o que sai e uma PASTA com o executavel dentro, e nao um
+    # arquivo solto -- ver a docstring de `penumbra.spec`.
+    #
+    # O `dist/Penumbra.exe` de uma build `onefile` anterior NAO e apagado pelo
+    # PyInstaller, e a versao anterior deste script procurava exatamente esse
+    # nome: ela encontrava o executavel velho e anunciava sucesso num artefato
+    # de dias atras. Por isso a limpeza e explicita.
+    stale = _ROOT / "dist" / "Penumbra.exe"
+    if stale.is_file():
+        stale.unlink()
+        print("  (removido o executavel onefile antigo em dist/)")
+
+    folder = _ROOT / "dist" / "Penumbra"
+    produced = folder / ("Penumbra.exe" if sys.platform == "win32" else "Penumbra")
     if not produced.is_file():
-        raise SystemExit(f"o PyInstaller terminou mas {produced.name} nao apareceu")
+        raise SystemExit(f"o PyInstaller terminou mas {produced} nao apareceu")
     return produced
 
 
@@ -90,9 +103,13 @@ def main() -> int:
     check_runs_from_anywhere()
     print("empacotando (leva alguns minutos)...")
     executable = build()
-    size = executable.stat().st_size / (1024 * 1024)
-    print(f"\npronto: {executable}  ({size:.1f} MB)")
-    print("nao precisa de Python nem da engine -- da pra mandar o arquivo sozinho.")
+    folder = executable.parent
+    size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
+    print(f"
+pronto: {executable}")
+    print(f"a pasta inteira tem {size / (1024 * 1024):.1f} MB")
+    print("nao precisa de Python nem da engine -- mas mande a PASTA, nao so o")
+    print(".exe: as bibliotecas e os dados ficam ao lado dele.")
     return 0
 
 
