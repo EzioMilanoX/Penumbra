@@ -105,8 +105,7 @@ def main() -> int:
     executable = build()
     folder = executable.parent
     size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
-    print(f"
-pronto: {executable}")
+    print(f"\npronto: {executable}")
     print(f"a pasta inteira tem {size / (1024 * 1024):.1f} MB")
     print("nao precisa de Python nem da engine -- mas mande a PASTA, nao so o")
     print(".exe: as bibliotecas e os dados ficam ao lado dele.")

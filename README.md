@@ -7,15 +7,19 @@ visual, colecionáveis e **multiplayer local**, construído sobre a
 vive no repositório dela, não é vendorizada aqui.
 
 📖 **[Manual de campo](docs/index.html)** — a escala de luz, o alfabeto do
-terreno, as doze fases e como dois chãos convivem numa simulação só.
+terreno, as trinta fases e como dois chãos convivem numa simulação só.
 
 ### Só jogar
+
+Baixe o `Penumbra-windows.zip` da [última release](https://github.com/EzioMilanoX/Penumbra/releases/latest),
+extraia e abra `Penumbra.exe`. Não precisa de Python nem da engine.
+
+Para gerar o executável você mesmo:
 
 ```bash
 python -m tools.build_exe     # gera a pasta dist/Penumbra/ (~63 MB)
 ```
 
-Um arquivo só, sem Python e sem a engine — dá para mandar para alguém. O
 **É uma pasta, e não um arquivo só** — mande a pasta inteira, porque as
 bibliotecas e os dados ficam ao lado do `.exe`. Era um arquivo só até o
 **Controle Inteligente de Aplicativos** do Windows 11 barrar o jogo, e o
