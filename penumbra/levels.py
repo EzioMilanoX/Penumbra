@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
 
 from penumbra.terrain import Terrain, TerrainDefinitionError
 
@@ -30,7 +29,7 @@ class LevelDefinition:
     name: str
     hint: str
     chapter: int
-    rows: Tuple[str, ...]
+    rows: tuple[str, ...]
     ambient: float = 0.0
     """A luz de fundo do MUNDO em que esta fase se passa.
 
@@ -50,7 +49,7 @@ class LevelDefinition:
     os capitulos deste jogo sao uma FUNCAO (aprender, misturar, quebrar) e
     nao um lugar, e a propria docstring de `Chapter` diz isso. Um eixo de
     mundo de verdade seria um conceito novo, ortogonal ao capitulo."""
-    duo_cells: Tuple[Tuple[int, int, str], ...] = ()
+    duo_cells: tuple[tuple[int, int, str], ...] = ()
     """Celulas que MUDAM no modo de dois jogadores, como `(col, linha, char)`.
 
     E um diff e nao um segundo ASCII inteiro de proposito: a diferenca entre
@@ -61,6 +60,12 @@ class LevelDefinition:
     """O que muda, em uma frase, pro jogador. Aparece no rodape quando o modo
     de dois jogadores esta ativo -- se a fase muda e nada diz, o jogador
     aprende a fase errada e depois acha que o jogo mentiu."""
+    echo_note: str = ""
+    """Esta fase aceita o **solo com eco** (`penumbra.tape`), e o que dizer a
+    quem joga assim. So fases de DUPLA -- as que nasceram para dois andando
+    juntos -- e so as que foram conferidas jogando em laco: o eco roda a
+    versao do duo, sem afrouxar nada, e uma fase que nao fechasse assim seria
+    uma promessa falsa no card."""
     teaches: str = ""
     """A mecanica que esta fase APRESENTA, quando ela apresenta alguma.
 
@@ -73,7 +78,11 @@ class LevelDefinition:
     def has_duo_variant(self) -> bool:
         return bool(self.duo_cells)
 
-    def rows_for(self, duo: bool) -> Tuple[str, ...]:
+    @property
+    def has_echo(self) -> bool:
+        return bool(self.echo_note)
+
+    def rows_for(self, duo: bool) -> tuple[str, ...]:
         """O ASCII desta fase no modo pedido.
 
         A mesma fase pode ser um problema diferente nos dois modos, e quase
@@ -117,7 +126,7 @@ _CHAPTERS = {
 }
 
 
-def _parse_duo_cells(raw: dict, path) -> Tuple[Tuple[int, int, str], ...]:
+def _parse_duo_cells(raw: dict, path) -> tuple[tuple[int, int, str], ...]:
     """Le `duo.cells`, uma lista de `[coluna, linha, caractere]`.
 
     Falha alto no carregamento: uma coordenada fora da grade ou um caractere
@@ -146,7 +155,7 @@ def _parse_duo_cells(raw: dict, path) -> Tuple[Tuple[int, int, str], ...]:
     return tuple(parsed)
 
 
-def _build_chapters(levels: Tuple[LevelDefinition, ...]) -> Tuple[Chapter, ...]:
+def _build_chapters(levels: tuple[LevelDefinition, ...]) -> tuple[Chapter, ...]:
     chapters = []
     for index, level in enumerate(levels):
         if chapters and chapters[-1][0] == level.chapter:
@@ -182,7 +191,7 @@ class LevelCatalog:
     caractere ou marcador aparece antes do primeiro frame.
     """
 
-    def __init__(self, levels: Tuple[LevelDefinition, ...]) -> None:
+    def __init__(self, levels: tuple[LevelDefinition, ...]) -> None:
         if not levels:
             raise LevelCatalogError("catalogo de fases vazio")
         self._levels = levels
@@ -196,7 +205,7 @@ class LevelCatalog:
         return self._levels[index]
 
     @property
-    def chapters(self) -> Tuple["Chapter", ...]:
+    def chapters(self) -> tuple[Chapter, ...]:
         """Os capitulos, derivados do campo `chapter` das fases.
 
         Exige que as fases de um capitulo sejam CONTIGUAS -- o catalogo e
@@ -206,14 +215,14 @@ class LevelCatalog:
         """
         return self._chapters
 
-    def chapter_of(self, index: int) -> "Chapter":
+    def chapter_of(self, index: int) -> Chapter:
         for chapter in self._chapters:
             if chapter.first <= index <= chapter.last:
                 return chapter
         return self._chapters[-1]
 
     @staticmethod
-    def load_from_directory(levels_directory: Path) -> "LevelCatalog":
+    def load_from_directory(levels_directory: Path) -> LevelCatalog:
         """Le todos os `*.json` de `levels_directory` em ordem de nome de
         arquivo (o prefixo numerico dos arquivos define a progressao)."""
         directory = Path(levels_directory)
@@ -253,6 +262,7 @@ class LevelCatalog:
                     teaches=str(raw.get("teaches", "")),
                     duo_cells=_parse_duo_cells(raw, path),
                     duo_note=str(raw.get("duo", {}).get("note", "")),
+                    echo_note=str(raw.get("echo", {}).get("note", "")) if isinstance(raw.get("echo"), dict) else "",
                     ambient=float(raw.get("ambient", 0.0)),
                 )
             )

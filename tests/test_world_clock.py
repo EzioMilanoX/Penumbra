@@ -11,8 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from penumbra.state import LUMEN, OUTCOME_PLAYING, UMBRA
-
+from penumbra.state import LUMEN, UMBRA
 from tests.conftest import advance, load_custom, place, position
 
 # Ponte de eter sob um FAROL: o farol acende e apaga sozinho, e a ponte troca

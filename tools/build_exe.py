@@ -15,10 +15,8 @@ outro lugar -- que e exatamente a situacao de um `.exe` clicado.
 """
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +27,8 @@ _REQUIRED = (
     Path("data") / "difficulties" / "penumbra" / "basic.json",
     Path("data") / "input_bindings" / "penumbra_keyboard.json",
     Path("data") / "archetypes" / "penumbra",
+    Path("data") / "music",
+    Path("data") / "story" / "interludes.json",
 )
 
 

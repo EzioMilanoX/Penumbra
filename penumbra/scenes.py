@@ -19,8 +19,6 @@ roda dentro de `world.step()`.
 """
 from __future__ import annotations
 
-from typing import List, Optional
-
 from ouroboros.bootstrap.game_loop import GameLoop
 from ouroboros.bootstrap.scene import GameplayScene, IScene
 from ouroboros.core.world import World
@@ -30,15 +28,37 @@ from ouroboros.interfaces.renderer import IRenderer
 from penumbra import achievements
 from penumbra import audio as audio_ids
 from penumbra.levels import LevelCatalog
-from penumbra.progress import Progress
 from penumbra.menu import (
-    MAIN_ACHIEVEMENTS, MAIN_OPTIONS, MAIN_PLAY,
-    OPTION_ERASE, OPTION_FULLSCREEN, OPTION_SOUND, OPTION_VOLUME,
-    AchievementsScreen, EndingScreen, LevelCardGrid, MainMenuScreen, MenuChrome,
-    OptionsScreen, PauseScreen, TitleScreen,
+    INTERLUDE_LINE_SECONDS,
+    MAIN_ACHIEVEMENTS,
+    MAIN_OPTIONS,
+    MAIN_PLAY,
+    OPTION_ERASE,
+    OPTION_FULLSCREEN,
+    OPTION_MUSIC,
+    OPTION_SOUND,
+    OPTION_VOLUME,
+    AchievementsScreen,
+    EndingScreen,
+    InterludeScreen,
+    LevelCardGrid,
+    MainMenuScreen,
+    MenuChrome,
+    OptionsScreen,
+    PauseScreen,
+    TitleScreen,
+    interlude_done,
+)
+from penumbra.progress import Progress
+from penumbra.state import (
+    OUTCOME_COMPLETE,
+    OUTCOME_PLAYING,
+    TAPE_RECORD,
+    TAPE_REPLAY,
+    DualityState,
+    LevelRuntime,
 )
 from penumbra.terrain import Terrain
-from penumbra.state import DualityState, LevelRuntime, OUTCOME_COMPLETE, OUTCOME_PLAYING
 from penumbra.tuning import DualityTuning
 
 _DISMISS_ACTIONS = ("jump", "ability", "switch")
@@ -74,9 +94,20 @@ class PenumbraFlow:
         preview_terrain: Terrain,
         audio=None,
         backdrop=None,
-        progress: Optional[Progress] = None,
+        progress: Progress | None = None,
+        tape=None,
+        music=None,
+        interludes=None,
     ) -> None:
         self._game_loop = game_loop
+        self.music = music
+        """`penumbra.audio.PenumbraMusic`, ou `None` (testes, headless)."""
+        self.interludes = dict(interludes or {})
+        """Capitulo -> `penumbra.story.Interlude`: o que o jogo diz ao entrar
+        nele. Vazio, as fases se seguem como sempre se seguiram."""
+        self.tape = tape
+        """O solo com eco (`penumbra.tape.TapeSession`), ou `None` quando quem
+        monta o fluxo nao o oferece -- o resto do fluxo nao depende dele."""
         self._runtime = runtime
         self._state = state
         self._catalog = catalog
@@ -86,7 +117,7 @@ class PenumbraFlow:
         """A tentativa corrente chegou ate aqui sem morte e sem `R`. Vive no
         fluxo e nao no `DualityState` porque atravessa RESETS -- e a memoria
         de que houve um reset que a conquista reconhece."""
-        self.unlocked: List[str] = []
+        self.unlocked: list[str] = []
         """Conquistas destravadas na ultima vitoria, pro menu anunciar."""
         # Guardado tambem aqui, e nao so repassado as cenas: `flow.pads` e
         # lido pelas telas que ENSINAM os controles, e elas perguntam ao
@@ -104,6 +135,8 @@ class PenumbraFlow:
         self.main = MainMenuScene(self, input_provider)
         self.achievements = AchievementsScene(self, input_provider)
         self.options = OptionsScene(self, input_provider)
+        self.echo = EchoScene(self, tape, state, tuning, input_provider) if tape is not None else None
+        self.interlude = InterludeScene(self, input_provider)
         self.title.duo = self.progress.duo
         self.apply_audio_settings()
 
@@ -111,6 +144,8 @@ class PenumbraFlow:
         """A raiz. O jogo abria na escolha de MODO, que e um passo do caminho
         e nao uma raiz -- e por isso nao havia porta nenhuma pras conquistas,
         pras opcoes nem pra sair."""
+        if self.music is not None:
+            self.music.stop()
         self._game_loop.reset_scenes(self.main)
 
     def show_achievements(self) -> None:
@@ -124,10 +159,38 @@ class PenumbraFlow:
         """Leva som e volume do progresso pro motor. Chamado na abertura e a
         cada ajuste -- o `PenumbraAudio` nao le o progresso sozinho, pra que
         o audio continue removivel sem que nada mais saiba disso."""
+        if self.music is not None:
+            self.music.apply(self.progress.sound_on, self.progress.music_volume)
         if self.audio is None:
             return
         self.audio.enabled = bool(self.progress.sound_on) and self.audio.has_engine
         self.audio.volume = float(self.progress.volume)
+
+    def play_chapter_music(self, level_index: int) -> None:
+        if self.music is not None:
+            self.music.play_chapter(self._catalog.at(level_index).chapter)
+
+    # ------------------------------------------------------------------
+    # as falas entre capitulos
+    # ------------------------------------------------------------------
+
+    def enter_level(self, level_index: int) -> None:
+        """Escolher uma fase no menu. A primeira fase, nunca vencida, abre
+        com o prologo: quem chega ao jogo pela primeira vez ouve do que ele e
+        sobre antes de aprender a primeira regra."""
+        if level_index == 0 and not self.progress.completed[0] and 1 in self.interludes:
+            self.show_interlude(1, then_level=0)
+        else:
+            self.start_level(level_index)
+
+    def show_interlude(self, chapter: int, then_level: int) -> None:
+        """A fala de entrada de um capitulo, e depois a fase `then_level`.
+        A musica do capitulo ja comeca aqui: a fala e a porta dele."""
+        self._stop_tape()
+        if self.music is not None:
+            self.music.play_chapter(chapter)
+        self.interlude.restart(self.interludes[chapter], then_level)
+        self._game_loop.reset_scenes(self.interlude)
 
     def erase_progress(self) -> None:
         """Apaga tudo menos os ajustes: quem apaga o progresso raramente
@@ -143,6 +206,7 @@ class PenumbraFlow:
         self._game_loop.reset_scenes(self.title)
 
     def show_menu(self, message: str = "") -> None:
+        self._stop_tape()
         self.menu.message = message
         self._game_loop.reset_scenes(self.menu)
 
@@ -153,19 +217,19 @@ class PenumbraFlow:
         self._game_loop.reset_scenes(self.ending)
 
     @property
-    def completed(self) -> List[bool]:
+    def completed(self) -> list[bool]:
         return self.progress.completed
 
     @property
-    def shards(self) -> List[bool]:
+    def shards(self) -> list[bool]:
         return self.progress.shards
 
     @property
-    def ending_choice(self) -> Optional[str]:
+    def ending_choice(self) -> str | None:
         return self.progress.ending_choice
 
     @ending_choice.setter
-    def ending_choice(self, value: Optional[str]) -> None:
+    def ending_choice(self, value: str | None) -> None:
         self.progress.ending_choice = value
         self.progress.save()
 
@@ -246,8 +310,38 @@ class PenumbraFlow:
 
     def restart_level(self) -> None:
         self._clean_run = False
-        self._runtime.reset()
+        if self.echo_active:
+            self.tape.restart()   # o passo corrente do laco, nao a fase inteira
+        else:
+            self._runtime.reset()
         self.resume()
+
+    # ------------------------------------------------------------------
+    # solo com eco
+    # ------------------------------------------------------------------
+
+    @property
+    def echo_active(self) -> bool:
+        return self.tape is not None and self.tape.active
+
+    def can_echo(self, level_index: int) -> bool:
+        """O eco e um modo do SOLO, e so nas fases conferidas em laco. Em dois
+        jogadores ele nao tem sentido: o parceiro ja e o outro tempo."""
+        return (self.tape is not None and not self.duo
+                and self._catalog.at(level_index).has_echo)
+
+    def start_echo(self, level_index: int) -> None:
+        """Abre a fase no laco: a versao do DUO, gravando a Lumen."""
+        self._clean_run = True
+        self.unlocked = []
+        self.tape.start(level_index)
+        self.play_chapter_music(level_index)
+        self._game_loop.reset_scenes(self.echo)
+
+    def _stop_tape(self) -> None:
+        if self.echo_active:
+            self.tape.stop()
+            self._state.duo = self.duo
 
     def note_echo(self) -> None:
         """O Instante. Concede a conquista escondida e grava na hora -- um
@@ -265,6 +359,7 @@ class PenumbraFlow:
         self._clean_run = False
 
     def start_level(self, level_index: int) -> None:
+        self._stop_tape()
         self._clean_run = True
         self.unlocked = []
         # O modo entra ANTES do load: a mesma fase pode ser um problema
@@ -272,6 +367,7 @@ class PenumbraFlow:
         # `state.duo`. Na ordem inversa, o duo comecava na fase do solo.
         self._state.duo = self.duo
         self._runtime.load(level_index)
+        self.play_chapter_music(level_index)
         self._game_loop.reset_scenes(self.gameplay)
 
     def finish_level(self, level_index: int) -> None:
@@ -290,7 +386,13 @@ class PenumbraFlow:
         )
         self.progress.save()
         if level_index + 1 < self._catalog.count:
-            self.start_level(level_index + 1)
+            following = level_index + 1
+            chapter = self._catalog.at(following).chapter
+            # Cruzou a borda de um capitulo: o jogo fala antes da fase.
+            if chapter != self._catalog.at(level_index).chapter and chapter in self.interludes:
+                self.show_interlude(chapter, then_level=following)
+            else:
+                self.start_level(following)
         else:
             self.show_ending()
 
@@ -303,7 +405,8 @@ class PenumbraFlow:
         independente da cena no topo), entao ele precisa saber quando calar a
         boca -- senao desenha a faixa de rodape e os medidores dos seres por
         cima do menu."""
-        return self._game_loop.current_scene is self.gameplay
+        scene = self._game_loop.current_scene
+        return scene is self.gameplay or (self.echo is not None and scene is self.echo)
 
 
 class MainMenuScene(IScene):
@@ -318,7 +421,7 @@ class MainMenuScene(IScene):
     Nao chama `world.step()`: o mundo fica parado.
     """
 
-    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+    def __init__(self, flow: PenumbraFlow, input_provider: IInputProvider) -> None:
         self._flow = flow
         self._input = input_provider
         self._screen = MainMenuScreen()
@@ -366,7 +469,7 @@ class MainMenuScene(IScene):
 class AchievementsScene(IScene):
     """So mostra. A unica tecla e ESC, porque nao ha nada a decidir aqui."""
 
-    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+    def __init__(self, flow: PenumbraFlow, input_provider: IInputProvider) -> None:
         self._flow = flow
         self._input = input_provider
         self._screen = AchievementsScreen()
@@ -395,7 +498,7 @@ class OptionsScene(IScene):
     aplicado basta pra nao recriar a janela sessenta vezes por segundo.
     """
 
-    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+    def __init__(self, flow: PenumbraFlow, input_provider: IInputProvider) -> None:
         self._flow = flow
         self._input = input_provider
         self._screen = OptionsScreen()
@@ -433,6 +536,16 @@ class OptionsScene(IScene):
             progress.volume = min(1.0, max(0.0, progress.volume + 0.1 * step))
             self._flow.apply_audio_settings()
             self._flow.play(audio_ids.MENU_PICK, 0.8)   # ouvir o que se ajusta
+            progress.save()
+            return
+        if step and screen.selected == OPTION_MUSIC:
+            progress.music_volume = min(1.0, max(0.0, progress.music_volume + 0.1 * step))
+            self._flow.apply_audio_settings()
+            # Ouvir o que se ajusta, aqui tambem: o menu e mudo, entao a
+            # faixa do primeiro capitulo toca ate a tela fechar.
+            music = self._flow.music
+            if music is not None and music.current is None:
+                music.play_chapter(1)
             progress.save()
             return
         if step and screen.selected in (OPTION_SOUND, OPTION_FULLSCREEN):
@@ -476,7 +589,7 @@ class OptionsScene(IScene):
             self._applied_fullscreen = progress.fullscreen
         completed, _, total = self._flow.summary
         self._screen.draw(renderer, progress.sound_on, progress.volume,
-                          progress.fullscreen, completed, total)
+                          progress.fullscreen, completed, total, music=progress.music_volume)
 
 
 class TitleScene(IScene):
@@ -488,7 +601,7 @@ class TitleScene(IScene):
     ele e a primeira pergunta que o jogo faz.
     """
 
-    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+    def __init__(self, flow: PenumbraFlow, input_provider: IInputProvider) -> None:
         self._flow = flow
         self._input = input_provider
         self._screen = TitleScreen()
@@ -538,7 +651,7 @@ class PauseScene(IScene):
     Nao chama `world.step()`, que e o que "pausa" quer dizer aqui.
     """
 
-    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+    def __init__(self, flow: PenumbraFlow, input_provider: IInputProvider) -> None:
         self._flow = flow
         self._input = input_provider
         self._screen = PauseScreen()
@@ -592,7 +705,7 @@ class EndingScene(IScene):
     Nao chama `world.step()`: o mundo fica parado onde a ultima fase parou.
     """
 
-    def __init__(self, flow: "PenumbraFlow", input_provider: IInputProvider) -> None:
+    def __init__(self, flow: PenumbraFlow, input_provider: IInputProvider) -> None:
         self._flow = flow
         self._input = input_provider
         self._screen = EndingScreen()
@@ -639,7 +752,7 @@ class MenuScene(IScene):
 
     def __init__(
         self,
-        flow: "PenumbraFlow",
+        flow: PenumbraFlow,
         catalog: LevelCatalog,
         preview_terrain: Terrain,
         input_provider: IInputProvider,
@@ -678,7 +791,10 @@ class MenuScene(IScene):
             self._flow.toggle_duo()
         if self._input.is_action_pressed("jump"):
             self._flow.play(audio_ids.MENU_PICK, 0.7)
-            self._flow.start_level(self._grid.selected)
+            self._flow.enter_level(self._grid.selected)
+        elif self._input.is_action_pressed("echo") and self._flow.can_echo(self._grid.selected):
+            self._flow.play(audio_ids.MENU_PICK, 0.7)
+            self._flow.start_echo(self._grid.selected)
         elif self._input.is_action_pressed("quit"):
             self._flow.show_title()
 
@@ -688,6 +804,7 @@ class MenuScene(IScene):
             renderer, self._flow.duo,
             sum(1 for got in self._flow.shards if got), len(self._flow.shards),
             pads=self._flow.pads,
+            echo=self._flow.can_echo(self._grid.selected),
         )
         self._grid.draw(renderer, self._flow.completed, self._flow.shards, self._flow.duo,
                         pads=self._flow.pads)
@@ -779,4 +896,156 @@ class PenumbraScene(IScene):
             self._flow.finish_level(self._state.level_index)
         else:
             self._runtime.reset()
+        self._frozen_seconds = 0.0
+
+
+class InterludeScene(IScene):
+    """
+    A fala de um capitulo, entre duas fases. Nao chama `world.step()`.
+
+    ESPAÇO mostra de uma vez as linhas que faltam; com tudo na tela, segue
+    para a fase. ESC volta ao menu -- quem quer reler a fala volta a ela pela
+    fase que a abre.
+    """
+
+    def __init__(self, flow: PenumbraFlow, input_provider: IInputProvider) -> None:
+        self._flow = flow
+        self._input = input_provider
+        self._screen = InterludeScreen()
+        self.interlude = None
+        self.then_level = 0
+        self.elapsed = 0.0
+
+    def restart(self, interlude, then_level: int) -> None:
+        self.interlude = interlude
+        self.then_level = then_level
+        self.elapsed = 0.0
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world
+        self.elapsed += delta_time
+        if self._input.is_action_pressed("quit"):
+            self._flow.show_menu()
+            return
+        if not any(self._input.is_action_pressed(a) for a in _DISMISS_ACTIONS):
+            return
+        if interlude_done(self.interlude, self.elapsed):
+            self._flow.play(audio_ids.MENU_PICK, 0.6)
+            self._flow.start_level(self.then_level)
+        else:
+            self.elapsed = len(self.interlude.lines) * INTERLUDE_LINE_SECONDS + 1.0
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        del world
+        self._screen.draw(renderer, self.interlude, self.elapsed, pads=self._flow.pads)
+
+
+class EchoScene(IScene):
+    """
+    O solo com eco: gravar a Lumen, rebobinar, jogar a Umbra ao lado dela.
+
+    Irma da `PenumbraScene`, e nao um ramo dentro dela: o mundo aqui nao anda
+    pelo `delta_time` do quadro, anda em ticks fixos pela `TapeSession` -- e
+    misturar os dois relogios numa cena so seria o jeito mais facil de uma
+    fita sair de sincronia sem motivo.
+
+    As teclas sao as do solo, e cada uma tem UM sentido por momento:
+
+    * **gravando** -- A/D, ESPACO e S comandam a Lumen; TAB rebobina; R
+      recomeca a gravacao;
+    * **jogando ao lado do eco** -- as mesmas teclas comandam a Umbra; TAB
+      joga a fita fora e volta a gravar; R recomeca o presente;
+    * **paradoxo** -- ESPACO ou R tentam o presente de novo; TAB regrava a
+      Lumen a partir de um segundo antes do ponto marcado.
+    """
+
+    def __init__(
+        self,
+        flow: PenumbraFlow,
+        tape,
+        state: DualityState,
+        tuning: DualityTuning,
+        input_provider: IInputProvider,
+    ) -> None:
+        self._flow = flow
+        self._tape = tape
+        self._state = state
+        self._tuning = tuning
+        self._input = input_provider
+        self._gameplay = GameplayScene()
+        self._frozen_seconds = 0.0
+        self._echo_noted = False
+
+    def on_enter(self, world: World, renderer: IRenderer) -> None:
+        del world, renderer
+        self._frozen_seconds = 0.0
+        self._echo_noted = False
+
+    def update(self, world: World, delta_time: float) -> None:
+        del world
+        state, tape = self._state, self._tape
+        if state.outcome != OUTCOME_PLAYING:
+            self._update_frozen(delta_time)
+            return
+
+        if self._input.is_action_pressed("quit"):
+            self._flow.show_pause()
+            return
+        if self._input.is_action_pressed("switch"):
+            if tape.phase == TAPE_RECORD and not tape.replaying_prefix:
+                tape.rewind()
+                self._flow.play(audio_ids.ECHO, 0.6)
+            elif tape.phase == TAPE_REPLAY:
+                tape.rerecord()
+                self._flow.play(audio_ids.MENU_MOVE, 0.6)
+            return
+        if self._input.is_action_pressed("restart"):
+            self._flow.note_failure()
+            tape.restart()
+            return
+
+        tape.advance(self._input, delta_time)
+
+        if state.echo_found and not self._echo_noted:
+            self._echo_noted = True
+            self._flow.note_echo()
+        if state.outcome != OUTCOME_PLAYING:
+            if state.outcome != OUTCOME_COMPLETE:
+                self._flow.note_failure()
+            self._frozen_seconds = 0.0
+
+    def render(self, world: World, renderer: IRenderer) -> None:
+        self._flow.draw_world(world, renderer, self._gameplay)
+
+    def _update_frozen(self, delta_time: float) -> None:
+        """Vitoria e derrota comum se dispensam como na fase normal. O
+        paradoxo, nao: ele espera a decisao -- tentar o presente de novo ou
+        regravar o passado --, porque escolher por quem joga seria tirar dele
+        justamente a parte que o modo existe para oferecer."""
+        flow, state, tape = self._tuning.flow, self._state, self._tape
+        self._frozen_seconds += delta_time
+        readable = self._frozen_seconds >= flow.overlay_min_seconds
+        if not readable:
+            return
+        if self._input.is_action_pressed("quit"):
+            self._flow.show_menu()
+            return
+
+        if state.tape_paradox:
+            if self._input.is_action_pressed("switch"):
+                tape.rerecord_from_paradox()
+                self._frozen_seconds = 0.0
+            elif (self._input.is_action_pressed("jump")
+                  or self._input.is_action_pressed("restart")):
+                tape.retry_present()
+                self._frozen_seconds = 0.0
+            return
+
+        dismissed = any(self._input.is_action_pressed(action) for action in _DISMISS_ACTIONS)
+        if not dismissed and self._frozen_seconds < flow.overlay_seconds:
+            return
+        if state.outcome == OUTCOME_COMPLETE:
+            self._flow.finish_level(state.level_index)
+        else:
+            tape.restart()
         self._frozen_seconds = 0.0

@@ -18,39 +18,44 @@ from __future__ import annotations
 import math
 
 import numpy as np
-
 from ouroboros.core.systems.base_system import ISystem
 from ouroboros.core.world import World
 from ouroboros.interfaces.renderer import SHAPE_CIRCLE, SHAPE_RECT, SHAPE_RING
 
-from penumbra.state import DualityState, LUMEN, UMBRA
+from penumbra.state import LUMEN, TAPE_OFF, TAPE_RECORD, TAPE_REPLAY, UMBRA, DualityState
 from penumbra.terrain import (
+    ROLE_ALTAR,
+    ROLE_BEACON,
+    ROLE_COUNTER_ETHER,
+    ROLE_CRUST,
     ROLE_DOOR,
-    ROLE_EMPTY,
+    ROLE_ECLIPSE,
     ROLE_ETHER,
+    ROLE_GLASS,
     ROLE_LAMP,
+    ROLE_LEVER,
     ROLE_LUMEN_GOAL,
     ROLE_PLATE,
     ROLE_SHADE,
     ROLE_SHARD,
-    ROLE_ROCK,
-    ROLE_BEACON,
-    ROLE_COUNTER_ETHER,
-    ROLE_CRUST,
-    ROLE_ECLIPSE,
-    ROLE_UMBRA_GOAL,
-    ROLE_ZONE_LIGHT,
-    ROLE_ZONE_SHADOW,
-    ROLE_ALTAR,
-    ROLE_WANDER,
-    ROLE_VEIL,
-    ROLE_GLASS,
     ROLE_SOURCE,
     ROLE_SOURCE_ALT,
-    ROLE_LEVER,
+    ROLE_UMBRA_GOAL,
+    ROLE_VEIL,
+    ROLE_WANDER,
+    ROLE_ZONE_LIGHT,
+    ROLE_ZONE_SHADOW,
     Terrain,
 )
 from penumbra.tuning import DualityTuning
+
+_ECHO_ALPHA = 150
+"""A Lumen gravada, jogando ao lado do eco: presente o bastante para ler o
+corpo e o facho, translucida o bastante para nunca ser confundida com quem
+voce comanda."""
+_NOT_YET_ALPHA = 60
+"""A Umbra enquanto a Lumen e gravada. Ela ainda nao chegou -- o
+`OutcomeSystem` nem a ve -- e o corpo quase apagado diz isso sem texto."""
 
 # --- terceiro tom: dourado, reservado ao que e cooperativo ---
 GOLD_DIM = (96, 76, 38)
@@ -674,6 +679,12 @@ class PresentationSystem(ISystem):
             sprite_view["tint_r"][row] = _mix(dark[0], bright[0], ratio)
             sprite_view["tint_g"][row] = _mix(dark[1], bright[1], ratio)
             sprite_view["tint_b"][row] = _mix(dark[2], bright[2], ratio)
+            alpha = 255
+            if side == LUMEN and state.tape_phase == TAPE_REPLAY:
+                alpha = _ECHO_ALPHA
+            elif side == UMBRA and state.tape_phase == TAPE_RECORD:
+                alpha = _NOT_YET_ALPHA
+            sprite_view["tint_a"][row] = alpha
 
     def _shape_characters(self, delta_time: float) -> None:
         """Estica no ar, amassa ao pousar -- e nada mais que isso.
@@ -787,7 +798,8 @@ class PresentationSystem(ISystem):
 
         active_x, active_y = (lumen_x, lumen_y) if state.active == LUMEN else (umbra_x, umbra_y)
         self._place_aura(2, active_x, active_y, (1.55 + 0.18 * pulse) * cell_size, SHAPE_RING,
-                         GOLD_BRIGHT, 0.0 if state.duo else 205.0, transform_view, sprite_view)
+                         GOLD_BRIGHT, 0.0 if state.duo and state.tape_phase == TAPE_OFF else 205.0,
+                         transform_view, sprite_view)
 
     def _place_aura(
         self, slot: int, x: float, y: float, diameter: float, shape: int,

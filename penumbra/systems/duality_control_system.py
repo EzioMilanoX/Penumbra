@@ -9,14 +9,12 @@ divergir em um dos lados sem ninguem notar.
 """
 from __future__ import annotations
 
-from typing import Tuple
-
 from ouroboros.core.systems.base_system import ISystem
 from ouroboros.core.systems.tile_collision_system import TileCollisionSystem
 from ouroboros.core.world import World
 from ouroboros.interfaces.input_provider import IInputProvider
 
-from penumbra.state import DualityState, LUMEN, UMBRA
+from penumbra.state import LUMEN, UMBRA, DualityState
 from penumbra.tuning import DualityTuning
 
 _PLAYER_TWO_PREFIX = "p2_"
@@ -70,7 +68,7 @@ class DualityControlSystem(ISystem):
         input_provider: IInputProvider,
         state: DualityState,
         tuning: DualityTuning,
-        tile_collision_systems: Tuple[TileCollisionSystem, TileCollisionSystem],
+        tile_collision_systems: tuple[TileCollisionSystem, TileCollisionSystem],
         velocity_pool_name: str = "velocity",
     ) -> None:
         self._input = input_provider

@@ -17,12 +17,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from penumbra.menu import MainMenuScreen
-from penumbra.state import UMBRA
-
-from tests.conftest import advance, load_custom, place
+from tests.conftest import advance, load_custom
 
 _BINDINGS = Path(__file__).resolve().parents[1] / "data" / "input_bindings" / "penumbra_keyboard.json"
 

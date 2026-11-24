@@ -16,10 +16,7 @@ do primeiro ao ultimo frame do processo.
 """
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 import numpy as np
-
 from ouroboros.core.world import World
 
 from penumbra.levels import LevelCatalog, LevelDefinition
@@ -33,6 +30,14 @@ _SIDE_NAMES = ("Lumen", "Umbra")
 OUTCOME_PLAYING = 0
 OUTCOME_COMPLETE = 1
 OUTCOME_FAILED = 2
+
+TAPE_OFF = 0
+TAPE_RECORD = 1
+TAPE_REPLAY = 2
+"""Os tres momentos do solo com eco (`penumbra.tape`): desligado, gravando a
+Lumen, e jogando a Umbra ao lado da gravacao. Moram aqui, e nao no modulo do
+eco, porque a apresentacao e o `OutcomeSystem` leem isto e nao deveriam
+depender da sessao que o escreve."""
 
 INITIAL_VELOCITY_Y = 1e-3
 """Spawn com `velocity_y` pequena e NAO-nula, exigido por
@@ -179,6 +184,19 @@ class DualityState:
         seria decorativa -- ninguem consegue estar parado numa zona e
         atravessar a porta no mesmo instante."""
 
+        # --- solo com eco (ver penumbra.tape) ---
+        self.tape_phase = TAPE_OFF
+        """Gravando a Lumen, jogando ao lado do eco, ou nada disso. Gravando,
+        a Umbra ainda nao chegou: fica no spawn, e o `OutcomeSystem` nao a
+        mata nem a conta nos portais. `LevelRuntime.reset` NAO mexe nisto --
+        rebobinar e justamente resetar a fase sem sair do modo."""
+        self.tape_paradox = False
+        """O presente quebrou o passado: o eco morreu ou saiu do caminho
+        gravado. A fase congela como numa derrota, mas o painel e outro."""
+        self.tape_paradox_x = 0.0
+        self.tape_paradox_y = 0.0
+        """Onde o eco estava quando o paradoxo aconteceu -- o ponto marcado."""
+
         # --- fluxo ---
         self.level_index = 0
         self.outcome = OUTCOME_PLAYING
@@ -231,7 +249,7 @@ class LevelRuntime:
         self._tuning = tuning
         self._transform_pool = world.get_pool("transform")
         self._velocity_pool = world.get_pool("velocity")
-        self._loaded_rows: Optional[Tuple[str, ...]] = None
+        self._loaded_rows: tuple[str, ...] | None = None
         """O ASCII que esta de fato carregado no `Terrain`. `reset()` recarrega
         ISTO, e nao `current.rows`: senao um cenario montado por fora (um teste,
         uma sonda de ferramenta) seria descartado pelo primeiro reset."""
@@ -270,7 +288,7 @@ class LevelRuntime:
         self._state.ambient = float(self.current.ambient)
         self.load_rows(self.current.rows_for(bool(self._state.duo)))
 
-    def load_rows(self, rows: Tuple[str, ...]) -> None:
+    def load_rows(self, rows: tuple[str, ...]) -> None:
         """Carrega um ASCII arbitrario e o adota como o que `reset()` deve
         restaurar. E por aqui que testes e ferramentas montam um cenario
         proprio sem que o proximo reset o jogue fora."""

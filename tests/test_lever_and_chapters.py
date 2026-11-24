@@ -16,10 +16,7 @@ quebrar nada.
 """
 from __future__ import annotations
 
-import pytest
-
 from penumbra.state import LUMEN, UMBRA
-
 from tests.conftest import advance, load_custom, place
 
 # Ponte de eter acesa por duas lampadas -- da Lumen -- com a alavanca na

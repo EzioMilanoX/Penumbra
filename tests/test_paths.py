@@ -16,10 +16,7 @@ onde o defeito e invisivel.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
-
-import pytest
 
 from ouroboros.bootstrap.engine_config import EngineConfig
 

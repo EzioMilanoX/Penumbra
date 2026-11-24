@@ -35,6 +35,10 @@
     "KEY_ESCAPE",
     "PAD_START"
   ],
+  "echo": [
+    "KEY_E",
+    "PAD_Y"
+  ],
   "p2_move_left": [
     "KEY_LEFT",
     "PAD2_LEFT"

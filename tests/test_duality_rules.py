@@ -12,7 +12,6 @@ from __future__ import annotations
 import numpy as np
 
 from penumbra.state import LUMEN, OUTCOME_COMPLETE, OUTCOME_FAILED, OUTCOME_PLAYING, UMBRA
-
 from tests.conftest import advance, load_custom, place, position
 
 # Grade 28x17 (lida de `data/difficulties`, ver `tests.conftest`): rocha nas

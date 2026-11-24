@@ -23,7 +23,6 @@ escolta em dois. Sao coisas que o jogador faz de proposito ou nao faz nunca.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 
 @dataclass(frozen=True)
@@ -52,7 +51,7 @@ ESCORT_IN_TWO = "escolta"
 BOTH_FORMS = "renuncia_dupla"
 ECHO = "o_instante"
 
-CATALOG: Tuple[Achievement, ...] = (
+CATALOG: tuple[Achievement, ...] = (
     Achievement(FIRST_LIGHT, "Primeira Luz", "Vencer a primeira fase."),
     Achievement(CHAPTER_ONE, "Aprendiz", "Vencer o capítulo de aprender inteiro."),
     Achievement(CHAPTER_TWO, "Misturador", "Vencer o capítulo de misturar inteiro."),

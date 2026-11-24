@@ -87,6 +87,10 @@ Nenhuma fase é trancada. Com fases curtas, poder repetir a que ensinou uma
 mecânica vale mais que a cerimônia de desbloquear — e cada card já diz, com
 selos, o que você fez nela.
 
+**Solo com eco** (cards marcados **ECO**, num jogador): **E** abre a fase em
+laço — grave a Lumen, TAB rebobina, jogue a Umbra ao lado da gravação. Ver
+[Solo com eco](#solo-com-eco).
+
 ---
 
 ## A ideia em uma frase
@@ -261,6 +265,54 @@ o jogador aprende a fase errada e depois acha que o jogo mentiu.
 A auditoria roda as três **duas vezes**, uma por versão — a variante é a
 metade que se joga menos, e a que quebraria sem ninguém ver.
 
+## Solo com eco
+
+Afrouxar as fases de escolta para o solo resolveu o problema e perdeu a fase:
+a 13 sozinha tem lâmpadas que a de dois não tem. O **eco** (conceito GAM-20,
+E.C.L.I.P.S.E.) é o outro caminho — sozinho, você é os dois **em tempos
+diferentes**, e joga a versão de dois jogadores intacta.
+
+1. **Gravando.** Você joga a Lumen. O jogo grava as quatro ações do corpo
+   (mover, pular, habilidade) em **tick fixo** de 1/60 s, até 60 s. A Umbra
+   ainda não chegou: fica no spawn, quase apagada, e nada a mata.
+2. **TAB rebobina.** A fase volta ao começo, e você joga a Umbra com as mesmas
+   teclas. A Lumen gravada — o **eco**, translúcido — repete a fita, e o
+   caminho que ela ainda vai fazer aparece em pontinhos.
+3. **Paradoxo.** A luz decide de quem é cada célula, então o presente pode
+   desfazer o passado: a Umbra apaga a lâmpada da ponte do eco, e o eco cai.
+   Se ele **morre ou se afasta mais de 12 px** do caminho gravado, o mundo
+   congela, o ponto da falha fica marcado (e o lugar onde ele deveria estar,
+   em dourado), e você escolhe: **ESPAÇO** tenta o presente de novo, **TAB**
+   regrava a Lumen a partir de 1 s antes do ponto — a fita antiga se repete
+   até ali, e a Lumen volta para as suas mãos.
+
+| Fase | O laço |
+|---|---|
+| **13 · Sob o Vidro** | a escolta inteira: grave a Lumen no passo da Umbra, com o facho aceso sobre o vidro |
+| **27 · Sem Rocha** | os dois seguem a lanterna, cada um na sua pista; ninguém espera ninguém |
+| **30 · A Fonte Aberta** | escolta, a descida à pedra e a subida; a Umbra espera no escuro, recua da luz da pedra e só cruza depois |
+
+**Como, sem que o `World` saiba.** O modo liga `state.duo` (os dois andam ao
+mesmo tempo) e entrega aos sistemas um `TapeInput` no lugar do teclado: as
+ações sem prefixo (Lumen) vêm da fita — o `ReplayInputProvider` de
+`ouroboros.bootstrap.replay` —, as `p2_*` (Umbra) vêm das suas teclas.
+Nenhum sistema ganhou um ramo de "eco"; só o `OutcomeSystem` deixa de ver a
+Umbra enquanto a Lumen é gravada.
+
+**Tick fixo.** O `GameLoop` passa o tempo real do quadro, e tempo real não se
+repete. A `TapeSession` acumula o tempo e anda em passos de 1/60 s (no
+máximo 4 por quadro), com as bordas de "apertou" calculadas de tick para tick.
+
+**O paradoxo falso que o teste não via.** O primeiro tick depois de um reset
+colide contra as grades de colisão do frame *anterior* — que, entrando pelo
+menu, são de outra fase. Gravar e reproduzir partiam de chãos diferentes, e o
+eco acusava paradoxo no tick zero sem ninguém mexer em nada. As duas grades
+são zeradas nos dois começos, e o teste de determinismo agora vem de outra
+fase jogada antes.
+
+Cada fase marcada é **resolvida jogando** em `tests/test_tape_echo.py`, na
+versão do duo; uma fase com a marca e sem solução conferida derruba a suíte.
+
 ## Os três capítulos
 
 As fases não são agrupadas por tema, e sim por **função**. O jogo tem trinta,
@@ -393,7 +445,9 @@ penumbra/
   reachability.py    modelo de salto + grafo de alcance (auditoria de geometria)
   state.py           estado compartilhado + troca de fase
   scenes.py          fluxo título -> fases -> jogo -> pausa -> fim
-  audio.py           a voz do jogo, sintetizada (nenhum arquivo de som)
+  audio.py           a voz do jogo, sintetizada, e a música de fundo por capítulo
+  tape.py            solo com eco: a fita da Lumen, o tick fixo, o paradoxo
+  story.py           as falas na porta de cada capítulo (data/story/)
   sparks.py          a poeira dos instantes em que alguma coisa cede
   backdrop.py        ar e rocha, num campo continuo
   paths.py           a raiz dos dados -- so isso; a mecanica e da engine
@@ -413,10 +467,10 @@ penumbra/
     outcome_system.py           as quatro mortes e a única vitória
     presentation_system.py      estado -> pixels
     spark_system.py             as mesmas bordas do áudio, viradas em faísca
-data/                dificuldade, bindings, arquétipos, fases
+data/                dificuldade, bindings, arquétipos, fases, music/ (WAV gerado), story/
 assets/penumbra.ico  ícone do atalho (tools/generate_icon.py o refaz)
-tests/              281 testes headless
-tools/               audit_levels.py, build_exe.py, generate_icon.py
+tests/              336 testes headless
+tools/               audit_levels.py, build_exe.py, generate_icon.py, generate_music.py
 penumbra.spec        receita do executável
 ```
 
@@ -491,8 +545,10 @@ engine exigem.
 ## Testes e auditoria
 
 ```
-pytest -q                      # 239 testes, ~21 s, headless
+pytest -q                      # 336 testes, ~45 s, headless
+ruff check .                   # lint (config em pyproject.toml)
 python -m tools.audit_levels   # luz, sobrevivência e alcance geométrico por fase
+python -m tools.generate_music # regrava data/music/*.wav (um teste confere que batem)
 ```
 
 Uma fase tem **duas** maneiras independentes de ser insolúvel, e cada uma tem
@@ -560,6 +616,23 @@ apresentação. Removido, o jogo fica idêntico e mudo.
 A paleta sonora segue a lei da paleta visual: **o dourado tem voz própria**, um
 `sweep` médio reservado ao que exige os dois (porta, eclipse, fragmento,
 altar).
+
+**E agora tem fundo.** Uma faixa por capítulo, em laço, gerada por
+`tools/generate_music.py` — somas de senoides com envelope, nenhuma amostra e
+nenhuma melodia de terceiros, e determinística (um teste confere que os WAVs
+de `data/music/` são exatamente o que o gerador produz). A música segue a
+**função** do capítulo: *Aprender* é um arpejo de vidro em lá menor que nunca
+surpreende; *Misturar* são duas vozes em ré dórico que se respondem sem tocar
+juntas — uma aguda (Lumen), uma grave (Umbra); *Especiais* é um drone em mi
+frígio que respira, com o fá puxando contra o mi. O laço fecha sem emenda
+porque toda nota que passa do fim é somada de volta no começo. O volume da
+música é separado do dos efeitos (Opções → MÚSICA): quem quer silêncio no
+fundo não pode perder o aviso de perigo junto.
+
+**E fala.** Uma fala curta na porta de cada capítulo (`data/story/interludes.json`):
+o prólogo antes da primeira fase conta a regra — duas metades de uma fonte,
+que não podem se tocar —, a do segundo conta o conflito, e a do terceiro
+anuncia a pergunta do fim, que antes chegava sem preparo.
 
 **O progresso agora sobrevive** a fechar o jogo (`%APPDATA%/Penumbra/`). Três
 regras, todas pela mesma razão — um save nunca pode ser o motivo de o jogo não
@@ -814,7 +887,7 @@ MENU PRINCIPAL          jogar · conquistas · opções · sair
 faltam — elas são a lista do que o jogo considera ter entendido alguma coisa.
 Escondidas, deixariam de ser um convite e virariam só um placar.
 
-**Opções** tem som, volume, tela cheia e apagar progresso. Apagar fica no mesmo
+**Opções** tem som, volume dos efeitos, volume da música, tela cheia e apagar progresso. Apagar fica no mesmo
 lugar que o volume porque é ali que o jogador vai procurar — mas exige um
 **segundo ESPAÇO**, com o aviso escrito na própria linha. Um menu que apaga
 trinta fases num toque é hostil; um que esconde a opção é um menu que mente.
@@ -925,6 +998,17 @@ ao frame por `set_on_draw_ui`, porque `GameLoop.input_provider` é somente
 leitura e eu não podia ser o provider. Com `PAD_*` nativo, o `run()` da engine
 chama `poll()` na hora certa e o truque some junto com o arquivo.
 
+**O eco usa o replay da engine** (`ouroboros.bootstrap.replay`, da engine
+0.4.0) — `ReplayRecorder`, `Replay`, `ReplayInputProvider` e, nos testes,
+`world_state_hash` — e **não mexe nela**. Três lacunas ficaram contornadas
+aqui, anotadas para a engine decidir:
+
+| lacuna | o contorno em Penumbra |
+|---|---|
+| `GameLoop` só tem passo variável | a `TapeSession` acumula o tempo e anda em ticks fixos |
+| não há como cortar um `Replay` (regravar "a partir daqui") | um `Replay` novo com as fatias de `bits`/`dts` |
+| `world_state_hash` cobre a pool inteira, sem filtro por entidade | o paradoxo compara a trajetória da Lumen gravada tick a tick, e o hash fica para o teste com a Umbra parada |
+
 **O que ficou aqui, e está certo onde está:** as duas grades
 (`hitbox`/`hitbox_shadow`, conseguidas parametrizando nomes de pool, sem uma
 linha de engine), o campo de luz geodésico, o *squash* e *stretch* dos dois
@@ -939,17 +1023,15 @@ de design original:
 - **Sacrifício de forma** (a Umbra cobrindo a Lumen para protegê-la) — o
   altar troca poder por permanência, que é a mesma ideia sem o gesto
 - **Boss fight**
-- **Música** — a engine expõe `load_track`/`play_track` e ninguém chama. O
-  jogo tem voz e não tem fundo
 - **Editor de fases**, **estatísticas**, **localização**
-- **A voz do jogo** — trinta fases sem que ele diga uma vez do que é sobre, e
-  a pergunta do fim chega sem preparo
 
 Já **não** estão fora, e estiveram: o **controle simultâneo** (modo duo, e o
 mesmo mapa muda de forma quando há dois jogadores), a **escolha da fusão** (o
 fim pergunta, e a raiz do menu lembra o que você respondeu), o **áudio** — o
 medidor de perigo era só visual, e você olhava o ser que comanda enquanto o
-outro morria fora da sua atenção — e o **controle**.
+outro morria fora da sua atenção —, o **controle**, a **música** (uma faixa
+por capítulo), a **voz do jogo** (as falas entre capítulos) e o **solo com
+eco** nas fases de dupla.
 
 ## Paleta
 

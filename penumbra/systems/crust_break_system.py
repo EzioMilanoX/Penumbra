@@ -28,14 +28,14 @@ from ouroboros.core.systems.tile_collision_system import TileCollisionSystem
 from ouroboros.core.world import World
 from ouroboros.interfaces.input_provider import IInputProvider
 
-from penumbra.state import DualityState, UMBRA
+from penumbra.state import UMBRA, DualityState
+from penumbra.terrain import Terrain
 
 _PLAYER_TWO_PREFIX = "p2_"
 """No modo duo a Umbra e sempre o jogador 2, como em
 `DualityControlSystem`. Sem este prefixo o sistema lia as teclas do jogador
 1 e exigia `state.active == UMBRA` -- e no duo nao existe 'ativo', entao a
 crosta nunca cedia e as fases 2, 7 e 14 eram invenciveis a dois."""
-from penumbra.terrain import Terrain
 
 
 class CrustBreakSystem(ISystem):

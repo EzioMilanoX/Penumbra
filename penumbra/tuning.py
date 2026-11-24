@@ -138,12 +138,12 @@ class DualityTuning:
     flow: FlowTuning
 
     @staticmethod
-    def from_json(difficulty_path: str) -> "DualityTuning":
+    def from_json(difficulty_path: str) -> DualityTuning:
         """Carrega e VALIDA o JSON de dificuldade apontado por
         `EngineConfig.difficulty_path`. Levanta `TuningDefinitionError`
         em qualquer campo ausente ou fora de faixa."""
         try:
-            with open(difficulty_path, "r", encoding="utf-8") as handle:
+            with open(difficulty_path, encoding="utf-8") as handle:
                 raw = json.load(handle)
         except (OSError, json.JSONDecodeError) as exc:
             raise TuningDefinitionError(f"nao foi possivel ler {difficulty_path}: {exc}") from exc

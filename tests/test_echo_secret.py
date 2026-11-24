@@ -12,11 +12,8 @@ cabe em fase nenhuma.
 """
 from __future__ import annotations
 
-import pytest
-
 from penumbra import achievements
 from penumbra.state import LUMEN, OUTCOME_FAILED, OUTCOME_PLAYING, UMBRA
-
 from tests.conftest import advance, load_custom, place
 
 # A lampada nao e enfeite: o Instante leva 2,2 s e a Lumen se apaga no

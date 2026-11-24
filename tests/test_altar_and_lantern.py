@@ -20,8 +20,7 @@ import pytest
 
 from penumbra.state import LUMEN, UMBRA
 from penumbra.terrain import TerrainDefinitionError
-
-from tests.conftest import advance, load_custom, make_rows, place, position
+from tests.conftest import advance, load_custom, make_rows, place
 
 # Um altar em (10,12), chao de rocha, e contra-eter logo a direita: o
 # contra-eter so e solido pra Umbra sob LUZ, entao ele e a prova viva de que

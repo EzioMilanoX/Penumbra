@@ -2,6 +2,21 @@
 
 As notas de cada versão, escritas para quem joga.
 
+## Ainda sem versão
+
+**Solo com eco** — as fases de dupla, sozinho, sem afrouxar nada
+- Nas fases marcadas com **ECO** no card (13 · Sob o Vidro, 27 · Sem Rocha e 30 · A Fonte Aberta), aperte **E** em vez de ESPAÇO.
+- Primeiro você joga a Lumen, e o jogo grava (até 60 s). **TAB** rebobina: agora você joga a Umbra, e a Lumen do passado — o eco — repete exatamente o que você fez. A fase é a versão de dois jogadores, sem as lâmpadas que facilitam o solo.
+- Na tela, os pontinhos mostram o caminho que o eco ainda vai fazer.
+- Se o que a Umbra faz agora desfaz o passado (apagar a luz de que o eco precisava, por exemplo), é um **paradoxo**: o mundo para, o ponto da falha fica marcado, e você escolhe entre tentar o presente de novo (ESPAÇO) ou regravar a Lumen a partir de um segundo antes dali (TAB).
+
+**Música e falas**
+- Cada capítulo tem a sua música de fundo, composta e sintetizada para o jogo. O volume dela fica em Opções → MÚSICA, separado do volume dos efeitos.
+- O jogo agora fala: uma fala curta na entrada de cada capítulo (a primeira, antes da fase 1).
+
+**Por dentro**
+- Lint (ruff) configurado e limpo; nada muda para quem joga.
+
 ## v0.1.0 — Luz e Sombra (2026-11-19)
 
 A primeira versão para jogar sem instalar nada: baixe o `Penumbra-windows.zip`, extraia e abra `Penumbra.exe`.

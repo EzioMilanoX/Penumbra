@@ -11,7 +11,6 @@ from __future__ import annotations
 import numpy as np
 
 from penumbra.state import LUMEN, UMBRA
-
 from tests.conftest import advance, load_custom, place, position
 
 # Eter (cols 4-7) e contra-eter (cols 9-12) na MESMA fase, com uma lampada

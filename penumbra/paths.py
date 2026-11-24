@@ -16,6 +16,10 @@ from pathlib import Path
 
 from ouroboros.bootstrap.resources import ResourceRoot, frozen_root, is_frozen
 
+__all__ = ["RESOURCES", "frozen_root", "is_frozen", "resolve", "resource", "resource_root"]
+"""`frozen_root`/`is_frozen` sao reexportados: quem pergunta "estou num .exe?"
+pergunta a `penumbra.paths`, e nao precisa saber que a resposta mora na engine."""
+
 RESOURCES = ResourceRoot(Path(__file__).resolve().parent.parent)
 
 resource = RESOURCES

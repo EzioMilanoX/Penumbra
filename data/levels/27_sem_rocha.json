@@ -3,6 +3,9 @@
   "name": "Sem Rocha",
   "hint": "Nenhuma rocha entre as margens. A mesma lanterna: em cima é o chão da Lumen, embaixo é o buraco da Umbra.",
   "chapter": 3,
+  "echo": {
+    "note": "O eco segue a lanterna lá em cima; aqui embaixo, você também. Ninguém espera ninguém."
+  },
   "duo": {
     "note": "No duo a pista de baixo inverte: a Umbra deixa de fugir da lanterna e passa a ter de andar debaixo dela.",
     "cells": [

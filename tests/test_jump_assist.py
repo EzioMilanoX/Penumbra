@@ -17,8 +17,7 @@ from __future__ import annotations
 import pytest
 
 from penumbra.state import LUMEN, UMBRA
-
-from tests.conftest import advance, load_custom, place, position
+from tests.conftest import advance, load_custom, place
 
 # Uma borda: rocha ate a coluna 9, abismo depois. Quem anda pra direita cai.
 _LEDGE = {
@@ -208,7 +207,6 @@ class TestItDoesNotOpenNewRoutes:
         alcance geometrico de `test_reachability` medem o salto a partir do
         chao, e e assim que ele continua saindo."""
         load_custom(simulation, _FLOOR)
-        state = simulation.state
         place(simulation, LUMEN, 9, 12)
         advance(simulation, input_provider, frames=8)   # o tempo de assentar
         input_provider.set_action_held("jump", True)

@@ -31,7 +31,7 @@ from __future__ import annotations
 from ouroboros.core.systems.base_system import ISystem
 from ouroboros.core.world import World
 
-from penumbra.state import DualityState, LUMEN, UMBRA
+from penumbra.state import LUMEN, UMBRA, DualityState
 from penumbra.terrain import Terrain
 from penumbra.tuning import DualityTuning
 

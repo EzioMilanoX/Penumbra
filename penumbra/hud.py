@@ -14,12 +14,14 @@ from ouroboros.interfaces.renderer import IRenderer
 
 from penumbra import achievements
 from penumbra.state import (
-    DualityState,
-    LevelRuntime,
     LUMEN,
     OUTCOME_COMPLETE,
     OUTCOME_PLAYING,
+    TAPE_OFF,
+    TAPE_RECORD,
     UMBRA,
+    DualityState,
+    LevelRuntime,
 )
 from penumbra.tuning import DualityTuning
 
@@ -76,6 +78,25 @@ def _control_line(duo: bool, pads: int) -> str:
             "TAB trocar   R reiniciar   ESC sair")
 
 
+def echo_control_line(recording: bool, pads: int) -> str:
+    """A linha de controles do solo com eco. As teclas sao as do solo -- o
+    que muda e de QUEM elas sao em cada momento, e o que TAB e R fazem."""
+    if pads:
+        move = "direcional  A  X"
+        swap, again, leave = "RB", "SELECT", "START"
+    else:
+        move = "A/D  ESPAÇO  S"
+        swap, again, leave = "TAB", "R", "ESC"
+    if recording:
+        return f"{move}: Lumen     {swap} rebobinar     {again} regravar     {leave} pausa"
+    return f"{move}: Umbra     {swap} regravar a Lumen     {again} recomeçar     {leave} pausa"
+
+
+_TRAIL_STEP = 6
+"""Um ponto do caminho gravado a cada 6 ticks (0,1 s): denso o bastante para
+ler a rota, ralo o bastante para nao virar uma linha que esconde o terreno."""
+
+
 class PenumbraHud:
     """Callable registrado em `GameLoop.set_on_draw_ui`.
 
@@ -96,8 +117,12 @@ class PenumbraHud:
         visible=None,
         unlocked=None,
         pads=None,
+        tape=None,
     ) -> None:
         self._unlocked = unlocked
+        self._tape = tape
+        """O solo com eco, para o caminho gravado e o relogio da fita. O HUD so
+        LE a sessao; quem decide e a cena."""
         # Quantos controles estao ligados AGORA -- e um callable, nao um
         # numero, porque um controle pode ser ligado com o jogo aberto e o
         # rodape tem de passar a falar dele no frame seguinte.
@@ -114,10 +139,19 @@ class PenumbraHud:
     def __call__(self, renderer: IRenderer) -> None:
         if not self._visible():
             return
+        echo = self._tape is not None and self._state.tape_phase != TAPE_OFF
+        if echo:
+            self._draw_echo_trail(renderer)
         self._draw_character_meters(renderer)
-        self._draw_footer(renderer)
+        if echo:
+            self._draw_echo_footer(renderer)
+        else:
+            self._draw_footer(renderer)
         if self._state.outcome != OUTCOME_PLAYING:
-            self._draw_outcome_panel(renderer)
+            if self._state.tape_paradox:
+                self._draw_paradox(renderer)
+            else:
+                self._draw_outcome_panel(renderer)
 
     # ------------------------------------------------------------------
 
@@ -244,3 +278,93 @@ class PenumbraHud:
             "ESPAÇO para continuar" if won else "ESPAÇO para tentar de novo",
             11, _TEXT_DIM, anchor="center",
         )
+
+    # ------------------------------------------------------------------
+    # solo com eco
+    # ------------------------------------------------------------------
+
+    def _draw_echo_trail(self, renderer: IRenderer) -> None:
+        """O caminho que a Lumen gravada ainda vai fazer, em pontos.
+
+        Jogando a Umbra, o problema e saber onde a luz VAI estar -- e o eco so
+        mostra onde ela esta. O que falta do caminho, desenhado, e o passado
+        lido como mapa. O que ja foi percorrido nao aparece: ja esta na tela
+        como o proprio eco."""
+        tape, state = self._tape, self._state
+        if state.tape_phase == TAPE_RECORD:
+            return
+        start = max(0, tape.replay_tick + 1)
+        start += (-start) % _TRAIL_STEP
+        trail = tape.trail
+        for index in range(start, tape.trail_count, _TRAIL_STEP):
+            x, y = float(trail[index, 0]), float(trail[index, 1])
+            renderer.draw_ui_rect(x - 1.5, y - 1.5, 3.0, 3.0, (236, 236, 250, 90))
+        if tape.trail_count:
+            end_x, end_y = float(trail[tape.trail_count - 1, 0]), float(trail[tape.trail_count - 1, 1])
+            renderer.draw_ui_circle(end_x, end_y, 7.0, (236, 236, 250, 110), 1)
+
+    def _draw_echo_footer(self, renderer: IRenderer) -> None:
+        """O rodape do laco: em que tempo voce esta, quanto da fita ja foi, e
+        as teclas do momento. "comando: LUMEN" seria verdade e nao bastaria --
+        a pergunta aqui e QUANDO."""
+        state, tape, level = self._state, self._tape, self._runtime.current
+        top = self._playfield_height
+        renderer.draw_ui_rect(0.0, top, self._width, self._height - top, _PANEL)
+        renderer.draw_ui_rect(0.0, top, self._width, 1.0, _RULE)
+
+        title = f"{state.level_index + 1}/{self._runtime.count}  {level.name}  ·  solo com eco"
+        renderer.draw_text(14.0, top + _LINE_1, title, 14, _TEXT)
+
+        recording = state.tape_phase == TAPE_RECORD
+        if recording and tape.replaying_prefix:
+            left = (tape.prefix_ticks - tape.recorded_ticks) / 60.0
+            label, tone = f"o passado se repete... sua vez em {left:.1f}s", _GOLD_DIM
+        elif recording:
+            label = f"GRAVANDO A LUMEN  {tape.recorded_seconds:4.1f}/{tape.capacity / 60.0:.0f}s"
+            tone = _PERIL
+        else:
+            played = min(max(0, tape.replay_tick + 1), tape.trail_count) / 60.0
+            label = f"UMBRA + ECO  {played:4.1f}/{tape.trail_count / 60.0:.1f}s"
+            tone = _GOLD
+        renderer.draw_text(self._width - 14.0, top + _LINE_1, label, 14, tone, anchor="topright")
+
+        note = level.echo_note if not recording else (
+            "Ela ainda está sozinha: grave o caminho que a Umbra vai precisar.")
+        renderer.draw_text(14.0, top + _LINE_2, note, 12, _GOLD_DIM)
+        self._draw_world_clock(renderer, top)
+        renderer.draw_text(14.0, top + _LINE_3, echo_control_line(recording, self._pads()),
+                           11, _TEXT_FAINT)
+
+    def _draw_paradox(self, renderer: IRenderer) -> None:
+        """O paradoxo: onde o eco quebrou, onde ele devia estar, e a escolha.
+
+        O ponto marcado e a informacao toda. Sem ele, "o passado mudou" e uma
+        frase; com ele, o jogador ve que foi a escuridao DELE que apagou a
+        ponte embaixo da Lumen -- e sabe o que mudar."""
+        state, tape = self._state, self._tape
+        x, y = state.tape_paradox_x, state.tape_paradox_y
+        renderer.draw_ui_circle(x, y, 18.0, _PERIL, 2)
+        renderer.draw_ui_line(x - 10.0, y - 10.0, x + 10.0, y + 10.0, _PERIL, 2)
+        renderer.draw_ui_line(x - 10.0, y + 10.0, x + 10.0, y - 10.0, _PERIL, 2)
+        index = tape.paradox_tick
+        if 0 <= index < tape.trail_count:
+            gx, gy = float(tape.trail[index, 0]), float(tape.trail[index, 1])
+            renderer.draw_ui_circle(gx, gy, 10.0, _GOLD, 1)
+
+        panel_width, panel_height = 560.0, 120.0
+        px = (self._width - panel_width) / 2.0
+        py = 24.0
+        renderer.draw_ui_rect(px, py, panel_width, panel_height, _PANEL)
+        renderer.draw_ui_rect(px, py, panel_width, 2.0, _PERIL)
+        center_x = self._width / 2.0
+        renderer.draw_text(center_x, py + 24.0, "PARADOXO", 20, _PERIL, anchor="center")
+        reason = state.message.removeprefix("Paradoxo: ")
+        renderer.draw_text(center_x, py + 54.0, reason[:1].upper() + reason[1:], 13, _TEXT, anchor="center")
+        pads = self._pads()
+        retry = "A" if pads else "ESPAÇO"
+        rerecord = "RB" if pads else "TAB"
+        renderer.draw_text(center_x, py + 80.0,
+                           f"{retry}: tentar o presente de novo", 11, _TEXT_DIM, anchor="center")
+        renderer.draw_text(center_x, py + 98.0,
+                           f"{rerecord}: regravar a Lumen desde 1 s antes do ponto marcado",
+                           11, _GOLD_DIM, anchor="center")

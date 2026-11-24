@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import itertools
 
-import pytest
-
 from penumbra import achievements
 from penumbra.menu import (
-    AchievementsScreen, MainMenuScreen, OptionsScreen, PauseScreen, TitleScreen,
+    AchievementsScreen,
+    MainMenuScreen,
+    OptionsScreen,
+    PauseScreen,
+    TitleScreen,
 )
 
 
@@ -32,6 +34,12 @@ def TitleScreenWithMode(duo: bool):
     return screen
 
 _CARD_SELECTED = (34, 32, 44, 255)
+
+
+def _title_draw(duo: bool, pads: int):
+    """A tela de titulo de um modo e de um numero de controles, pronta para
+    desenhar -- com os dois valores presos na hora, e nao no fim do laco."""
+    return lambda r: TitleScreenWithMode(duo).draw(r, 0, 0, 30, 0, 11, pads=pads)
 
 
 class _RecordingRenderer:
@@ -133,7 +141,7 @@ class TestOptionsHighlight:
         """Aqui o texto usa `topleft`, e por isso a linha ja estava certa --
         o teste existe pra que ela continue certa se alguem uniformizar as
         ancoras sem olhar a faixa."""
-        for choice, label in enumerate(("SOM", "VOLUME", "TELA CHEIA", "APAGAR PROGRESSO")):
+        for choice, label in enumerate(("SOM", "EFEITOS", "MÚSICA", "TELA CHEIA", "APAGAR PROGRESSO")):
             screen = OptionsScreen()
             screen.selected = choice
             renderer = _RecordingRenderer()
@@ -162,8 +170,7 @@ class TestNothingLeavesTheWindow:
             # A tela de titulo ENSINA os controles, e as linhas mudam com
             # quantos controles estao ligados -- quatro textos diferentes no
             # mesmo lugar, e o do controle e o mais longo dos quatro.
-            *[(f"titulo duo={d} pads={n}",
-               (lambda d=d, n=n: lambda r: TitleScreenWithMode(d).draw(r, 0, 0, 30, 0, 11, pads=n))())
+            *[(f"titulo duo={d} pads={n}", _title_draw(d, n))
               for d in (False, True) for n in (0, 1, 2)],
         )
         for name, draw in screens:
@@ -181,7 +188,7 @@ class TestNothingLeavesTheWindow:
                 assert 0.0 <= entry["left"] and entry["right"] <= width, (
                     f"{name}: {entry['text']!r} sai da janela na horizontal"
                 )
-            for left, top, w, h, _ in renderer.rects:
+            for _left, top, _w, h, _ in renderer.rects:
                 assert top >= 0.0 and top + h <= height, f"{name}: retangulo fora da janela"
 
     def test_nenhum_texto_cai_por_cima_de_outro(self):
@@ -200,8 +207,7 @@ class TestNothingLeavesTheWindow:
             # A tela de titulo ENSINA os controles, e as linhas mudam com
             # quantos controles estao ligados -- quatro textos diferentes no
             # mesmo lugar, e o do controle e o mais longo dos quatro.
-            *[(f"titulo duo={d} pads={n}",
-               (lambda d=d, n=n: lambda r: TitleScreenWithMode(d).draw(r, 0, 0, 30, 0, 11, pads=n))())
+            *[(f"titulo duo={d} pads={n}", _title_draw(d, n))
               for d in (False, True) for n in (0, 1, 2)],
         )
         for name, draw in screens:

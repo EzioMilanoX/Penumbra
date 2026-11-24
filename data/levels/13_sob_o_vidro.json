@@ -4,6 +4,9 @@
   "hint": "A luz atravessa o vidro. Ela caminha em cima e acende o chão da Umbra embaixo -- nenhum dos dois faz isso só.",
   "chapter": 1,
   "teaches": "vidro",
+  "echo": {
+    "note": "Embaixo do vidro, só a luz do eco te sustenta. Ande no passo que você gravou."
+  },
   "duo": {
     "note": "No duo as lâmpadas saem: a escolta é a travessia inteira, e só funciona com os dois andando juntos.",
     "cells": [

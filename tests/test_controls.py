@@ -17,10 +17,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from penumbra.hud import _control_line
-from penumbra.menu import mode_controls
 
 _BINDINGS = (Path(__file__).resolve().parents[1]
              / "data" / "input_bindings" / "penumbra_keyboard.json")

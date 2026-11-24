@@ -14,8 +14,6 @@ compoe as duas grades de colisao a partir daqui e
 """
 from __future__ import annotations
 
-from typing import Tuple
-
 import numpy as np
 
 ROCK_CHAR = "#"
@@ -247,14 +245,14 @@ class Terrain:
     def cell_size(self) -> float:
         return self._cell_size
 
-    def cell_center(self, cell: Tuple[int, int]) -> Tuple[float, float]:
+    def cell_center(self, cell: tuple[int, int]) -> tuple[float, float]:
         """Converte um `(col, row)` de marcador para o centro de mundo da
         celula -- mesma ordem `(col, row)` de `Grid2D.world_to_cell`, pra
         nunca inverter X/Y silenciosamente."""
         col, row = cell
         return ((col + 0.5) * self._cell_size, (row + 0.5) * self._cell_size)
 
-    def load_rows(self, rows: Tuple[str, ...]) -> None:
+    def load_rows(self, rows: tuple[str, ...]) -> None:
         """
         Reescreve TODAS as mascaras a partir do ASCII de uma fase, no
         lugar (sem realocar nada). Valida antes de escrever qualquer
@@ -483,7 +481,7 @@ class Terrain:
         self.role[row, col] = ROLE_EMPTY
         return True
 
-    def _validate_shape(self, rows: Tuple[str, ...]) -> None:
+    def _validate_shape(self, rows: tuple[str, ...]) -> None:
         if len(rows) != self._rows:
             raise TerrainDefinitionError(
                 f"fase com {len(rows)} linhas -- a grade alocada tem {self._rows} "

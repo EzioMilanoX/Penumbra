@@ -23,10 +23,9 @@ premio; este e um convite, e esta la desde o comeco.
 from __future__ import annotations
 
 from ouroboros.core.systems.base_system import ISystem
-from ouroboros.core.systems.tile_collision_system import TileCollisionSystem
 from ouroboros.core.world import World
 
-from penumbra.state import DualityState, LUMEN, OUTCOME_PLAYING, UMBRA
+from penumbra.state import LUMEN, OUTCOME_PLAYING, UMBRA, DualityState
 from penumbra.tuning import DualityTuning
 
 _STILL_SPEED = 6.0

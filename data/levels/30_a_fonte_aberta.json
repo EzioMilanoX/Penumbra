@@ -3,6 +3,9 @@
   "name": "A Fonte Aberta",
   "hint": "Ela caminha em cima e acende o chão da Umbra embaixo. No fim desce ao chão dela e deixa a última luz numa pedra.",
   "chapter": 3,
+  "echo": {
+    "note": "O eco escolta, desce à pedra e sobe de volta. Espere longe da luz dela, sem cruzar o caminho."
+  },
   "duo": {
     "note": "No duo a lâmpada sai: a Lumen escolta a travessia inteira antes de descer pra pedra.",
     "cells": [

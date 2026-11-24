@@ -10,10 +10,8 @@ para depois conferi-la contra si mesma.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Tuple
 
 import pytest
-
 from ouroboros.bootstrap.engine_config import EngineConfig
 from ouroboros.interfaces.null.null_input_provider import NullInputProvider
 
@@ -64,7 +62,7 @@ def advance(simulation, input_provider, frames: int = 1, delta_time: float = FRA
         simulation.world.step(delta_time)
 
 
-def make_rows(spec: Dict[int, str], cols: int = GRID_COLS, rows: int = GRID_ROWS) -> Tuple[str, ...]:
+def make_rows(spec: dict[int, str], cols: int = GRID_COLS, rows: int = GRID_ROWS) -> tuple[str, ...]:
     """Monta um ASCII de fase a partir de `{indice_da_linha: prefixo}`,
     completando com vazio a direita e as linhas omitidas. Permite que cada
     teste declare a geometria minima do que ele testa em duas ou tres
@@ -78,7 +76,7 @@ def make_rows(spec: Dict[int, str], cols: int = GRID_COLS, rows: int = GRID_ROWS
     return tuple(built)
 
 
-def load_custom(simulation, spec: Dict[int, str]) -> None:
+def load_custom(simulation, spec: dict[int, str]) -> None:
     """Recarrega o `Terrain` da simulacao com uma fase de teste e reinicia.
 
     Usa exatamente o caminho que o jogo usa pra trocar de fase (as
@@ -115,7 +113,7 @@ def place(simulation, side: int, col: float, row: float) -> None:
     velocity_view["linear_y"][velocity_row] = INITIAL_VELOCITY_Y
 
 
-def position(simulation, side: int) -> Tuple[float, float]:
+def position(simulation, side: int) -> tuple[float, float]:
     pool = simulation.world.get_pool("transform")
     dense_row = pool.dense_row_of(int(simulation.state.entity_index[side]))
     view = pool.active_view()

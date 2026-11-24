@@ -16,14 +16,14 @@ ele diz "alcanca", o caminho e real.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from math import sqrt
-from typing import Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 
 from penumbra.tuning import CharacterTuning, WorldTuning
 
-Cell = Tuple[int, int]
+Cell = tuple[int, int]
 """`(col, row)` -- a mesma ordem de `Grid2D.world_to_cell`."""
 
 
@@ -50,7 +50,7 @@ class JumpModel:
         self._jump_speed = abs(character.jump_velocity_y)
         self._move_speed = character.move_speed
         self.max_climb = 0
-        self._reach_by_climb: Dict[int, float] = {}
+        self._reach_by_climb: dict[int, float] = {}
         for climb in range(1, 8):
             reach = self.horizontal_reach(climb)
             if reach < 1.0:
@@ -98,7 +98,7 @@ class TraversalGraph:
         self._standable = self._compute_standable()
 
     @property
-    def standable(self) -> Set[Cell]:
+    def standable(self) -> set[Cell]:
         return self._standable
 
     def _free(self, col: int, row: int) -> bool:
@@ -116,7 +116,7 @@ class TraversalGraph:
             return False
         return self._free(col, row) and not self._free(col, row + 1)
 
-    def _compute_standable(self) -> Set[Cell]:
+    def _compute_standable(self) -> set[Cell]:
         return {
             (col, row)
             for row in range(self._rows)
@@ -196,14 +196,14 @@ class TraversalGraph:
                 return None
         return (col, current) if self._is_standable(col, current) else None
 
-    def reachable_from(self, origin: Cell) -> Set[Cell]:
+    def reachable_from(self, origin: Cell) -> set[Cell]:
         """Fecho transitivo por BFS. `origin` nao precisa ser um ponto de
         apoio (um spawn no ar cai primeiro)."""
         start = origin if origin in self._standable else self._land_from(*origin)
         if start is None:
             return set()
         seen = {start}
-        queue: List[Cell] = [start]
+        queue: list[Cell] = [start]
         while queue:
             cell = queue.pop()
             for neighbor in self.neighbors(cell):

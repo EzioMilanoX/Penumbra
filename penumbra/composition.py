@@ -25,11 +25,8 @@ headless. Os dois passam por `_assemble`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
-
 from ouroboros.bootstrap.composition_root import CompositionRoot
 from ouroboros.bootstrap.engine_config import EngineConfig
 from ouroboros.bootstrap.game_loop import GameLoop
@@ -45,16 +42,16 @@ from ouroboros.interfaces.null.null_input_provider import NullInputProvider
 from ouroboros.interfaces.renderer import SHAPE_CIRCLE, SHAPE_RECT
 from ouroboros.roguelite.entities.archetype_loader import ArchetypeLoader
 
-from penumbra.audio import AudioSystem, PenumbraAudio
+from penumbra.audio import AudioSystem, PenumbraAudio, PenumbraMusic
 from penumbra.backdrop import Backdrop
 from penumbra.hud import PenumbraHud
 from penumbra.levels import LevelCatalog
 from penumbra.paths import resolve, resource
 from penumbra.progress import Progress
-from penumbra.sparks import SparkField
-from penumbra.systems.spark_system import SparkSystem
 from penumbra.scenes import PenumbraFlow
-from penumbra.state import DualityState, LevelRuntime, LUMEN, UMBRA
+from penumbra.sparks import SparkField
+from penumbra.state import LUMEN, UMBRA, DualityState, LevelRuntime
+from penumbra.story import load_interludes
 from penumbra.systems.crust_break_system import CrustBreakSystem
 from penumbra.systems.duality_control_system import DualityControlSystem
 from penumbra.systems.echo_system import EchoSystem
@@ -64,7 +61,9 @@ from penumbra.systems.outcome_system import OutcomeSystem
 from penumbra.systems.polarity_door_system import PolarityDoorSystem
 from penumbra.systems.polarity_lever_system import PolarityLeverSystem
 from penumbra.systems.presentation_system import PresentationSystem
+from penumbra.systems.spark_system import SparkSystem
 from penumbra.systems.world_clock_system import WorldClockSystem
+from penumbra.tape import TapeInput, TapeSession
 from penumbra.terrain import Terrain
 from penumbra.tuning import DualityTuning
 
@@ -79,6 +78,8 @@ unico motivo pelo qual Umbra pode pisar onde Lumen cai."""
 
 ARCHETYPES_DIR = resource("data", "archetypes", "penumbra")
 LEVELS_DIR = resource("data", "levels")
+MUSIC_DIR = resource("data", "music")
+INTERLUDES_PATH = resource("data", "story", "interludes.json")
 
 _CELL_SPRITE_UNIT = 8.0
 _LAYER_CELL = 5
@@ -104,8 +105,10 @@ class Simulation:
     runtime: LevelRuntime
     lumen_grid: Grid2D
     umbra_grid: Grid2D
-    backdrop: "Backdrop"
-    tile_collision_systems: Tuple[TileCollisionSystem, TileCollisionSystem]
+    backdrop: Backdrop
+    tile_collision_systems: tuple[TileCollisionSystem, TileCollisionSystem]
+    tape: TapeSession
+    """O solo com eco desta simulacao. Desligado, nao faz nada."""
 
 
 class _WorldPoolRegistry:
@@ -172,6 +175,10 @@ def build_game(config: EngineConfig) -> GameLoop:
         audio=audio,
         backdrop=simulation.backdrop,
         progress=Progress(catalog.count).load(),
+        tape=simulation.tape,
+        # Musica e falas, como o som: so aqui, nunca em `build_simulation`.
+        music=PenumbraMusic(game_loop.audio_engine, MUSIC_DIR),
+        interludes=load_interludes(INTERLUDES_PATH),
     )
     # O HUD e um callback GLOBAL (roda independente da cena no topo), entao
     # ele consulta `flow.hud_visible` -- senao desenha o rodape e os
@@ -182,6 +189,7 @@ def build_game(config: EngineConfig) -> GameLoop:
         visible=lambda: flow.hud_visible,
         unlocked=lambda: flow.unlocked,
         pads=lambda: game_loop.input_provider.connected_pads(),
+        tape=simulation.tape,
     )
 
     def draw_overlay(renderer) -> None:
@@ -203,7 +211,7 @@ def build_game(config: EngineConfig) -> GameLoop:
 
 
 def build_simulation(
-    config: EngineConfig, input_provider: Optional[IInputProvider] = None
+    config: EngineConfig, input_provider: IInputProvider | None = None
 ) -> Simulation:
     """
     Monta a mesma simulacao de `build_game` SEM abrir janela nem tocar
@@ -287,7 +295,11 @@ def _assemble(
     lumen_tile_collision = _find_lumen_tile_collision(world, umbra_tile_collision)
     tile_collision_systems = (lumen_tile_collision, umbra_tile_collision)
 
-    world.register_system(DualityControlSystem(input_provider, state, tuning, tile_collision_systems))
+    # Os sistemas que leem teclas recebem o `TapeInput`, e nao o teclado: no
+    # solo com eco ele troca a metade da Lumen por uma fita. Desligado, e
+    # transparente -- o jogo de sempre passa por ele sem saber.
+    tape_input = TapeInput(input_provider)
+    world.register_system(DualityControlSystem(tape_input, state, tuning, tile_collision_systems))
     world.register_system(LightFieldSystem(terrain, state, tuning, lumen_grid, umbra_grid))
     # Depois do LightFieldSystem: ele e quem atualiza `state.cell`, e o alvo
     # de ruptura e a celula vizinha a da Umbra. Romper aqui muta o `Terrain`,
@@ -297,7 +309,7 @@ def _assemble(
     world.register_system(WorldClockSystem(terrain, state, tuning))
     world.register_system(
         CrustBreakSystem(
-            input_provider, terrain, state, umbra_tile_collision,
+            tape_input, terrain, state, umbra_tile_collision,
             tuning.umbra.crust_break_seconds,
         )
     )
@@ -316,8 +328,10 @@ def _assemble(
 
     runtime = LevelRuntime(world, terrain, catalog, state, tuning)
     runtime.load(0)
+    tape = TapeSession(world, state, runtime, tape_input, grids=(lumen_grid, umbra_grid))
 
     return Simulation(
+        tape=tape,
         world=world,
         tuning=tuning,
         terrain=terrain,

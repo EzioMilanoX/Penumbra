@@ -4,11 +4,21 @@ version = "0.1.0"
 description = "Luz e Sombra: Dualidade -- puzzle-platformer cooperativo de um jogador so, sobre a OuroborosEngine"
 requires-python = ">=3.11"
 dependencies = [
-    "ouroboros-engine>=0.3.0",
+    "ouroboros-engine>=0.4.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# zip sem strict= e o comportamento atual em todo o jogo (pares de mesmo tamanho
+# por construcao); exigir strict= mudaria o contrato sem pegar bug nenhum.
+ignore = ["B905"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -22,9 +22,7 @@ from penumbra.state import (
     OUTCOME_PLAYING,
     UMBRA,
 )
-
 from penumbra.terrain import Terrain
-
 from tests.conftest import CELL_SIZE, FRAME, GRID_COLS, GRID_ROWS, advance, place, position
 
 

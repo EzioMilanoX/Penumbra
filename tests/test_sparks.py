@@ -12,14 +12,9 @@ faisca -- e o contrario faria um dos dois virar ruido.
 """
 from __future__ import annotations
 
-import numpy as np
-import pytest
-
 from penumbra.sparks import SparkField
-from penumbra.state import LUMEN, UMBRA
 from penumbra.systems.spark_system import SparkSystem
-
-from tests.conftest import advance, load_custom, place
+from tests.conftest import load_custom
 
 
 class _FakeRenderer:
@@ -118,7 +113,8 @@ class TestSparkField:
             )
 
     def test_cada_ser_se_desfaz_na_propria_cor(self):
-        from penumbra.sparks import LUMEN as LUMEN_TINT, UMBRA as UMBRA_TINT
+        from penumbra.sparks import LUMEN as LUMEN_TINT
+        from penumbra.sparks import UMBRA as UMBRA_TINT
 
         field = SparkField()
         field.died(10.0, 10.0, lumen=True)

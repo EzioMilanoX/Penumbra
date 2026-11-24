@@ -21,7 +21,6 @@ vez no `__init__`. `emit_burst` recebe arrays prontos e `update` e vetorizado
 from __future__ import annotations
 
 import numpy as np
-
 from ouroboros.core.particle_storage import ParticleStorage
 
 _CAPACITY = 360

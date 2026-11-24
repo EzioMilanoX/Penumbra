@@ -23,7 +23,6 @@ import json
 from pathlib import Path
 
 from penumbra.state import LUMEN, OUTCOME_FAILED, UMBRA
-
 from tests.conftest import advance, load_custom, place
 
 _BINDINGS = Path(__file__).resolve().parents[1] / "data" / "input_bindings" / "penumbra_keyboard.json"

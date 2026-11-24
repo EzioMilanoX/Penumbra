@@ -22,10 +22,8 @@ import numpy as np
 import pytest
 
 from penumbra.composition import SHADOW_HITBOX_POOL
-from penumbra.systems.presentation_system import (
-    _AIR_STRETCH, _LAND_RECOVER, _LAND_SQUASH, _STRETCH_LIMITS)
 from penumbra.state import LUMEN, UMBRA
-
+from penumbra.systems.presentation_system import _AIR_STRETCH, _LAND_RECOVER, _LAND_SQUASH, _STRETCH_LIMITS
 from tests.conftest import CELL_SIZE, advance, load_custom
 
 _ROOM = {
@@ -159,7 +157,7 @@ class TestNobodyFloats:
     ar, que e exatamente o oposto do que um baque diz."""
 
     def test_nenhum_dos_dois_descola_do_chao_ao_amassar(self, simulation, input_provider):
-        for meia_altura, side, nome in (
+        for meia_altura, _side, nome in (
             (simulation.tuning.lumen.half_height, LUMEN, "Lumen"),
             (simulation.tuning.umbra.half_height, UMBRA, "Umbra"),
         ):

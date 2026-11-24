@@ -21,14 +21,9 @@ O que estes testes guardam:
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
-from penumbra.backdrop import Backdrop
 from penumbra.backdrop import VOID
-from penumbra.systems.presentation_system import (
-    AIR_GLOW, AIR_GLOW_MAX_ALPHA, ROCK_LIT, ROCK_UNLIT)
 from penumbra.terrain import ROLE_EMPTY, ROLE_ROCK
-
 from tests.conftest import advance, load_custom
 
 

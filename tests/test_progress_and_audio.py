@@ -17,10 +17,9 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
-from penumbra import achievements, audio as audio_ids
-from penumbra.audio import AudioSystem, PenumbraAudio, _TONES
+from penumbra import achievements
+from penumbra import audio as audio_ids
+from penumbra.audio import _TONES, AudioSystem, PenumbraAudio
 from penumbra.progress import Progress
 
 

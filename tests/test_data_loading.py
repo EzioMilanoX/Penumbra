@@ -15,7 +15,6 @@ import pytest
 from penumbra.levels import LevelCatalog, LevelCatalogError
 from penumbra.terrain import Terrain, TerrainDefinitionError
 from penumbra.tuning import DualityTuning, TuningDefinitionError
-
 from tests.conftest import DIFFICULTY_PATH, GRID_COLS, GRID_ROWS, make_rows
 
 

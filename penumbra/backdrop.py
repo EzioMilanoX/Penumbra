@@ -30,8 +30,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from penumbra.systems.presentation_system import (
-    AIR_GLOW, AIR_GLOW_MAX_ALPHA, ROCK_LIT, ROCK_UNLIT)
+from penumbra.systems.presentation_system import AIR_GLOW, AIR_GLOW_MAX_ALPHA, ROCK_LIT, ROCK_UNLIT
+from penumbra.terrain import ROLE_ROCK
 
 VOID = (8, 8, 14)
 """A cor com que `IRenderer.begin_frame` limpa a tela.
@@ -39,7 +39,6 @@ VOID = (8, 8, 14)
 Precisa estar aqui porque o fundo entrega cor OPACA: o ar no escuro total tem
 de sair exatamente igual ao vazio atras dele, senao a metade apagada de cada
 fase ganha uma mancha com a forma da grade."""
-from penumbra.terrain import ROLE_EMPTY, ROLE_ROCK
 
 
 class Backdrop:

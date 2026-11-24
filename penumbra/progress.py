@@ -21,7 +21,6 @@ que alguem ja fez.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Set
 
 from ouroboros.bootstrap.save_file import SaveFile, default_save_path
 
@@ -46,19 +45,22 @@ class Progress:
     jogador ja fez.
     """
 
-    def __init__(self, level_count: int, path: Optional[Path] = None) -> None:
+    def __init__(self, level_count: int, path: Path | None = None) -> None:
         self._path = Path(path) if path is not None else default_path()
         self._file = SaveFile(self._path)
         self.level_count = int(level_count)
-        self.completed: List[bool] = [False] * self.level_count
-        self.shards: List[bool] = [False] * self.level_count
-        self.achievements: Set[str] = set()
-        self.ending_choice: Optional[str] = None
+        self.completed: list[bool] = [False] * self.level_count
+        self.shards: list[bool] = [False] * self.level_count
+        self.achievements: set[str] = set()
+        self.ending_choice: str | None = None
         self.duo = False
         # Ajustes. Moram no mesmo arquivo do progresso porque sao a mesma
         # pergunta pro jogador -- "como eu deixei isto da ultima vez?" -- e
         # dois arquivos dobrariam as chances de um deles nao abrir.
         self.volume = 0.7
+        self.music_volume = 0.5
+        """Separado do volume dos efeitos: a musica e fundo, e quem quer
+        silencio nela nao quer perder o aviso de perigo junto."""
         self.sound_on = True
         self.fullscreen = False
 
@@ -68,7 +70,7 @@ class Progress:
 
     # ------------------------------------------------------------------
 
-    def load(self) -> "Progress":
+    def load(self) -> Progress:
         """Le o save, ou fica no vazio. `SaveFile.read` nunca levanta --
         arquivo ausente, JSON corrompido ou raiz que nao e objeto viram `{}`,
         e cada campo abaixo tem o proprio default."""
@@ -83,6 +85,7 @@ class Progress:
         self.ending_choice = str(choice) if isinstance(choice, str) else None
         self.duo = bool(raw.get("duo", False))
         self.volume = _ratio(raw.get("volume"), 0.7)
+        self.music_volume = _ratio(raw.get("music_volume"), 0.5)
         self.sound_on = bool(raw.get("sound_on", True))
         self.fullscreen = bool(raw.get("fullscreen", False))
         return self
@@ -98,6 +101,7 @@ class Progress:
             "ending_choice": self.ending_choice,
             "duo": bool(self.duo),
             "volume": float(self.volume),
+            "music_volume": float(self.music_volume),
             "sound_on": bool(self.sound_on),
             "fullscreen": bool(self.fullscreen),
         }
@@ -113,7 +117,7 @@ def _ratio(value, fallback: float) -> float:
         return fallback
 
 
-def _flags(value, count: int) -> List[bool]:
+def _flags(value, count: int) -> list[bool]:
     """Lista de booleanos do tamanho do catalogo ATUAL, venha o que vier.
 
     Um save de uma versao com menos fases e completado com falso; um com

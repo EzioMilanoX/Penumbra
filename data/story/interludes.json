@@ -1,0 +1,35 @@
+{
+  "_nota": "As falas do jogo, uma na porta de cada capitulo. Curtas de proposito: quem joga quer a proxima fase, e o jogo fala tres vezes antes da pergunta do fim. Cada linha cabe na tela (ver tests/test_music_and_story.py).",
+  "interludes": [
+    {
+      "chapter": 1,
+      "title": "I · APRENDER",
+      "lines": [
+        "No começo havia uma fonte, e ela se partiu em dois.",
+        "Uma metade precisa de luz. A outra, de sombra.",
+        "Onde uma pisa, a outra cai. Sozinha, nenhuma chega.",
+        "E as duas não podem se tocar."
+      ]
+    },
+    {
+      "chapter": 2,
+      "title": "II · MISTURAR",
+      "lines": [
+        "Vocês já sabem o que cada metade faz.",
+        "Agora o que vocês fazem começa a brigar.",
+        "A luz que abre o caminho de uma fecha o da outra.",
+        "Não existe lado certo. Existe a ordem certa."
+      ]
+    },
+    {
+      "chapter": 3,
+      "title": "III · ESPECIAIS",
+      "lines": [
+        "Daqui em diante, nem o chão é neutro.",
+        "A fonte está perto. Dá para senti-la respirar.",
+        "Cada fragmento que vocês carregam é um pedaço dela.",
+        "No fim, ela vai perguntar o que vocês querem ser."
+      ]
+    }
+  ]
+}

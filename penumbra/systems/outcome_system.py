@@ -11,7 +11,7 @@ from __future__ import annotations
 from ouroboros.core.systems.base_system import ISystem
 from ouroboros.core.world import World
 
-from penumbra.state import DualityState, LUMEN, UMBRA
+from penumbra.state import LUMEN, TAPE_RECORD, UMBRA, DualityState
 from penumbra.terrain import Terrain
 from penumbra.tuning import DualityTuning
 
@@ -49,6 +49,11 @@ class OutcomeSystem(ISystem):
     fragmento da fonte. Ele nao entra na vitoria nem na derrota -- e um
     desvio opcional, e o que o torna interessante e que o caminho ate ele
     quase sempre pede a polaridade oposta a da rota obvia.
+
+    **Gravando o eco** (`state.tape_phase == TAPE_RECORD`) a Umbra ainda nao
+    chegou: fica no spawn, e nada aqui a mata, a encosta na Lumen ou a conta
+    num portal. So a Lumen vive esse tempo -- e e por isso que ela pode ser
+    gravada sozinha. Ver `penumbra.tape`.
     """
 
     def __init__(
@@ -66,6 +71,7 @@ class OutcomeSystem(ISystem):
         self._transform_pool = None
         self._position_x = [0.0, 0.0]
         self._position_y = [0.0, 0.0]
+        self._sides_alive = (LUMEN, UMBRA)
 
     def update(self, world: World, delta_time: float) -> None:
         if self._transform_pool is None:
@@ -74,6 +80,9 @@ class OutcomeSystem(ISystem):
         self._read_positions()
         if self._state.outcome != 0:
             return
+
+        # Gravando o eco, so a Lumen esta no mundo -- o mesmo laco, com um lado.
+        self._sides_alive = (LUMEN,) if self._state.tape_phase == TAPE_RECORD else (LUMEN, UMBRA)
 
         self._check_shard()
         self._check_void()
@@ -110,12 +119,14 @@ class OutcomeSystem(ISystem):
     def _check_void(self) -> None:
         terrain = self._terrain
         void_top = (terrain.rows - 1) * terrain.cell_size
-        for side in (LUMEN, UMBRA):
+        for side in self._sides_alive:
             if self._position_y[side] >= void_top:
                 self._state.fail(f"{self._state.side_name(side)} caiu no abismo.")
                 return
 
     def _check_contact(self) -> None:
+        if len(self._sides_alive) < 2:
+            return
         lumen, umbra = self._sides[LUMEN], self._sides[UMBRA]
         overlap_x = abs(self._position_x[LUMEN] - self._position_x[UMBRA]) < (lumen.half_width + umbra.half_width)
         overlap_y = abs(self._position_y[LUMEN] - self._position_y[UMBRA]) < (lumen.half_height + umbra.half_height)
@@ -124,7 +135,7 @@ class OutcomeSystem(ISystem):
 
     def _advance_peril(self, delta_time: float) -> None:
         state, light_tuning = self._state, self._tuning.light
-        for side in (LUMEN, UMBRA):
+        for side in self._sides_alive:
             col, row = int(state.cell[side, 0]), int(state.cell[side, 1])
             light_here = float(state.light[row, col])
             in_danger = (
@@ -158,5 +169,7 @@ class OutcomeSystem(ISystem):
                 abs(self._position_x[side] - goal_x) <= tolerance
                 and abs(self._position_y[side] - goal_y) <= tolerance
             )
+        if len(self._sides_alive) < 2:
+            return
         if bool(state.reached_goal[LUMEN]) and bool(state.reached_goal[UMBRA]):
             state.complete("Os dois portais responderam ao mesmo tempo.")

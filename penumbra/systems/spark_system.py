@@ -12,12 +12,11 @@ identico e fica sem poeira. E por isso que so e registrado em `build_game`.
 from __future__ import annotations
 
 import numpy as np
-
 from ouroboros.core.systems.base_system import ISystem
 from ouroboros.core.world import World
 
 from penumbra.sparks import SparkField
-from penumbra.state import DualityState, LUMEN, OUTCOME_COMPLETE, OUTCOME_FAILED, UMBRA
+from penumbra.state import LUMEN, OUTCOME_FAILED, UMBRA, DualityState
 from penumbra.terrain import Terrain
 
 

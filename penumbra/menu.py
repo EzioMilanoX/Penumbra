@@ -15,34 +15,32 @@ graca.
 """
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
-
 from ouroboros.interfaces.renderer import IRenderer
 
 from penumbra import achievements
 from penumbra.levels import LevelCatalog, LevelDefinition
 from penumbra.terrain import (
+    ROLE_ALTAR,
     ROLE_BEACON,
     ROLE_COUNTER_ETHER,
     ROLE_CRUST,
     ROLE_DOOR,
     ROLE_ECLIPSE,
     ROLE_ETHER,
+    ROLE_GLASS,
     ROLE_LAMP,
+    ROLE_LEVER,
     ROLE_LUMEN_GOAL,
     ROLE_PLATE,
     ROLE_ROCK,
     ROLE_SHARD,
-    ROLE_UMBRA_GOAL,
-    ROLE_ZONE_LIGHT,
-    ROLE_ZONE_SHADOW,
-    ROLE_ALTAR,
-    ROLE_WANDER,
-    ROLE_VEIL,
-    ROLE_GLASS,
     ROLE_SOURCE,
     ROLE_SOURCE_ALT,
-    ROLE_LEVER,
+    ROLE_UMBRA_GOAL,
+    ROLE_VEIL,
+    ROLE_WANDER,
+    ROLE_ZONE_LIGHT,
+    ROLE_ZONE_SHADOW,
     Terrain,
 )
 
@@ -124,7 +122,7 @@ class LevelPreview:
         terrain.load_rows(level.rows_for(duo))
         self.cols = terrain.cols
         self.rows = terrain.rows
-        self.cells: List[Tuple[int, int, Tuple[int, int, int, int]]] = []
+        self.cells: list[tuple[int, int, tuple[int, int, int, int]]] = []
         role = terrain.role
         for row in range(terrain.rows):
             for col in range(terrain.cols):
@@ -223,7 +221,7 @@ class LevelCardGrid:
             target -= 1
         self.selected = max(chapter.first, min(chapter.last, target))
 
-    def card_rect(self, index: int) -> Tuple[float, float, float, float]:
+    def card_rect(self, index: int) -> tuple[float, float, float, float]:
         local = index - self._catalog.chapter_of(index).first
         column = local % _COLUMNS
         row = local // _COLUMNS
@@ -239,8 +237,8 @@ class LevelCardGrid:
     def draw(
         self,
         renderer: IRenderer,
-        completed: List[bool],
-        shards: List[bool],
+        completed: list[bool],
+        shards: list[bool],
         duo: bool = False,
         pads: int = 0,
     ) -> None:
@@ -250,7 +248,7 @@ class LevelCardGrid:
         for index in range(chapter.first, chapter.last + 1):
             self._draw_card(renderer, index, completed[index], shards[index], duo)
 
-    def _draw_chapter_tabs(self, renderer: IRenderer, completed: List[bool]) -> None:
+    def _draw_chapter_tabs(self, renderer: IRenderer, completed: list[bool]) -> None:
         """Os capitulos numa linha, com o progresso de cada um.
 
         O capitulo corrente leva o nome por extenso e a legenda; os outros, so
@@ -307,6 +305,10 @@ class LevelCardGrid:
         if level.has_duo_variant:
             renderer.draw_text(preview_x + preview_w - 3.0, preview_y + 2.0, "2P", 10,
                                _GOLD if duo else _GOLD_DIM, anchor="topright")
+        # E a fase que, sozinho, da para jogar em laco com o proprio eco.
+        if level.has_echo and not duo:
+            renderer.draw_text(preview_x + 3.0, preview_y + 2.0, "ECO", 10,
+                               _GOLD if selected else _GOLD_DIM)
 
         renderer.draw_text(x + 9.0, y + height - 32.0, level.name, 12,
                            _TEXT if selected else _TEXT_DIM)
@@ -495,7 +497,9 @@ class MenuChrome:
         self.message = ""
 
     def draw(self, renderer: IRenderer, duo: bool, collected: int, total: int,
-             pads: int = 0) -> None:
+             pads: int = 0, echo: bool = False) -> None:
+        """`echo`: o card escolhido aceita o solo com eco -- o rodape passa a
+        dizer a tecla, que e a unica porta de entrada do modo."""
         width, height = renderer.get_viewport_size()
         renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
         center = width / 2.0
@@ -515,11 +519,14 @@ class MenuChrome:
 
         footer_y = height - 46.0
         renderer.draw_ui_rect(0.0, footer_y - 12.0, width, 1.0, _RULE)
-        renderer.draw_text(
-            center, footer_y,
-            "direcional escolher      A jogar      START sair" if pads
-            else "W/A/S/D escolher      ESPAÇO jogar      ESC sair",
-            12, _TEXT_DIM, anchor="center")
+        if echo:
+            line = ("direcional escolher    A jogar    Y solo com eco    START sair" if pads
+                    else "W/A/S/D escolher    ESPAÇO jogar    E solo com eco    ESC sair")
+        else:
+            line = ("direcional escolher      A jogar      START sair" if pads
+                    else "W/A/S/D escolher      ESPAÇO jogar      ESC sair")
+        renderer.draw_text(center, footer_y, line, 12, _GOLD if echo else _TEXT_DIM,
+                           anchor="center")
         if duo:
             controls = (("J1: controle" if pads >= 1 else "J1: A/D  ESPAÇO  S")
                         + "          "
@@ -862,10 +869,11 @@ class AchievementsScreen:
 
 OPTION_SOUND = 0
 OPTION_VOLUME = 1
-OPTION_FULLSCREEN = 2
-OPTION_ERASE = 3
+OPTION_MUSIC = 2
+OPTION_FULLSCREEN = 3
+OPTION_ERASE = 4
 
-_OPTION_ROWS = ("SOM", "VOLUME", "TELA CHEIA", "APAGAR PROGRESSO")
+_OPTION_ROWS = ("SOM", "EFEITOS", "MÚSICA", "TELA CHEIA", "APAGAR PROGRESSO")
 
 
 class OptionsScreen:
@@ -890,7 +898,7 @@ class OptionsScreen:
             self.confirm_erase = False
 
     def draw(self, renderer: IRenderer, sound_on: bool, volume: float,
-             fullscreen: bool, completed: int, total: int) -> None:
+             fullscreen: bool, completed: int, total: int, music: float = 0.5) -> None:
         width, height = renderer.get_viewport_size()
         renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
         center = width / 2.0
@@ -901,10 +909,11 @@ class OptionsScreen:
         values = (
             "ligado" if sound_on else "desligado",
             f"{int(round(volume * 100))}%",
+            f"{int(round(music * 100))}%",
             "sim" if fullscreen else "não",
             f"{completed} de {total} fases vencidas",
         )
-        top = 140.0
+        top = 132.0
         for index, label in enumerate(_OPTION_ROWS):
             y = top + index * 56.0
             chosen = index == self.selected
@@ -916,12 +925,13 @@ class OptionsScreen:
             renderer.draw_text(center + 244.0, y, values[index], 15,
                                _TEXT if chosen else _TEXT_DIM, anchor="topright")
 
-            if index == OPTION_VOLUME:
+            if index in (OPTION_VOLUME, OPTION_MUSIC):
                 # A barra e o unico valor daqui que se le melhor em forma que
-                # em numero: e a unica linha que muda em passos pequenos.
+                # em numero: sao as unicas linhas que mudam em passos pequenos.
+                level = volume if index == OPTION_VOLUME else music
                 bar_y = y + 26.0
                 renderer.draw_ui_rect(center - 244.0, bar_y, 488.0, 4.0, _RULE)
-                renderer.draw_ui_rect(center - 244.0, bar_y, 488.0 * volume, 4.0,
+                renderer.draw_ui_rect(center - 244.0, bar_y, 488.0 * level, 4.0,
                                       _GOLD if sound_on else _GOLD_DIM)
 
         if self.selected == OPTION_ERASE:
@@ -935,3 +945,43 @@ class OptionsScreen:
         renderer.draw_text(center, height - 72.0,
                            "W/S escolher      A/D ajustar      ESPAÇO alternar      ESC volta",
                            12, _TEXT_FAINT, anchor="center")
+
+
+INTERLUDE_LINE_SECONDS = 1.6
+"""Uma linha a cada 1,6 s: o tempo de ler uma frase curta e esperar a
+proxima. Quem nao quer esperar aperta ESPAÇO e ve tudo de uma vez."""
+_INTERLUDE_FADE = 0.7
+
+
+class InterludeScreen:
+    """A fala na porta de um capitulo: o titulo e as linhas, uma por vez.
+
+    Preto, branco e dourado, como o resto: o titulo do capitulo em dourado (e
+    a unica coisa da tela que pede os dois), o texto em branco baixo, e nada
+    desenhado alem disso -- uma tela de fala que tivesse imagem competiria
+    com a frase."""
+
+    def draw(self, renderer: IRenderer, interlude, elapsed: float, pads: int = 0) -> None:
+        width, height = renderer.get_viewport_size()
+        renderer.draw_ui_rect(0.0, 0.0, width, height, _VOID)
+        center = width / 2.0
+        renderer.draw_text(center, 150.0, interlude.title, 22, _GOLD, anchor="center")
+        renderer.draw_ui_rect(center - 160.0, 182.0, 320.0, 1.0, _RULE)
+
+        for index, line in enumerate(interlude.lines):
+            shown = elapsed - index * INTERLUDE_LINE_SECONDS
+            if shown <= 0.0:
+                break
+            fade = min(1.0, shown / _INTERLUDE_FADE)
+            tone = tuple(int(c * fade + v * (1.0 - fade)) for c, v in zip(_TEXT[:3], _VOID[:3])) + (255,)
+            renderer.draw_text(center, 230.0 + index * 40.0, line, 16, tone, anchor="center")
+
+        if interlude_done(interlude, elapsed):
+            renderer.draw_text(center, height - 60.0,
+                               "A continuar" if pads else "ESPAÇO continuar",
+                               12, _TEXT_FAINT, anchor="center")
+
+
+def interlude_done(interlude, elapsed: float) -> bool:
+    """Todas as linhas ja apareceram."""
+    return elapsed >= (len(interlude.lines) - 1) * INTERLUDE_LINE_SECONDS + _INTERLUDE_FADE

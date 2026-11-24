@@ -14,7 +14,6 @@ apenas uma lampada com outro nome.
 from __future__ import annotations
 
 from penumbra.state import LUMEN, UMBRA
-
 from tests.conftest import advance, load_custom, place
 
 # Lampada em (12,10) sobre uma ponte de eter, e um veu em (16,*) que corta a

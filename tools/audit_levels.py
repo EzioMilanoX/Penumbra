@@ -36,7 +36,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-
 from ouroboros.bootstrap.engine_config import EngineConfig
 
 from penumbra.composition import build_simulation
@@ -332,7 +331,8 @@ def main() -> int:
     light = simulation.tuning.light
     print(f"balanceamento: decaimento {light.decay_per_cell:.4f}/celula")
     print(
-        f"  lampada deixa eter solido em raio {(light.lamp_intensity - light.solid_threshold) * light.falloff_radius_cells:.2f} cel"
+        "  lampada deixa eter solido em raio "
+        f"{(light.lamp_intensity - light.solid_threshold) * light.falloff_radius_cells:.2f} cel"
         f" | Lumen segura em {(light.lamp_intensity - light.extinguish_below) * light.falloff_radius_cells:.2f} cel"
         f" | Umbra se dissolve em {(light.lamp_intensity - light.dissolve_above) * light.falloff_radius_cells:.2f} cel"
     )

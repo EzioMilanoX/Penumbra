@@ -22,12 +22,12 @@ A paleta sonora obedece a mesma lei da paleta visual:
 """
 from __future__ import annotations
 
-from typing import Optional
+from pathlib import Path
 
 from ouroboros.core.systems.base_system import ISystem
 from ouroboros.core.world import World
 
-from penumbra.state import DualityState, LUMEN, OUTCOME_COMPLETE, OUTCOME_FAILED, UMBRA
+from penumbra.state import LUMEN, OUTCOME_COMPLETE, OUTCOME_FAILED, UMBRA, DualityState
 from penumbra.terrain import Terrain
 
 # --- vozes dos dois seres ---
@@ -116,6 +116,72 @@ class PenumbraAudio:
         if not self.enabled:
             return
         self._engine.play_one_shot(sound_id, volume=max(0.0, min(1.0, volume * self.volume)))
+
+
+MUSIC_FILES = {1: "capitulo_1.wav", 2: "capitulo_2.wav", 3: "capitulo_3.wav"}
+"""Capitulo -> faixa em `data/music/`. Os arquivos saem de
+`tools/generate_music.py`; nenhum e de terceiros."""
+
+
+class PenumbraMusic:
+    """
+    O fundo: uma faixa por capitulo, em laco.
+
+    O jogo tinha voz e nao tinha fundo -- `load_track`/`play_track` existiam na
+    engine e ninguem chamava. A faixa segue o CAPITULO e nao a fase: trocar de
+    musica a cada fase de 20 s seria um corte por minuto, e o que muda de um
+    capitulo para o outro e justamente o que ele pede de quem joga.
+
+    Como o resto do audio, so existe em `build_game`: removida, o jogo fica
+    identico e sem fundo. Faixa ausente no disco vira silencio, nunca erro --
+    musica nao pode ser o motivo de o jogo nao abrir.
+    """
+
+    def __init__(self, engine, directory) -> None:
+        self._engine = engine
+        self.current: int | None = None
+        self.available: set[int] = set()
+        self.enabled = True
+        self.volume = 0.5
+        if engine is None:
+            return
+        for chapter, name in MUSIC_FILES.items():
+            path = Path(directory) / name
+            if path.is_file():
+                engine.load_track(self._track_id(chapter), str(path))
+                self.available.add(chapter)
+
+    @staticmethod
+    def _track_id(chapter: int) -> str:
+        return f"penumbra_capitulo_{chapter}"
+
+    def apply(self, enabled: bool, volume: float) -> None:
+        """Som desligado cala tambem a musica; o volume dela e proprio."""
+        self.enabled = bool(enabled)
+        self.volume = max(0.0, min(1.0, float(volume)))
+        if self._engine is not None:
+            self._engine.set_track_volume(self.volume if self.enabled else 0.0)
+
+    def play_chapter(self, chapter: int) -> None:
+        """Toca a faixa do capitulo -- e nao recomeca a que ja esta tocando:
+        passar de uma fase para a seguinte do mesmo capitulo nao e um corte."""
+        if self._engine is None or chapter == self.current:
+            return
+        if chapter not in self.available:
+            self.stop()
+            return
+        try:
+            self._engine.play_track(self._track_id(chapter), loop=True)
+        except Exception:   # mixer sem dispositivo, arquivo ilegivel: fica mudo
+            self.current = None
+            return
+        self._engine.set_track_volume(self.volume if self.enabled else 0.0)
+        self.current = chapter
+
+    def stop(self) -> None:
+        if self._engine is not None and self.current is not None:
+            self._engine.stop_track(self._track_id(self.current))
+        self.current = None
 
 
 class AudioSystem(ISystem):

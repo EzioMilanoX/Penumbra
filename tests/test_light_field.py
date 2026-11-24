@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 from penumbra.state import LUMEN, UMBRA
-
 from tests.conftest import advance, load_custom, place
 
 # Uma unica lampada no meio do vazio (linha 4, coluna 14), com chao de rocha

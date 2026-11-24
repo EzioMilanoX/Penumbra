@@ -24,9 +24,7 @@ from pathlib import Path
 import pytest
 
 from penumbra.levels import LevelCatalog, LevelCatalogError
-from penumbra.state import LUMEN, UMBRA
 from penumbra.terrain import Terrain
-
 from tests.conftest import GRID_COLS, GRID_ROWS, advance
 
 _LEVELS_DIR = Path(__file__).resolve().parents[1] / "data" / "levels"

@@ -15,11 +15,9 @@ solvel em polaridade e nunca perguntou se os pes alcancavam.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from penumbra.reachability import JumpModel, TraversalGraph, solid_mask
 from penumbra.terrain import Terrain
-
 from tests.conftest import GRID_COLS, GRID_ROWS, make_rows
 
 
@@ -129,7 +127,7 @@ class TestShippedLevelGeometry:
         Se nenhuma fase ficar intransponivel com a crosta intacta, romper
         virou decoracao."""
         obrigatoria_em = []
-        for index, level in self._levels(simulation):
+        for _index, level in self._levels(simulation):
             terrain = simulation.terrain
             if not terrain.crust.any():
                 continue
