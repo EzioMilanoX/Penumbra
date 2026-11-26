@@ -2,7 +2,7 @@
 
 As notas de cada versão, escritas para quem joga.
 
-## Ainda sem versão
+## v0.2.0 — Solo com eco (2026-11-26)
 
 **Solo com eco** — as fases de dupla, sozinho, sem afrouxar nada
 - Nas fases marcadas com **ECO** no card (13 · Sob o Vidro, 27 · Sem Rocha e 30 · A Fonte Aberta), aperte **E** em vez de ESPAÇO.
